@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data
+data/saves/*
+!data/saves/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Generated media (future Imagine / voice assets)
+data/media/

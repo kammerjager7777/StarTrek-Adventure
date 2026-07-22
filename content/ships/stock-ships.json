@@ -1,0 +1,89 @@
+[
+  {
+    "id": "nx-01",
+    "name": "USS Enterprise NX-01",
+    "className": "NX class",
+    "era": "22nd century (Enterprise era)",
+    "stardate": "2151.4",
+    "description": "Humanity's first Warp 5 starship — pioneering, lightly armed, and bold.",
+    "capabilities": [
+      "Warp 5",
+      "Phase cannons",
+      "Spatial torpedoes",
+      "Limited transporter"
+    ],
+    "crew": [
+      { "name": "T'Pol", "role": "Science Officer / First Officer", "species": "Vulcan" },
+      { "name": "Malcolm Reed", "role": "Armory Officer", "species": "Human" },
+      { "name": "Hoshi Sato", "role": "Communications", "species": "Human" },
+      { "name": "Trip Tucker", "role": "Chief Engineer", "species": "Human" }
+    ]
+  },
+  {
+    "id": "ncc-1701",
+    "name": "USS Enterprise NCC-1701",
+    "className": "Constitution class",
+    "era": "23rd century (TOS era)",
+    "stardate": "2265.2",
+    "description": "Legendary explorer of the five-year mission — balanced science and combat.",
+    "capabilities": [
+      "Warp 8",
+      "Phasers",
+      "Photon torpedoes",
+      "Deflector shields",
+      "Transporters"
+    ],
+    "crew": [
+      { "name": "Spock", "role": "Science Officer / First Officer", "species": "Vulcan-Human" },
+      { "name": "Leonard McCoy", "role": "Chief Medical Officer", "species": "Human" },
+      { "name": "Nyota Uhura", "role": "Communications", "species": "Human" },
+      { "name": "Montgomery Scott", "role": "Chief Engineer", "species": "Human" }
+    ]
+  },
+  {
+    "id": "ncc-1701-d",
+    "name": "USS Enterprise NCC-1701-D",
+    "className": "Galaxy class",
+    "era": "24th century (TNG era)",
+    "stardate": "46357.4",
+    "description": "Flagship of the Federation — diplomacy, science, and family aboard a city among the stars.",
+    "capabilities": [
+      "Warp 9.6",
+      "Phaser arrays",
+      "Photon & quantum-ready launchers",
+      "High-capacity shields",
+      "Holodecks",
+      "Saucer separation"
+    ],
+    "crew": [
+      { "name": "William T. Riker", "role": "First Officer", "species": "Human" },
+      { "name": "Data", "role": "Operations Officer", "species": "Android" },
+      { "name": "Worf", "role": "Tactical / Security", "species": "Klingon" },
+      { "name": "Deanna Troi", "role": "Counselor", "species": "Betazoid-Human" },
+      { "name": "Geordi La Forge", "role": "Chief Engineer", "species": "Human" },
+      { "name": "Beverly Crusher", "role": "Chief Medical Officer", "species": "Human" }
+    ]
+  },
+  {
+    "id": "ncc-74656",
+    "name": "USS Voyager NCC-74656",
+    "className": "Intrepid class",
+    "era": "late 24th century (Voyager era)",
+    "stardate": "48315.6",
+    "description": "Agile long-range explorer — adaptable, resourceful, far from home.",
+    "capabilities": [
+      "Warp 9.975",
+      "Bio-neural circuitry",
+      "Variable geometry pylons",
+      "Advanced sensors",
+      "Compact tactical suite"
+    ],
+    "crew": [
+      { "name": "Chakotay", "role": "First Officer", "species": "Human" },
+      { "name": "Tuvok", "role": "Tactical / Security", "species": "Vulcan" },
+      { "name": "B'Elanna Torres", "role": "Chief Engineer", "species": "Klingon-Human" },
+      { "name": "The Doctor", "role": "Emergency Medical Hologram", "species": "Hologram" },
+      { "name": "Seven of Nine", "role": "Astrometrics / Specialist", "species": "Human (ex-Borg)" }
+    ]
+  }
+]
