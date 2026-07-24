@@ -65,3 +65,12 @@ export async function listSaves(): Promise<
   }
   return runs.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
+
+export async function deleteSave(runId: string): Promise<boolean> {
+  try {
+    await fs.unlink(savePath(runId));
+    return true;
+  } catch {
+    return false;
+  }
+}

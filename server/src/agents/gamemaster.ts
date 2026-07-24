@@ -1,147 +1,44 @@
 /**
- * GamemasterAgent (Narrotator)
- * Phase 1: structured setup + play via mock or xAI.
- * Future: ImagineAgent is separate; this agent only proposes viewscreenPrompt text.
+ * GamemasterAgent (Narrator)
+ * Setup: state machine + **AI-generated** Trek-aligned content (ships, missions, greetings).
+ * Playing / freeform / debrief: **LLM only** — no mock narration fallbacks.
+ * Code remains referee for dice, integrity, and tool application.
  */
 
-import OpenAI from "openai";
 import { randomUUID } from "node:crypto";
 import type {
   Difficulty,
   GameState,
-  Mission,
   MissionType,
+  OptionRisk,
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
-import { loadSkillPacks, loadStockShips, shipChoicesText, templateToShip } from "../content/loader.js";
-
-const MISSION_SEEDS: Record<
-  MissionType,
-  Array<{ title: string; summary: string; location: string; main: string; secondaries: string[] }>
-> = {
-  science: [
-    {
-      title: "The Whispering Lattice",
-      summary: "A crystalline subspace lattice is rewriting local physics near a research outpost.",
-      location: "Sector 441-B, lattice perimeter",
-      main: "Stabilize or safely dismantle the lattice before the outpost is lost",
-      secondaries: [
-        "Recover the outpost's research logs",
-        "Evacuate remaining scientists",
-      ],
-    },
-    {
-      title: "Chroniton Bloom",
-      summary: "Temporal micro-anomalies are aging crew equipment in minutes.",
-      location: "Nebula R-9",
-      main: "Identify the chroniton source and neutralize the bloom",
-      secondaries: ["Protect the ship's bio-neural systems", "Map safe transit corridors"],
-    },
-    {
-      title: "Silent Algorithm",
-      summary: "A derelict AI probe is broadcasting a mathematical plea no one can parse.",
-      location: "Deep space buoy chain",
-      main: "Decode the probe's message without triggering its defense protocols",
-      secondaries: ["Preserve the probe intact", "Prevent signal contamination of nearby colonies"],
-    },
-  ],
-  exploration: [
-    {
-      title: "First Light of Ka'reth",
-      summary: "A pre-warp civilization has lit its first city-wide power grid — and detected your ship.",
-      location: "Ka'reth system",
-      main: "Uphold non-interference while preventing a cultural catastrophe",
-      secondaries: ["Identify the faction that spotted you", "Secure a quiet withdrawal path"],
-    },
-    {
-      title: "The Hollow Moon",
-      summary: "A moon-sized construct opens every 19 years. It opened early.",
-      location: "Outer rim of the Talis Expanse",
-      main: "Explore the construct and determine its purpose",
-      secondaries: ["Establish peaceful contact if inhabitants exist", "Chart an exit before the aperture closes"],
-    },
-    {
-      title: "Cartographer's Debt",
-      summary: "Starfleet needs a safe corridor through disputed space claimed by two rival powers.",
-      location: "Border shoals of the Veylan Reach",
-      main: "Chart a navigable corridor accepted by both powers",
-      secondaries: ["Avoid sparking a border war", "Recover a missing survey drone"],
-    },
-  ],
-  search_rescue: [
-    {
-      title: "Mayday from the Winter Finch",
-      summary: "A civilian freighter's distress call cuts out mid-sentence near a plasma storm.",
-      location: "Plasma storm front, grid 12",
-      main: "Locate and rescue the Winter Finch survivors",
-      secondaries: ["Salvage the freighter's cargo manifests", "Identify what attacked them"],
-    },
-    {
-      title: "Away Team Overdue",
-      summary: "An away team from another starship missed two check-ins on a Class-L world.",
-      location: "Surface of PX-220",
-      main: "Recover the away team alive",
-      secondaries: ["Preserve local ecosystem balance", "Retrieve their tricorder data"],
-    },
-    {
-      title: "Colony Blackout",
-      summary: "New Hope Colony went silent after reporting 'visitors under the ice.'",
-      location: "New Hope Colony",
-      main: "Restore contact and ensure colonist survival",
-      secondaries: ["Determine the nature of the visitors", "Re-establish planetary defenses"],
-    },
-  ],
-  battle: [
-    {
-      title: "Ambush at Relay 9",
-      summary: "A critical subspace relay is under attack by raiders using stolen cloaking tech.",
-      location: "Relay 9",
-      main: "Defend the relay until reinforcements arrive",
-      secondaries: ["Minimize civilian traffic losses", "Capture a raider officer for intelligence"],
-    },
-    {
-      title: "The Broken Line",
-      summary: "Two allied frigates are pinned; a third hostile squadron is inbound.",
-      location: "Kessik Flats",
-      main: "Break the enemy pincer and extract the frigates",
-      secondaries: ["Keep your ship above 40% integrity", "Protect the medical transport in the formation"],
-    },
-    {
-      title: "Ghost Torpedoes",
-      summary: "Unmarked torpedoes are striking border outposts with no launch signatures.",
-      location: "Border outpost chain",
-      main: "Identify and stop the source of the ghost torpedoes",
-      secondaries: ["Prevent an outpost cascade failure", "Avoid open war with the nearest power"],
-    },
-  ],
-  expanded: [
-    {
-      title: "Council of Knives",
-      summary: "A peace summit, a missing ambassador, and a sabotage plot unfold at once.",
-      location: "Neutral station Orryx",
-      main: "Prevent war while recovering the ambassador",
-      secondaries: [
-        "Expose the saboteur",
-        "Keep at least two factions at the table",
-        "Protect station civilian decks",
-      ],
-    },
-    {
-      title: "Eclipse Protocol",
-      summary: "A stellar engineering project is failing — and three fleets disagree on who is to blame.",
-      location: "Binary star Velara",
-      main: "Avert stellar catastrophe and a multi-fleet battle",
-      secondaries: ["Secure scientific cooperation", "Stop a false-flag attack", "Evacuate research habitats"],
-    },
-    {
-      title: "The Long Siege",
-      summary: "A colony under siege needs supplies, diplomacy, and a surgical strike — in the wrong order.",
-      location: "Colony world Marris III",
-      main: "Lift the siege without glassing the planet",
-      secondaries: ["Negotiate a humanitarian corridor", "Disable the siege command ship", "Rescue hostages"],
-    },
-  ],
-};
+import { tracedTool } from "../debug/sessionDebugLog.js";
+import {
+  generateDebriefNarration,
+  generateFreeformScene,
+  generateOpeningScene,
+  generatePlayScene,
+  isLlmConfigured,
+  type LlmScene,
+  type MechanicalResults,
+} from "./llmGamemaster.js";
+import {
+  formatShipChoices,
+  generateCustomShip,
+  generateDifficultyPrompt,
+  generateMissionBrief,
+  generateMissionOffers,
+  generateMissionTypePrompt,
+  generateOpeningGreeting,
+  generateShipOffers,
+  generateTutorialBeat,
+  generateWelcomeAndTutorialOffer,
+  missionFromOffer,
+  shipOfferToShip,
+  type SetupMissionOffer,
+  type SetupShipOffer,
+} from "./setupContent.js";
 
 function numbered(options: string[]): TurnOption[] {
   return options.map((text, i) => ({
@@ -161,6 +58,80 @@ function pushLog(state: GameState, kind: GameState["log"][0]["kind"], text: stri
   };
 }
 
+/** Title-case names: "picard" → "Picard", "jean-luc picard" → "Jean-Luc Picard" */
+function capitalizeName(raw: string): string {
+  return raw
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) =>
+      word
+        .split("-")
+        .map((part) => {
+          if (!part) return part;
+          // Preserve all-caps short tokens (II, III) if already uppercase multi-letter roman-ish
+          if (/^[IVXLCDM]+$/i.test(part) && part.length <= 5 && part === part.toUpperCase()) {
+            return part.toUpperCase();
+          }
+          // O'brien / o'brien → O'Brien
+          if (part.includes("'")) {
+            return part
+              .split("'")
+              .map((p, i) =>
+                p
+                  ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
+                  : p
+              )
+              .join("'");
+          }
+          return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        })
+        .join("-")
+    )
+    .join(" ");
+}
+
+/** Ensure custom Starfleet vessels use the USS registry prefix. */
+function ensureUssShipName(raw: string): string {
+  let name = capitalizeName(raw);
+  // Strip a leading USS so we never double-prefix ("uss uss enterprise")
+  name = name.replace(/^U\.?S\.?S\.?\s+/i, "").trim();
+  if (!name) name = "Unnamed";
+  return `USS ${name}`;
+}
+
+/** Resolve "1" / "2" into the full multiple-choice label for mission logs. */
+export function resolveChoiceLabel(
+  input: string,
+  choices: TurnOption[] | null | undefined
+): string {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+
+  // Client often sends "1. Full option text" already — keep it as-is
+  // so we never re-map the number onto a *later* choice list.
+  if (/^\d+\.\s+\S/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const id = parseChoice(trimmed, choices);
+  if (id != null && choices?.length) {
+    const opt = choices.find((c) => c.id === id);
+    if (opt?.text) {
+      return `${opt.id}. ${opt.text}`;
+    }
+  }
+  return trimmed;
+}
+
+function logPlayerChoice(
+  state: GameState,
+  input: string,
+  choices: TurnOption[] | null | undefined = state.pendingChoices
+): GameState {
+  return pushLog(state, "player", resolveChoiceLabel(input, choices));
+}
+
 export async function advanceSetup(
   state: GameState,
   playerText: string
@@ -172,58 +143,56 @@ export async function advanceSetup(
     case "boot":
     case "ask_name": {
       if (state.phase === "boot") {
+        const greeting = await setupCall("opening greeting", () =>
+          generateOpeningGreeting(next)
+        );
         next = {
           ...next,
           phase: "ask_name",
-          pendingQuestion:
-            "I am the Narrotator, your Gamemaster. Before we cast off — what is your name, Captain?",
+          pendingQuestion: greeting,
           pendingChoices: null,
         };
         return pushLog(next, "narration", next.pendingQuestion!);
       }
       if (!input) {
-        next.pendingQuestion = "I must know how to address you. What is your name?";
+        next.pendingQuestion =
+          "I must know how to address you. What is your name, Captain?";
         return next;
       }
-      next.playerName = input;
+      const captainName = capitalizeName(input);
+      next.playerName = captainName;
+      const welcome = await setupCall("welcome", () =>
+        generateWelcomeAndTutorialOffer(next, captainName)
+      );
       next.phase = "tutorial_offer";
-      next.pendingQuestion = `Welcome aboard, Captain ${input}. Would you like to run an optional tutorial mission first?`;
-      next.pendingChoices = numbered([
-        "Yes — teach me the ropes (tutorial)",
-        "No — take me to ship selection",
-      ]);
-      return pushLog(next, "player", input);
+      next.pendingQuestion = welcome.narration;
+      next.pendingChoices = numbered(welcome.choices);
+      return logPlayerChoice(next, captainName, state.pendingChoices);
     }
 
     case "tutorial_offer": {
       const choice = parseChoice(input, next.pendingChoices);
       if (choice === 1) {
         next.settings = { ...next.settings, tutorialCompleted: false };
+        const beat = await setupCall("tutorial", () =>
+          generateTutorialBeat(next)
+        );
         next.phase = "tutorial";
-        next.pendingQuestion =
-          "Tutorial: You will face one simple decision. Options are numbered; pick only one. Risky actions may call for a d20. Choose:";
-        next.pendingChoices = numbered([
-          "Scan the anomaly carefully before approaching (safer)",
-          "Charge in at full impulse to impress the crew (risky)",
-        ]);
+        next.pendingQuestion = beat.narration;
+        next.pendingChoices = numbered(beat.choices);
         next.turn = {
           sceneId: "tutorial-1",
-          narration: next.pendingQuestion,
-          crewDialogue: [
-            {
-              speaker: "Operations",
-              line: "Captain, sensors show a low-risk training buoy. Perfect for a drill.",
-            },
-          ],
+          narration: beat.narration,
+          crewDialogue: [beat.crewLine],
           options: next.pendingChoices,
-          viewscreenPrompt: "Starship bridge viewscreen showing a distant training buoy",
+          viewscreenPrompt: beat.viewscreenPrompt,
         };
       } else if (choice === 2) {
         next = await goShipSelect(next);
       } else {
         next.pendingQuestion = "Please select option 1 or 2.";
       }
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "tutorial": {
@@ -247,53 +216,48 @@ export async function advanceSetup(
         );
       }
       next = await goShipSelect(next);
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "ship_select": {
-      const ships = await loadStockShips();
+      const ships = (next.setupShips || []) as SetupShipOffer[];
       const choice = parseChoice(input, next.pendingChoices);
       if (choice && choice >= 1 && choice <= ships.length) {
-        next.ship = templateToShip(ships[choice - 1]);
-        next.phase = "mission_type";
-        next.pendingQuestion = `You have the bridge of ${next.ship.name}. What manner of mission do you seek?`;
-        next.pendingChoices = numbered([
-          "Science — technology and problem-solving",
-          "Exploration — discovery and diplomacy",
-          "Search & Rescue — find and save those in peril",
-          "Battle — starship combat and strategy",
-          "Expanded — complex multi-skill Hardcore scenario",
-        ]);
+        next.ship = shipOfferToShip(ships[choice - 1]);
+        next.setupShips = null;
+        next = await goMissionType(next);
       } else if (choice === ships.length + 1 || /custom/i.test(input)) {
         next.phase = "ship_custom";
         next.setupNotes = [];
+        next.setupShips = null;
         next.pendingQuestion =
-          "Custom vessel. First: what is your ship's name?";
+          "A custom vessel, then. What shall we name her, Captain?";
         next.pendingChoices = null;
       } else {
-        next.pendingQuestion = "Select a numbered ship, or choose the custom option.";
+        next.pendingQuestion =
+          "Select a numbered ship, or choose the custom option.";
       }
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "ship_custom": {
-      // Simple multi-step custom ship via setupNotes length
       if (next.setupNotes.length === 0) {
         if (!input) {
           next.pendingQuestion = "What is your ship's name?";
           return next;
         }
-        next.setupNotes = [input];
+        const shipName = ensureUssShipName(input);
+        next.setupNotes = [shipName];
         next.pendingQuestion =
-          "Select a ship class:\n1. Galaxy class\n2. Intrepid class\n3. Constitution class\n4. Shepard class\n5. Type another class name";
+          "Select a ship class, or type another class name:";
         next.pendingChoices = numbered([
           "Galaxy class",
           "Intrepid class",
           "Constitution class",
           "Shepard class",
-          "Other (type the class after selecting 5, or just type it)",
+          "Other (type the class name)",
         ]);
-        return pushLog(next, "player", input);
+        return logPlayerChoice(next, shipName, state.pendingChoices);
       }
       if (next.setupNotes.length === 1) {
         const classes = [
@@ -303,85 +267,38 @@ export async function advanceSetup(
           "Shepard class",
         ];
         const choice = parseChoice(input, next.pendingChoices);
-        let className = input;
+        let className = input.trim();
         if (choice && choice <= 4) className = classes[choice - 1];
-        else if (choice === 5) className = "Custom class";
+        else if (choice === 5) {
+          next.pendingQuestion =
+            "Type the class name for your vessel (e.g. Sovereign class).";
+          next.pendingChoices = null;
+          next.setupNotes = [...next.setupNotes, "__await_class__"];
+          return logPlayerChoice(next, input, state.pendingChoices);
+        }
         next.setupNotes = [...next.setupNotes, className];
-        // Build ship
-        const eraGuess = className.includes("Constitution")
-          ? "23rd century"
-          : className.includes("Shepard")
-            ? "mid-23rd century"
-            : "24th century";
-        const stardate = className.includes("Constitution")
-          ? "2268.1"
-          : className.includes("Shepard")
-            ? "2259.4"
-            : "47600.2";
-        next.ship = {
-          id: randomUUID(),
-          name: next.setupNotes[0],
-          className,
-          era: eraGuess,
-          stardate,
-          description: `Custom ${className} under your command.`,
-          capabilities: ["Warp drive", "Phasers", "Photon torpedoes", "Shields", "Sensors"],
-          integrity: 100,
-          maxIntegrity: 100,
-          systems: {
-            shields: "ok",
-            torpedoes: "ok",
-            warp: "ok",
-            communications: "ok",
-            sensors: "ok",
-            lifeSupport: "ok",
-          },
-          crew: [
-            {
-              id: randomUUID(),
-              name: "Cmdr. Arel Voss",
-              role: "First Officer",
-              species: "Human",
-              imageUrl: null,
-              loyalty: 55,
-            },
-            {
-              id: randomUUID(),
-              name: "Lt. Soven",
-              role: "Science Officer",
-              species: "Vulcan",
-              imageUrl: null,
-              loyalty: 50,
-            },
-            {
-              id: randomUUID(),
-              name: "Lt. Kira Mendez",
-              role: "Tactical",
-              species: "Human",
-              imageUrl: null,
-              loyalty: 50,
-            },
-            {
-              id: randomUUID(),
-              name: "Lt. Cmdr. Oryn",
-              role: "Chief Engineer",
-              species: "Tellarite",
-              imageUrl: null,
-              loyalty: 50,
-            },
-          ],
-          scars: [],
-        };
-        next.phase = "mission_type";
-        next.pendingChoices = numbered([
-          "Science — technology and problem-solving",
-          "Exploration — discovery and diplomacy",
-          "Search & Rescue — find and save those in peril",
-          "Battle — starship combat and strategy",
-          "Expanded — complex multi-skill Hardcore scenario",
-        ]);
-        next.pendingQuestion = `The ${next.ship.name} (${className}, stardate ${stardate}) is ready. Crew stands by. What mission type?`;
-        return pushLog(next, "player", input);
+        next.ship = await setupCall("custom ship", () =>
+          generateCustomShip(next, next.setupNotes[0], className)
+        );
+        next = await goMissionType(next);
+        return logPlayerChoice(next, input, state.pendingChoices);
+      }
+      // Free-typed class after selecting "Other"
+      if (
+        next.setupNotes.length === 2 &&
+        next.setupNotes[1] === "__await_class__"
+      ) {
+        if (!input) {
+          next.pendingQuestion = "Type the class name for your vessel.";
+          return next;
+        }
+        const className = capitalizeName(input);
+        next.setupNotes = [next.setupNotes[0], className];
+        next.ship = await setupCall("custom ship", () =>
+          generateCustomShip(next, next.setupNotes[0], className)
+        );
+        next = await goMissionType(next);
+        return logPlayerChoice(next, className, state.pendingChoices);
       }
       return next;
     }
@@ -404,11 +321,9 @@ export async function advanceSetup(
         next.difficulty = "hardcore";
         next = await offerMissions(next);
       } else {
-        next.phase = "difficulty";
-        next.pendingQuestion = "Select difficulty:";
-        next.pendingChoices = numbered(["Easy", "Medium", "Hard", "Hardcore"]);
+        next = await goDifficulty(next);
       }
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "difficulty": {
@@ -425,43 +340,39 @@ export async function advanceSetup(
       }
       next.difficulty = map[choice];
       next = await offerMissions(next);
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "mission_offer": {
       if (/more/i.test(input)) {
         next = await offerMissions(next, true);
-        return pushLog(next, "player", input);
+        return logPlayerChoice(next, input, state.pendingChoices);
       }
       const choice = parseChoice(input, next.pendingChoices);
-      const offers = next.missionOffers || [];
+      const offers = (next.missionOffers || []) as SetupMissionOffer[];
       if (!choice || choice < 1 || choice > offers.length) {
         next.pendingQuestion =
           "Select a mission by number, or type 'more' for new options.";
         return next;
       }
       const pick = offers[choice - 1];
-      const seed = findSeed(pick.type, pick.title);
-      const mission = buildMission(pick, seed, next.difficulty || "medium");
-      next.mission = mission;
-      next.phase = "mission_brief";
-      next.pendingQuestion = formatBrief(next);
-      next.pendingChoices = numbered([
-        "Accept mission and take the bridge",
-        "Return to mission list",
-      ]);
-      return pushLog(next, "player", input);
+      next.mission = missionFromOffer(
+        toSetupMissionOffer(pick),
+        next.difficulty || "medium"
+      );
+      next = await goMissionBrief(next);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     case "mission_brief": {
       const choice = parseChoice(input, next.pendingChoices);
       if (choice === 2) {
         next = await offerMissions(next);
-        return pushLog(next, "player", input);
+        return logPlayerChoice(next, input, state.pendingChoices);
       }
       if (choice === 1) {
-        next = startPlaying(next);
-        return pushLog(next, "player", input);
+        next = await startPlaying(next);
+        return logPlayerChoice(next, input, state.pendingChoices);
       }
       next.pendingQuestion = "Select 1 to begin or 2 to return to the list.";
       return next;
@@ -480,17 +391,7 @@ export async function advanceSetup(
         next.turn = null;
         next.debrief = null;
         next.missionOffers = null;
-        next.phase = "mission_type";
         next.status = "active";
-        next.pendingQuestion = `Captain ${next.playerName}, what manner of mission next?`;
-        next.pendingChoices = numbered([
-          "Science",
-          "Exploration",
-          "Search & Rescue",
-          "Battle",
-          "Expanded (Hardcore)",
-        ]);
-        // Repair ship partially between missions for Phase 1
         if (next.ship) {
           next.ship = {
             ...next.ship,
@@ -500,8 +401,9 @@ export async function advanceSetup(
             ),
           };
         }
+        next = await goMissionType(next);
       }
-      return pushLog(next, "player", input);
+      return logPlayerChoice(next, input, state.pendingChoices);
     }
 
     default:
@@ -509,324 +411,645 @@ export async function advanceSetup(
   }
 }
 
+/** Normalize a stored mission offer into a full SetupMissionOffer. */
+function toSetupMissionOffer(
+  pick: NonNullable<GameState["missionOffers"]>[number]
+): SetupMissionOffer {
+  return {
+    id: pick.id,
+    title: pick.title,
+    summary: pick.summary,
+    type: pick.type,
+    location: pick.location || "Uncharted space",
+    background: pick.background || pick.summary,
+    main: pick.main || "Complete the primary Starfleet objective",
+    secondaries:
+      pick.secondaries && pick.secondaries.length
+        ? pick.secondaries
+        : ["Support allied vessels and uphold Federation principles"],
+  };
+}
+
+async function setupCall<T>(purpose: string, fn: () => Promise<T>): Promise<T> {
+  requireLlm();
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof LlmNarratorError) throw err;
+    throw new LlmNarratorError(
+      `Narrator failed to generate ${purpose}.`,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 async function goShipSelect(state: GameState): Promise<GameState> {
-  const ships = await loadStockShips();
-  const choices = [
-    ...ships.map((s) => `${s.name} — ${s.className} (${s.era})`),
-    "Create a custom ship",
-  ];
+  const { narration, ships } = await setupCall("ship offers", () =>
+    generateShipOffers(state)
+  );
+  const formatted = formatShipChoices(ships, narration);
   return {
     ...state,
     phase: "ship_select",
-    pendingQuestion: `Select your command vessel:\n\n${shipChoicesText(ships)}\n\n${
-      ships.length + 1
-    }. Create a custom ship`,
+    setupShips: ships,
+    pendingQuestion: formatted.text,
+    pendingChoices: formatted.choices,
+  };
+}
+
+async function goMissionType(state: GameState): Promise<GameState> {
+  const { narration, choices } = await setupCall("mission type prompt", () =>
+    generateMissionTypePrompt(state)
+  );
+  return {
+    ...state,
+    phase: "mission_type",
+    pendingQuestion: narration,
     pendingChoices: numbered(choices),
   };
 }
 
-async function offerMissions(state: GameState, reshuffle = false): Promise<GameState> {
-  const type = state.missionType || "exploration";
-  const seeds = MISSION_SEEDS[type];
-  const shuffled = [...seeds].sort(() => Math.random() - 0.5).slice(0, 3);
-  const offers = shuffled.map((s) => ({
-    id: randomUUID(),
-    title: s.title,
-    summary: s.summary,
-    type,
-  }));
-  const text = offers
-    .map((o, i) => `${i + 1}. ${o.title}\n   ${o.summary}`)
-    .join("\n\n");
+async function goDifficulty(state: GameState): Promise<GameState> {
+  const { narration, choices } = await setupCall("difficulty prompt", () =>
+    generateDifficultyPrompt(state)
+  );
+  return {
+    ...state,
+    phase: "difficulty",
+    pendingQuestion: narration,
+    pendingChoices: numbered(choices),
+  };
+}
+
+async function offerMissions(
+  state: GameState,
+  reshuffle = false
+): Promise<GameState> {
+  const { narration, offers } = await setupCall("mission offers", () =>
+    generateMissionOffers(state, reshuffle)
+  );
   return {
     ...state,
     phase: "mission_offer",
     missionOffers: offers,
-    pendingQuestion: `${reshuffle ? "New options:\n\n" : ""}${text}\n\nSelect 1–3, or type "more" for different missions.`,
+    pendingQuestion: narration,
     pendingChoices: numbered(offers.map((o) => o.title)),
   };
 }
 
-function findSeed(type: MissionType, title: string) {
-  return (
-    MISSION_SEEDS[type].find((s) => s.title === title) || MISSION_SEEDS[type][0]
+async function goMissionBrief(state: GameState): Promise<GameState> {
+  const { narration, choices } = await setupCall("mission brief", () =>
+    generateMissionBrief(state)
   );
-}
-
-function buildMission(
-  pick: { id: string; title: string; summary: string; type: MissionType },
-  seed: (typeof MISSION_SEEDS)["science"][0],
-  difficulty: Difficulty
-): Mission {
-  return {
-    id: pick.id,
-    title: pick.title,
-    type: pick.type,
-    difficulty,
-    background: seed.summary,
-    brief: seed.summary,
-    location: seed.location,
-    status: "active",
-    knownIntel: [seed.summary],
-    flags: [],
-    objectives: [
-      {
-        id: "main",
-        title: seed.main,
-        description: seed.main,
-        kind: "main",
-        status: "active",
-      },
-      ...seed.secondaries.map((s, i) => ({
-        id: `sec-${i + 1}`,
-        title: s,
-        description: s,
-        kind: "secondary" as const,
-        status: "active" as const,
-      })),
-    ],
-  };
-}
-
-function formatBrief(state: GameState): string {
-  const m = state.mission!;
-  const ship = state.ship!;
-  const objs = m.objectives
-    .map((o) => `- (${o.kind}) ${o.title}`)
-    .join("\n");
-  return [
-    `Mission Brief — ${m.title}`,
-    `Stardate ${ship.stardate} | ${ship.name}`,
-    "",
-    m.background,
-    "",
-    "Objectives:",
-    objs,
-    "",
-    `Ship status: integrity ${ship.integrity}/${ship.maxIntegrity}, systems nominal.`,
-    "",
-    "Accept this mission?",
-  ].join("\n");
-}
-
-function startPlaying(state: GameState): GameState {
-  const ship = state.ship!;
-  const mission = state.mission!;
-  const xo = ship.crew[0];
-  const tactical = ship.crew.find((c) => /tactical|security|armory/i.test(c.role)) || ship.crew[1];
-
-  const narration = [
-    `Captain's Log, Stardate ${ship.stardate}.`,
-    `We have arrived at ${mission.location}. ${mission.background}`,
-    `Our primary objective: ${mission.objectives[0]?.title}.`,
-    "The crew is at readiness. I must choose our first action carefully.",
-  ].join(" ");
-
-  const options = numbered([
-    "Run a full sensor sweep and hold position",
-    "Open hailing frequencies and attempt diplomatic contact",
-    "Launch a probe toward the anomaly / target",
-    "Raise shields and approach at full impulse",
-  ]);
-  // Mark last as trap-ish
-  options[3].risk = "trap";
-  options[2].risk = "medium";
-  options[0].risk = "low";
-  options[1].risk = "medium";
-
   return {
     ...state,
-    phase: "playing",
+    phase: "mission_brief",
     pendingQuestion: narration,
-    pendingChoices: options,
-    turn: {
-      sceneId: randomUUID(),
-      narration,
-      crewDialogue: [
-        {
-          speaker: xo?.name || "First Officer",
-          line: "All departments report ready, Captain. Awaiting your orders.",
-        },
-        {
-          speaker: tactical?.name || "Tactical",
-          line: "I recommend caution until we understand the local threat picture.",
-        },
-      ],
-      options,
-      viewscreenPrompt: `Star Trek style bridge viewscreen, ${mission.location}, cinematic, ${ship.name}`,
-    },
+    pendingChoices: numbered(choices),
   };
 }
 
+/** Thrown when the Narrator LLM cannot produce a scene — never fall back to mock text. */
+export class LlmNarratorError extends Error {
+  status = 503;
+  reason: string;
+  detail?: string;
+
+  constructor(reason: string, detail?: string) {
+    super(reason);
+    this.name = "LlmNarratorError";
+    this.reason = reason;
+    this.detail = detail;
+  }
+}
+
+function requireLlm(): void {
+  if (!isLlmConfigured()) {
+    throw new LlmNarratorError(
+      "Narrator LLM is not configured.",
+      "Set a valid XAI_API_KEY in .env and restart the server."
+    );
+  }
+}
+
+async function requireScene(
+  scene: LlmScene | null,
+  purpose: string
+): Promise<LlmScene> {
+  if (!scene || !scene.usedLlm || !scene.narration?.trim()) {
+    throw new LlmNarratorError(
+      `Narrator failed to generate ${purpose}.`,
+      "The LLM returned no usable scene. Check API credits, model access, and debug logs."
+    );
+  }
+  return scene;
+}
+
+async function startPlaying(state: GameState): Promise<GameState> {
+  requireLlm();
+  let next: GameState = {
+    ...state,
+    phase: "playing",
+  };
+
+  const scene = await requireScene(
+    await generateOpeningScene(next),
+    "mission opening"
+  );
+  next = applySceneSideEffects(next, scene);
+
+  next = {
+    ...next,
+    pendingQuestion: scene.narration,
+    pendingChoices: scene.options,
+    turn: {
+      sceneId: randomUUID(),
+      narration: scene.narration,
+      crewDialogue: scene.crewDialogue,
+      options: scene.options,
+      viewscreenPrompt: scene.viewscreenPrompt,
+    },
+  };
+  return next;
+}
+
+/**
+ * Resolve a play turn:
+ * - Numbered option → dice/integrity referee + LLM scene
+ * - Free text (question or custom order) → LLM freeform
+ * - No mock narration — LLM required
+ */
 export async function resolvePlayTurn(
   state: GameState,
   playerText: string
 ): Promise<GameState> {
+  requireLlm();
   const input = playerText.trim();
-  const choice = parseChoice(input, state.turn?.options || state.pendingChoices);
-  if (!choice) {
+  if (!input) {
     return {
       ...state,
       pendingQuestion:
-        "You may select only one numbered option. Please choose a single course of action.",
+        state.pendingQuestion ||
+        "The bridge is waiting, Captain. Choose a numbered option or type a question/order.",
     };
   }
 
-  const option = (state.turn?.options || []).find((o) => o.id === choice);
-  let next = pushLog(state, "player", option?.text || input);
+  const choice = parseChoice(
+    input,
+    state.turn?.options || state.pendingChoices
+  );
 
-  // Mechanical resolution without LLM for Phase 1 reliability
-  const risk = option?.risk || "medium";
-  let narration = "";
+  // Free-text path: questions or custom orders (not a listed option)
+  if (!choice) {
+    return resolveFreeformTurn(state, input);
+  }
+
+  const option = (state.turn?.options || []).find((o) => o.id === choice);
+  let next = logPlayerChoice(state, input, state.turn?.options || state.pendingChoices);
+  next = bumpPlayTurn(next);
+
+  const mechanical = await applyMechanics(
+    next,
+    option?.text || input,
+    option?.risk || "medium"
+  );
+  next = mechanical.state;
+
+  // Ship destroyed mid-resolution
+  if (next.phase === "debrief") {
+    return await finishMission(next, false, mechanical.results);
+  }
+
+  const scene = await requireScene(
+    await generatePlayScene(next, mechanical.results),
+    "play turn"
+  );
+
+  return finalizePlayScene(next, scene, mechanical.results);
+}
+
+function looksLikeQuestion(text: string): boolean {
+  const t = text.trim();
+  if (t.includes("?")) return true;
+  return /^(who|what|where|when|why|how|can |could |would |should |is |are |am |do |does |did |will |have |has |tell me|status|report|explain|describe|any intel|sensors)\b/i.test(
+    t
+  );
+}
+
+async function resolveFreeformTurn(
+  state: GameState,
+  input: string
+): Promise<GameState> {
+  let next = pushLog(state, "player", input);
+  const isQuestion = looksLikeQuestion(input);
+
+  let mechanical: MechanicsOutcome | null = null;
+
+  // Custom orders (not questions) get light referee mechanics + count as a play turn
+  if (!isQuestion) {
+    next = bumpPlayTurn(next);
+    mechanical = await applyMechanics(next, input, "medium");
+    next = mechanical.state;
+    if (next.phase === "debrief") {
+      return await finishMission(next, false, mechanical.results);
+    }
+  } else {
+    // Record a no-op mechanical snapshot for the LLM
+    mechanical = {
+      state: next,
+      results: {
+        playerAction: input,
+        risk: "low",
+        roll: null,
+        integrityBefore: next.ship?.integrity ?? 100,
+        integrityAfter: next.ship?.integrity ?? 100,
+        integrityDelta: 0,
+        systemChanges: [],
+        flagsAdded: [],
+        notes: [
+          "Free-text QUESTION — no dice; answer with known ship intel only.",
+        ],
+      },
+    };
+  }
+
+  let scene = await requireScene(
+    await generateFreeformScene(next, input, mechanical?.results ?? null),
+    "freeform reply"
+  );
+
+  // Prefer keeping prior options if freeform question returned unusable options
+  if (
+    isQuestion &&
+    scene.options.length < 3 &&
+    (next.turn?.options?.length || 0) >= 3
+  ) {
+    scene = { ...scene, options: next.turn!.options! };
+  }
+
+  // Questions should not end the mission via freeform
+  if (isQuestion) {
+    scene = { ...scene, endMission: null };
+  }
+
+  return finalizePlayScene(
+    next,
+    scene,
+    mechanical?.results ?? {
+      playerAction: input,
+      risk: "low",
+      roll: null,
+      integrityBefore: next.ship?.integrity ?? 100,
+      integrityAfter: next.ship?.integrity ?? 100,
+      integrityDelta: 0,
+      systemChanges: [],
+      flagsAdded: [],
+      notes: [],
+    }
+  );
+}
+
+/** Count only real play actions after mission start (not Accept). */
+function bumpPlayTurn(state: GameState): GameState {
+  if (!state.mission) return state;
+  return {
+    ...state,
+    mission: {
+      ...state.mission,
+      playTurnCount: (state.mission.playTurnCount || 0) + 1,
+    },
+  };
+}
+
+/**
+ * Prevent the LLM (or old turn-count hack) from ending the mission too early.
+ * - success: need enough play, or main already completed
+ * - failed: allow if ship is badly hurt, else need a few turns
+ * - never auto-success just because a crit rolled
+ */
+function clampEndMission(
+  requested: LlmScene["endMission"],
+  state: GameState
+): LlmScene["endMission"] {
+  if (!requested) return null;
+  const turns = state.mission?.playTurnCount ?? 0;
+  const integrity = state.ship?.integrity ?? 100;
+  const main = state.mission?.objectives.find((o) => o.kind === "main");
+  const mainDone = main?.status === "completed";
+  const mainFailed = main?.status === "failed";
+
+  if (requested === "success") {
+    if (mainDone) return "success";
+    // Require a real mission arc before declaring victory
+    if (turns < 6) return null;
+    return "success";
+  }
+
+  if (requested === "failed") {
+    if (mainFailed || integrity <= 0) return "failed";
+    if (integrity <= 15 && turns >= 3) return "failed";
+    if (turns < 5) return null;
+    return "failed";
+  }
+
+  return null;
+}
+
+async function finalizePlayScene(
+  state: GameState,
+  scene: LlmScene,
+  mechanical: MechanicalResults
+): Promise<GameState> {
+  let next = applySceneSideEffects(state, scene);
+
+  // Safety valve only — very long missions, never a short auto-win
+  const turns = next.mission?.playTurnCount ?? 0;
+  const safetyEnd =
+    turns >= 20 ? ("success" as const) : null;
+
+  const endMission =
+    clampEndMission(scene.endMission, next) || safetyEnd;
+
+  if (endMission === "success" || endMission === "failed") {
+    if (endMission === "success" && next.mission) {
+      next.mission = {
+        ...next.mission,
+        status: "success",
+        objectives: next.mission.objectives.map((o) =>
+          o.kind === "main" && o.status === "active"
+            ? { ...o, status: "completed" }
+            : o
+        ),
+      };
+    }
+    if (endMission === "failed" && next.mission) {
+      next.mission = { ...next.mission, status: "failed" };
+    }
+    return finishMission(next, endMission === "success", mechanical);
+  }
+
+  next.turn = {
+    sceneId: randomUUID(),
+    narration: scene.narration,
+    crewDialogue: scene.crewDialogue,
+    options: scene.options,
+    viewscreenPrompt: scene.viewscreenPrompt,
+    lastRoll: next.turn?.lastRoll,
+  };
+  next.pendingQuestion = scene.narration;
+  next.pendingChoices = scene.options;
+  next = pushLog(next, "narration", scene.narration);
+  return next;
+}
+
+type MechanicsOutcome = {
+  state: GameState;
+  results: MechanicalResults;
+};
+
+async function applyMechanics(
+  state: GameState,
+  playerAction: string,
+  risk: OptionRisk | string
+): Promise<MechanicsOutcome> {
+  const { toolRollD20, toolUpdateIntegrity, toolSetSystem } = await import(
+    "../tools/registry.js"
+  );
+
+  let next = state;
+  const integrityBefore = next.ship?.integrity ?? 100;
   let integrityDelta = 0;
-  let flag: string | null = null;
-  let completeMain = false;
+  const systemChanges: string[] = [];
+  const flagsAdded: string[] = [];
+  const notes: string[] = [];
+  let rollData: MechanicalResults["roll"] = null;
 
   if (risk === "low") {
-    narration = `Sensors paint a clearer picture. ${next.mission?.knownIntel[0] || "The situation stabilizes slightly."} Your measured approach buys the crew time.`;
-    next.mission = next.mission
-      ? {
+    notes.push(
+      "Measured approach: sensors improve the picture; low immediate risk."
+    );
+    if (next.mission) {
+      next = {
+        ...next,
+        mission: {
           ...next.mission,
           knownIntel: [
             ...next.mission.knownIntel,
             "Detailed sensor map acquired",
           ],
-        }
-      : next.mission;
+        },
+      };
+    }
   } else if (risk === "medium") {
-    // light dice
-    const { toolRollD20 } = await import("../tools/registry.js");
-    const roll = toolRollD20(next, option?.text || "action", 0);
+    const roll = tracedTool(
+      next.runId,
+      next.phase,
+      "roll_d20",
+      { reason: playerAction, actionModifier: 0, risk },
+      toolRollD20(next, playerAction, 0)
+    );
     if (roll.state) next = roll.state;
-    const success = roll.data?.success;
-    narration = success
-      ? `Your order succeeds. The crew executes with precision. Progress toward the objective is real.`
-      : `The attempt falters. ${next.ship?.crew[0]?.name || "Your first officer"} reports complications — recoverable, but costly in time.`;
-    if (!success) integrityDelta = 5;
+    rollData = next.turn?.lastRoll
+      ? { ...next.turn.lastRoll }
+      : null;
+    if (roll.data?.success) {
+      notes.push("d20 success on a moderate action.");
+    } else {
+      notes.push("d20 failure on a moderate action — minor setback.");
+      integrityDelta = 5;
+    }
   } else if (risk === "high") {
-    const { toolRollD20 } = await import("../tools/registry.js");
-    const roll = toolRollD20(next, option?.text || "high-risk action", 2);
+    const roll = tracedTool(
+      next.runId,
+      next.phase,
+      "roll_d20",
+      { reason: playerAction, actionModifier: 2, risk },
+      toolRollD20(next, playerAction, 2)
+    );
     if (roll.state) next = roll.state;
-    const success = roll.data?.success;
+    rollData = next.turn?.lastRoll ? { ...next.turn.lastRoll } : null;
     const critical = roll.data?.critical;
     if (critical === "success") {
-      narration =
-        "A brilliant maneuver! Critical success — the crew will speak of this for years.";
-      completeMain = Math.random() > 0.4;
+      notes.push("Critical success on high-risk action.");
+      notes.push("force_success");
     } else if (critical === "failure") {
-      narration =
-        "Critical failure. Alarms cascade across the bridge. The ship shudders under the consequences of boldness unchecked.";
+      notes.push("Critical failure on high-risk action.");
       integrityDelta = 25;
-      flag = "critical_failure_event";
-      const { toolSetSystem } = await import("../tools/registry.js");
-      const sys = toolSetSystem(next, "shields", "damaged");
+      flagsAdded.push("critical_failure_event");
+      const sys = tracedTool(
+        next.runId,
+        next.phase,
+        "set_system_status",
+        { system: "shields", status: "damaged" },
+        toolSetSystem(next, "shields", "damaged")
+      );
       if (sys.state) next = sys.state;
-    } else if (success) {
-      narration = "High risk, hard won. You advance the mission under fire.";
-      completeMain = Math.random() > 0.6;
+      systemChanges.push("shields → damaged");
+    } else if (roll.data?.success) {
+      notes.push("High-risk action succeeded.");
     } else {
-      narration = "The gamble fails. Systems strain; options narrow.";
+      notes.push("High-risk action failed.");
       integrityDelta = 15;
     }
   } else {
     // trap
-    const { toolRollD20 } = await import("../tools/registry.js");
-    const roll = toolRollD20(next, "dangerous impulse action", 3);
+    const roll = tracedTool(
+      next.runId,
+      next.phase,
+      "roll_d20",
+      { reason: playerAction, actionModifier: 3, risk },
+      toolRollD20(next, playerAction, 3)
+    );
     if (roll.state) next = roll.state;
-    narration =
-      "That course proves perilous. What seemed decisive becomes a snare — the enemy, the anomaly, or simple physics answers harshly.";
+    rollData = next.turn?.lastRoll ? { ...next.turn.lastRoll } : null;
+    notes.push("Trap/risky impulse path resolved by dice.");
     integrityDelta = roll.data?.success ? 10 : 20;
-    flag = "chose_trap_option";
+    flagsAdded.push("chose_trap_option");
   }
 
   if (integrityDelta > 0) {
-    const { toolUpdateIntegrity } = await import("../tools/registry.js");
-    const dmg = toolUpdateIntegrity(next, integrityDelta, narration.slice(0, 80));
+    const dmg = tracedTool(
+      next.runId,
+      next.phase,
+      "update_ship_integrity",
+      { amount: integrityDelta, note: playerAction.slice(0, 80) },
+      toolUpdateIntegrity(next, integrityDelta, playerAction.slice(0, 80))
+    );
     if (dmg.state) next = dmg.state;
   }
-  if (flag && next.mission) {
-    next.mission = {
-      ...next.mission,
-      flags: [...new Set([...next.mission.flags, flag])],
-    };
-  }
 
-  // Progress / end conditions
-  if (next.phase === "debrief") {
-    next.debrief = buildDebrief(next, false);
-    next.pendingQuestion = next.debrief;
-    next.pendingChoices = numbered(["New mission", "Remain on debrief"]);
-    return pushLog(next, "debrief", next.debrief);
-  }
-
-  // Simple mission length: after several player actions or main complete
-  const playTurns = next.log.filter((l) => l.kind === "player" && l.phase === "playing").length;
-  if (completeMain || playTurns >= 5) {
+  for (const flag of flagsAdded) {
+    tracedTool(
+      next.runId,
+      next.phase,
+      "set_mission_flag",
+      { flag },
+      { ok: true, message: `Flag set: ${flag}` }
+    );
     if (next.mission) {
-      next.mission = {
-        ...next.mission,
-        status: "success",
-        objectives: next.mission.objectives.map((o) =>
-          o.kind === "main" ? { ...o, status: "completed" } : o
-        ),
+      next = {
+        ...next,
+        mission: {
+          ...next.mission,
+          flags: [...new Set([...next.mission.flags, flag])],
+        },
       };
     }
-    next.phase = "debrief";
-    next.status = "completed";
-    next.debrief = buildDebrief(next, true);
-    next.pendingQuestion = next.debrief;
-    next.pendingChoices = numbered(["New mission", "Remain on debrief"]);
-    next.turn = {
-      sceneId: randomUUID(),
-      narration: next.debrief,
-      crewDialogue: [
-        {
-          speaker: next.ship?.crew[0]?.name || "First Officer",
-          line: "Mission archived, Captain. The crew awaits your next command.",
-        },
-      ],
-      options: next.pendingChoices,
-      viewscreenPrompt: "Quiet stars from orbit after a hard-fought mission",
-    };
-    return pushLog(next, "debrief", next.debrief);
   }
 
-  // Next scene
-  const options = numbered([
-    "Hold and reassess with a senior staff briefing",
-    "Commit to the primary objective with a focused plan",
-    "Divert to a secondary objective that just became visible",
-    "Force the issue with an aggressive play",
-  ]);
-  options[0].risk = "low";
-  options[1].risk = "medium";
-  options[2].risk = "medium";
-  options[3].risk = "trap";
-
-  const crewName = next.ship?.crew[Math.floor(Math.random() * (next.ship.crew.length || 1))]?.name;
-
-  next.turn = {
-    sceneId: randomUUID(),
-    narration,
-    crewDialogue: crewName
-      ? [
-          {
-            speaker: crewName,
-            line: "Your orders, Captain?",
-          },
-        ]
-      : [],
-    options,
-    viewscreenPrompt: `${next.mission?.location || "deep space"}, tension rising, starship bridge viewscreen`,
-    lastRoll: next.turn?.lastRoll,
+  const integrityAfter = next.ship?.integrity ?? integrityBefore;
+  return {
+    state: next,
+    results: {
+      playerAction,
+      risk,
+      roll: rollData,
+      integrityBefore,
+      integrityAfter,
+      integrityDelta: integrityBefore - integrityAfter,
+      systemChanges,
+      flagsAdded,
+      notes,
+    },
   };
-  next.pendingQuestion = narration;
-  next.pendingChoices = options;
-  next = pushLog(next, "narration", narration);
+}
+
+function applySceneSideEffects(state: GameState, scene: LlmScene): GameState {
+  let next = state;
+  if (!next.mission) return next;
+
+  let knownIntel = [...next.mission.knownIntel];
+  for (const intel of scene.newIntel) {
+    if (!knownIntel.includes(intel)) knownIntel.push(intel);
+  }
+
+  let flags = [...next.mission.flags];
+  for (const flag of scene.setFlags) {
+    if (!flags.includes(flag)) {
+      flags.push(flag);
+      tracedTool(
+        next.runId,
+        next.phase,
+        "set_mission_flag",
+        { flag, source: "llm" },
+        { ok: true, message: `Flag set: ${flag}` }
+      );
+    }
+  }
+
+  let objectives = next.mission.objectives.map((o) => {
+    const update = scene.objectiveUpdates.find((u) => u.id === o.id);
+    return update ? { ...o, status: update.status } : o;
+  });
+
+  next = {
+    ...next,
+    mission: {
+      ...next.mission,
+      knownIntel,
+      flags,
+      objectives,
+    },
+  };
   return next;
 }
 
-function buildDebrief(state: GameState, success: boolean): string {
+async function finishMission(
+  state: GameState,
+  success: boolean,
+  mechanical?: MechanicalResults
+): Promise<GameState> {
+  requireLlm();
+  let next = { ...state, phase: "debrief" as const, status: "completed" as const };
+  if (next.mission) {
+    next.mission = {
+      ...next.mission,
+      status: success ? "success" : "failed",
+    };
+  }
+
+  const llmDebrief = await generateDebriefNarration(next, success);
+  if (!llmDebrief?.trim()) {
+    throw new LlmNarratorError(
+      "Narrator failed to generate mission debrief.",
+      "The LLM returned no debrief text."
+    );
+  }
+
+  const debrief = [
+    success ? "=== Mission Complete ===" : "=== Mission Failed ===",
+    "",
+    llmDebrief.trim(),
+    "",
+    buildDebriefStats(next),
+    "",
+    "Select an option to continue.",
+  ].join("\n");
+
+  next.debrief = debrief;
+  next.pendingQuestion = debrief;
+  next.pendingChoices = numbered(["New mission", "Remain on debrief"]);
+  next.turn = {
+    sceneId: randomUUID(),
+    narration: debrief,
+    crewDialogue: [
+      {
+        speaker: next.ship?.crew[0]?.name || "First Officer",
+        line: success
+          ? "Mission archived, Captain. The crew awaits your next command."
+          : "We did what we could, Captain. The log will remember this day.",
+      },
+    ],
+    options: next.pendingChoices,
+    viewscreenPrompt: success
+      ? "Quiet stars from orbit after a hard-fought mission"
+      : "Damaged starship drifting, emergency lights, solemn mood",
+    lastRoll: next.turn?.lastRoll ?? mechanical?.roll ?? undefined,
+  };
+  return pushLog(next, "debrief", debrief);
+}
+
+function buildDebriefStats(state: GameState): string {
   const ship = state.ship;
   const mission = state.mission;
   const objs =
@@ -834,20 +1057,16 @@ function buildDebrief(state: GameState, success: boolean): string {
       .map((o) => `- [${o.status}] ${o.title}`)
       .join("\n") || "n/a";
   return [
-    success ? "=== Mission Complete ===" : "=== Mission Failed ===",
     mission ? `Mission: ${mission.title}` : "",
-    ship ? `Ship: ${ship.name} — integrity ${ship.integrity}/${ship.maxIntegrity}` : "",
-    ship?.scars.length ? `Damage log: ${ship.scars.join("; ")}` : "Damage log: none recorded",
+    ship
+      ? `Ship: ${ship.name} — integrity ${ship.integrity}/${ship.maxIntegrity}`
+      : "",
+    ship?.scars.length
+      ? `Damage log: ${ship.scars.join("; ")}`
+      : "Damage log: none recorded",
     "",
     "Objectives:",
     objs,
-    "",
-    "Narrative:",
-    success
-      ? `Captain ${state.playerName} navigated peril with the crew of the ${ship?.name}. Not every choice was gentle, but the core objective was secured. The stars remain uncaring — and still worth the voyage.`
-      : `Captain ${state.playerName}, the ${ship?.name} paid a heavy price. Study this debrief. Failure is a teacher; the next mission need not rhyme with this one.`,
-    "",
-    "Select an option to continue.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -863,7 +1082,6 @@ function parseChoice(
     if (!choices || choices.some((c) => c.id === n)) return n;
     if (!choices) return n;
   }
-  // match full option text
   if (choices) {
     const found = choices.find(
       (c) => c.text.toLowerCase() === input.toLowerCase()
@@ -871,48 +1089,4 @@ function parseChoice(
     if (found) return found.id;
   }
   return null;
-}
-
-/** Optional LLM enrichment when XAI_API_KEY is set */
-export async function enrichNarrationWithXai(
-  state: GameState,
-  baseNarration: string
-): Promise<string> {
-  const key = process.env.XAI_API_KEY;
-  if (!key) return baseNarration;
-
-  try {
-    const skills = await loadSkillPacks();
-    const client = new OpenAI({
-      apiKey: key,
-      baseURL: process.env.XAI_BASE_URL || "https://api.x.ai/v1",
-    });
-    const model = process.env.XAI_MODEL || "grok-4.5";
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: `${skills}\n\nRewrite the mission beat in Picard-like Narrotator voice. Keep facts identical. 2-4 short paragraphs max. No options list.`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            player: state.playerName,
-            ship: state.ship?.name,
-            stardate: state.ship?.stardate,
-            mission: state.mission?.title,
-            integrity: state.ship?.integrity,
-            flags: state.mission?.flags,
-            baseNarration,
-          }),
-        },
-      ],
-      temperature: 0.8,
-    });
-    return response.choices[0]?.message?.content?.trim() || baseNarration;
-  } catch (err) {
-    console.warn("xAI enrichment failed, using base narration:", err);
-    return baseNarration;
-  }
 }

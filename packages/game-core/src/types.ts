@@ -1,4 +1,4 @@
-/** Shared game types — Phase 1 core, future-ready hooks */
+/** Shared game types — Phase 1 core + viewscreen visual journey */
 
 export type Difficulty = "easy" | "medium" | "hard" | "hardcore";
 
@@ -35,15 +35,74 @@ export type ShipSystems = {
   lifeSupport: SystemStatus;
 };
 
+/** Canonical appearance used for consistent Imagine prompts */
+export type VisualIdentity = {
+  /** Stable short id for this visual subject */
+  subjectId: string;
+  /** Full locked description for image models (must stay stable across a run) */
+  imagePrompt: string;
+  /** Optional short tags */
+  tags?: string[];
+};
+
+/**
+ * Locked voice bible for Grok TTS consistency across a mission.
+ * voiceId maps to an xAI built-in voice; voicePrompt is the delivery profile.
+ */
+export type VoiceIdentity = {
+  /** xAI TTS voice_id (stable for the whole run) */
+  voiceId: string;
+  /** Human-readable voice label */
+  voiceName: string;
+  /**
+   * Detailed locked prompt: speech tendencies, language style, Trek-lore
+   * anchors, and emotional range. Must stay stable for a character.
+   */
+  voicePrompt: string;
+  /** Default delivery tone when no scene emotion is supplied */
+  baselineTone: string;
+  /** Speech speed multiplier for TTS (0.7–1.5) */
+  speed: number;
+  tags?: string[];
+  /** Bump when voice mapping changes so saves re-lock distinct profiles */
+  profileVersion?: number;
+};
+
+/** Scene emotion hints used to lightly style TTS delivery */
+export type VoiceEmotion =
+  | "calm"
+  | "warm"
+  | "tense"
+  | "urgent"
+  | "somber"
+  | "wonder"
+  | "formal";
+
 export type CrewMember = {
   id: string;
   name: string;
   role: string;
   species?: string;
+  sex?: string;
+  height?: string;
+  skinTone?: string;
+  hair?: string;
+  eyes?: string;
+  build?: string;
+  clothing?: string;
+  scarsMarks?: string;
   personality?: string;
-  /** Phase 5: generated portrait URL */
+  /** Short bio for crew dossier */
+  bio?: string;
+  /** Locked visual bible for Imagine consistency */
+  visual?: VisualIdentity;
+  /** Locked voice bible for Grok TTS consistency */
+  voice?: VoiceIdentity;
+  /** Generated portrait URL (local /media or remote) */
   imageUrl?: string | null;
-  /** Phase 5: loyalty / attachment */
+  /** Portrait generation status for UI */
+  portraitStatus?: "pending" | "ready" | "failed" | "none";
+  /** Loyalty / attachment 0–100 */
   loyalty?: number;
 };
 
@@ -61,6 +120,10 @@ export type Ship = {
   crew: CrewMember[];
   /** Permanent scars for attachment / history */
   scars: string[];
+  /** Locked exterior / bridge look for Imagine consistency */
+  visual?: VisualIdentity;
+  /** Optional exterior hero image */
+  exteriorImageUrl?: string | null;
 };
 
 export type ObjectiveStatus = "active" | "completed" | "failed" | "missed";
@@ -86,6 +149,8 @@ export type Mission = {
   knownIntel: string[];
   /** Long-term consequence flags */
   flags: string[];
+  /** Combat/play turns after mission start (does not include Accept) */
+  playTurnCount?: number;
 };
 
 export type OptionRisk = "low" | "medium" | "high" | "trap";
@@ -106,9 +171,9 @@ export type Turn = {
   narration: string;
   crewDialogue: CrewLine[];
   options: TurnOption[];
-  /** Phase 3: Imagine Agent consumes this */
+  /** Beat summary for the Viewscreen / Imagine agent */
   viewscreenPrompt?: string;
-  /** Pending dice context shown to player */
+  /** Pending dice context (server/debug; not shown in UI) */
   lastRoll?: {
     die: number;
     threshold: number;
@@ -125,11 +190,43 @@ export type LogEntry = {
   text: string;
 };
 
+/** One frame in the viewscreen journey book */
+export type ViewscreenFrame = {
+  id: string;
+  createdAt: string;
+  /** Short caption under / over the image */
+  caption: string;
+  /** Scene moment description used to generate the frame */
+  momentPrompt: string;
+  /** Final Imagine prompt (with visual bible baked in) */
+  fullPrompt: string;
+  imageUrl: string | null;
+  status: "pending" | "ready" | "failed";
+  /** Optional subjects featured (crew ids / ship) */
+  subjects?: string[];
+  turnSceneId?: string;
+  phase?: Phase;
+};
+
+export type ViewscreenState = {
+  /** Playlist of journey frames (oldest → newest) */
+  playlist: ViewscreenFrame[];
+  /** Index currently preferred for display (-1 = latest ready) */
+  activeIndex: number;
+  /** True while an Imagine job is running */
+  generating: boolean;
+  lastError?: string | null;
+};
+
 export type GameSettings = {
+  /** Auto-play Grok TTS for narrator + crew lines */
   speechOn: boolean;
   imagesOn: boolean;
   tutorialCompleted: boolean;
-  voiceMode: "off" | "on"; // Phase 4
+  /** Alias kept for older saves; prefer speechOn */
+  voiceMode: "off" | "on";
+  /** Auto-generate viewscreen journey frames during play */
+  viewscreenEnabled: boolean;
 };
 
 export type GameState = {
@@ -146,15 +243,35 @@ export type GameState = {
   turn: Turn | null;
   log: LogEntry[];
   settings: GameSettings;
+  /** Locked Narrator voice (Picard-toned GM) for the run */
+  narratorVoice?: VoiceIdentity | null;
+  /** Visual journey book for the viewscreen banner */
+  viewscreen: ViewscreenState;
   /** Setup UI helpers */
   pendingQuestion: string | null;
   pendingChoices: TurnOption[] | null;
   setupNotes: string[];
+  /** AI-generated ship offers during ship_select */
+  setupShips?: Array<{
+    id: string;
+    name: string;
+    className: string;
+    era: string;
+    stardate: string;
+    description: string;
+    capabilities: string[];
+    shipVisualPrompt: string;
+    crew: Array<Record<string, unknown>>;
+  }> | null;
   missionOffers: Array<{
     id: string;
     title: string;
     summary: string;
     type: MissionType;
+    location?: string;
+    background?: string;
+    main?: string;
+    secondaries?: string[];
   }> | null;
   debrief: string | null;
 };
@@ -163,6 +280,9 @@ export type PublicGameView = {
   state: GameState;
   metaCommands: string[];
   canHint: boolean;
+  /** Live narrator mode — always LLM when a game is active */
+  narrator: "llm";
+  model: string;
 };
 
 export const DICE_THRESHOLDS: Record<Difficulty, number> = {
@@ -180,3 +300,12 @@ export const DEFAULT_SYSTEMS: ShipSystems = {
   sensors: "ok",
   lifeSupport: "ok",
 };
+
+export function emptyViewscreen(): ViewscreenState {
+  return {
+    playlist: [],
+    activeIndex: -1,
+    generating: false,
+    lastError: null,
+  };
+}

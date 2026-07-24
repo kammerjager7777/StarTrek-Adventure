@@ -12,9 +12,61 @@
         <div class="brand">
           <span class="pip"></span>
           <h1>Star Trek Adventure</h1>
-          <span class="sub">Narrotator // Phase 1 Bridge</span>
+          <span class="sub">Narrator // Phase 1 Bridge</span>
+          <span id="narrator-badge" class="badge narrator-badge">narrator: …</span>
         </div>
         <div class="top-actions">
+          <div class="voice-controls" id="voice-controls">
+            <button
+              type="button"
+              id="btn-voice"
+              class="lcars-btn secondary voice-toggle"
+              title="Auto-play Grok voice for narrator and crew"
+              aria-pressed="false"
+            >
+              Voice: Off
+            </button>
+            <div id="voice-transport" class="voice-transport hidden" aria-label="Voice transport">
+              <button
+                type="button"
+                id="btn-voice-pause"
+                class="lcars-btn secondary voice-ctrl"
+                title="Pause or resume speech"
+                disabled
+              >
+                Pause
+              </button>
+              <button
+                type="button"
+                id="btn-voice-stop"
+                class="lcars-btn secondary voice-ctrl"
+                title="Stop speech"
+                disabled
+              >
+                Stop
+              </button>
+              <label class="voice-speed-label" title="Playback speed">
+                <span>Speed</span>
+                <select id="voice-speed" aria-label="Voice playback speed">
+                  <option value="0.75">0.75×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.25">1.25×</option>
+                  <option value="1.5">1.5×</option>
+                </select>
+              </label>
+              <label class="voice-volume-label" title="Volume">
+                <span>Vol</span>
+                <input
+                  id="voice-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value="100"
+                  aria-label="Voice volume"
+                />
+              </label>
+            </div>
+          </div>
           <button type="button" id="btn-new" class="lcars-btn">New Game</button>
           <button type="button" id="btn-history" class="lcars-btn secondary">
             History
@@ -22,13 +74,30 @@
         </div>
       </header>
 
+      <div id="ai-error-banner" class="ai-error-banner hidden" role="alert">
+        <div class="ai-error-title">Cannot establish link to AI narrator</div>
+        <div id="ai-error-reason" class="ai-error-reason"></div>
+        <div id="ai-error-detail" class="ai-error-detail"></div>
+        <button type="button" id="btn-retry-ai" class="lcars-btn">Retry connection</button>
+      </div>
+
+      <div id="soft-error-toast" class="soft-error-toast hidden" role="status" aria-live="polite">
+        <div class="soft-error-title">Bridge message</div>
+        <div id="soft-error-text" class="soft-error-text"></div>
+        <button type="button" id="btn-dismiss-soft-error" class="lcars-btn secondary">Dismiss</button>
+      </div>
+
       <main class="bridge">
         <aside class="panel left">
-          <h2 class="panel-title">Ship Systems</h2>
-          <div id="ship-panel" class="panel-body muted">No ship selected</div>
+          <section class="panel-section ship-section">
+            <h2 class="panel-title">Ship Systems</h2>
+            <div id="ship-panel" class="panel-body muted">No ship selected</div>
+          </section>
 
-          <h2 class="panel-title">Crew</h2>
-          <div id="crew-panel" class="panel-body muted">—</div>
+          <section class="panel-section crew-section">
+            <h2 class="panel-title">Crew</h2>
+            <div id="crew-panel" class="panel-body crew-panel muted">—</div>
+          </section>
         </aside>
 
         <section class="center">
@@ -37,8 +106,12 @@
               <div id="viewscreen-content" class="viewscreen-inner">
                 <p class="vs-placeholder">
                   VIEWSCREEN STANDBY<br />
-                  <span>Scene imaging arrives in Phase 3 (Imagine Agent)</span>
+                  <span>Journey book frames appear as the mission unfolds</span>
                 </p>
+              </div>
+              <div class="viewscreen-chrome">
+                <span id="viewscreen-caption" class="viewscreen-caption">Standby</span>
+                <span id="viewscreen-meta" class="viewscreen-meta"></span>
               </div>
             </div>
           </div>
@@ -53,15 +126,23 @@
 
           <div class="options-bar" id="options-bar"></div>
 
+          <div id="waiting-banner" class="waiting-banner hidden" role="status" aria-live="polite">
+            <span class="waiting-spinner" aria-hidden="true"></span>
+            <div class="waiting-copy">
+              <div class="waiting-title">Narrator is responding…</div>
+              <div id="waiting-detail" class="waiting-detail">Stand by on the bridge.</div>
+            </div>
+          </div>
+
           <form id="command-form" class="command-form">
             <label class="sr-only" for="command-input">Captain's order</label>
             <input
               id="command-input"
               type="text"
               autocomplete="off"
-              placeholder="Type your name, a number (1–4), or a meta command…"
+              placeholder="Numbered option, free-text question/order, or meta command…"
             />
-            <button type="submit" class="lcars-btn">Engage</button>
+            <button type="submit" class="lcars-btn" id="engage-btn">Engage</button>
           </form>
         </section>
 
@@ -86,9 +167,32 @@
             </button>
           </div>
           <p class="hint">
-            Phase 1 stores every run so you can resume. Richer history UI comes in Phase 2.
+            Resume a voyage or delete saves you no longer need.
           </p>
           <div id="history-list" class="history-list"></div>
+        </div>
+      </div>
+
+      <div id="scar-modal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-card scar-modal-card">
+          <div class="modal-head">
+            <h2 id="scar-modal-title">Ship scar</h2>
+            <button type="button" id="btn-close-scar" class="lcars-btn secondary">
+              Close
+            </button>
+          </div>
+          <div class="scar-modal-hero">
+            <div id="scar-modal-icon" class="scar-modal-icon" aria-hidden="true">⚠</div>
+            <div>
+              <div id="scar-modal-type" class="scar-modal-type">Damage</div>
+              <div id="scar-modal-index" class="scar-modal-index muted"></div>
+            </div>
+          </div>
+          <p id="scar-modal-body" class="scar-modal-body"></p>
+          <p class="hint">
+            Scars are a lasting record of damage and hard choices this voyage —
+            not a second hit-point bar.
+          </p>
         </div>
       </div>
     </div>

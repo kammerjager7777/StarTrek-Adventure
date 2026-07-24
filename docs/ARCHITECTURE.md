@@ -34,9 +34,19 @@ Player action (UI)
 
 | Agent | Phase | Role |
 |---|---|---|
-| GamemasterAgent | 1 | Narrotator — stages, narration, options |
+| GamemasterAgent (setup) | 1 | Structured stages: name, ship, mission pick |
+| GamemasterAgent (play) | 1 | **xAI LLM Narrator** when `XAI_API_KEY` set — unique scenes, crew lines, options; mock fallback otherwise |
 | ImagineAgent | 3 | Scene / crew art via Grok Imagine |
 | Voice | 4 | Service more than agent — TTS of narration |
+
+### Play turn pipeline
+
+1. Player picks one numbered option  
+2. **Code referee** runs dice / integrity / system tools from option risk  
+3. **LLM** receives `GameState` + `mechanicalResults` → JSON scene  
+4. Code applies intel/flags/objective updates; never lets LLM invent dice outcomes  
+5. Debug log records user, tools, and LLM request/response previews  
+
 
 ## Tools (Phase 1)
 

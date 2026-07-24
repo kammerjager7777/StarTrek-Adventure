@@ -1,0 +1,17 @@
+{
+  "nx-01": {
+    "imagePrompt": "USS Enterprise NX-01, NX-class starship, early 22nd-century human design, saucer with twin warp nacelles on pylons, gunmetal and blue-grey hull plating, utilitarian pre-Federation aesthetic, exterior hero angle in deep space, cinematic lighting, photorealistic, no text, no watermark"
+  },
+  "ncc-1701": {
+    "imagePrompt": "USS Enterprise NCC-1701, Constitution-class starship, classic 23rd-century design, primary saucer, secondary hull, twin nacelles, white-grey hull with red accents, iconic silhouette, exterior hero angle among stars, cinematic photorealistic, no text, no watermark"
+  },
+  "ncc-1701-d": {
+    "imagePrompt": "USS Enterprise NCC-1701-D, Galaxy-class starship, 24th-century oval saucer, elegant engineering hull, long nacelles, soft blue-white hull with dark blue details, graceful flagship silhouette, exterior hero angle in deep space, cinematic photorealistic, no text, no watermark"
+  },
+  "ncc-74656": {
+    "imagePrompt": "USS Voyager NCC-74656, Intrepid-class starship, sleek late-24th-century design, compact saucer, variable-geometry nacelle pylons, blue-grey hull, agile explorer look, exterior hero angle in deep space, cinematic photorealistic, no text, no watermark"
+  },
+  "default": {
+    "imagePrompt": "Federation starship exterior, clean Starfleet design, saucer and nacelles, soft blue running lights, photorealistic cinematic deep space, no text, no watermark"
+  }
+}

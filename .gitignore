@@ -12,6 +12,8 @@ dist/
 # Runtime data
 data/saves/*
 !data/saves/.gitkeep
+data/debug/*
+!data/debug/.gitkeep
 
 # OS / editor
 .DS_Store
