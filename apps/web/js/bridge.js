@@ -35,7 +35,9 @@ const els = {
   scarModalBody: document.getElementById("scar-modal-body"),
   btnCloseScar: document.getElementById("btn-close-scar"),
   btnVoice: document.getElementById("btn-voice"),
-  voiceTransport: document.getElementById("voice-transport"),
+  btnVoiceMenu: document.getElementById("btn-voice-menu"),
+  voiceMenu: document.getElementById("voice-menu"),
+  voiceControls: document.getElementById("voice-controls"),
   btnVoicePause: document.getElementById("btn-voice-pause"),
   btnVoiceStop: document.getElementById("btn-voice-stop"),
   voiceSpeed: document.getElementById("voice-speed"),
@@ -387,13 +389,12 @@ function render(view, opts = {}) {
   updateVoiceToggleUi();
 
   els.phase.textContent = s.phase;
+  // Model badge is header-hidden (debug); keep Run panel as the debug surface
   if (els.narratorBadge) {
     const mode = view.narrator || "unknown";
     const model = view.model || "";
     els.narratorBadge.textContent =
       mode === "llm" ? `narrator: LLM (${model})` : `narrator: ${mode}`;
-    els.narratorBadge.classList.toggle("llm-on", mode === "llm");
-    els.narratorBadge.classList.toggle("llm-off", mode !== "llm");
   }
   const nv = s.narratorVoice;
   els.run.innerHTML = [
@@ -404,7 +405,7 @@ function render(view, opts = {}) {
     `Narrator: ${view.narrator || "—"}${view.model ? ` / ${view.model}` : ""}`,
     `Voice: ${voice.enabled ? "auto-on" : "off"}${
       nv ? ` · GM ${nv.voiceName || nv.voiceId}` : ""
-    }`,
+    } · ${voice.speed}×`,
   ].join("\n");
 
   renderShip(s.ship);
@@ -414,6 +415,22 @@ function render(view, opts = {}) {
   // Options appear after typewriter finishes (unless no narration)
   renderLog(s, { forceTypewriter });
   renderViewscreen(s);
+}
+
+function isVoiceMenuOpen() {
+  return Boolean(els.voiceMenu && !els.voiceMenu.classList.contains("hidden"));
+}
+
+function setVoiceMenuOpen(open) {
+  if (!els.voiceMenu) return;
+  els.voiceMenu.classList.toggle("hidden", !open);
+  if (els.btnVoiceMenu) {
+    els.btnVoiceMenu.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+}
+
+function toggleVoiceMenu() {
+  setVoiceMenuOpen(!isVoiceMenuOpen());
 }
 
 function updateVoiceToggleUi() {
@@ -431,16 +448,11 @@ function updateVoiceToggleUi() {
       Boolean(voice.speaking && !voice.paused)
     );
     els.btnVoice.title = voice.enabled
-      ? "Auto-voice on — Grok speaks narrator and crew. Click to disable."
-      : "Auto-voice off — click to enable Grok TTS for narration.";
+      ? "Auto-voice on — click to disable. Use ▾ for speed, volume, pause."
+      : "Auto-voice off — click to enable. Use ▾ for options.";
   }
 
-  // Transport works for auto-voice and one-shot click-to-replay
   const active = Boolean(voice.speaking);
-  if (els.voiceTransport) {
-    const showTransport = voice.enabled || active || voice.paused;
-    els.voiceTransport.classList.toggle("hidden", !showTransport);
-  }
   if (els.btnVoicePause) {
     els.btnVoicePause.disabled = !active && !voice.paused;
     els.btnVoicePause.textContent = voice.paused ? "Resume" : "Pause";
@@ -1932,6 +1944,12 @@ els.btnCloseHistory.addEventListener("click", () => closeHistory());
 if (els.btnVoice) {
   els.btnVoice.addEventListener("click", () => toggleVoice());
 }
+if (els.btnVoiceMenu) {
+  els.btnVoiceMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleVoiceMenu();
+  });
+}
 if (els.btnVoicePause) {
   els.btnVoicePause.addEventListener("click", () => toggleVoicePause());
 }
@@ -1950,6 +1968,17 @@ if (els.voiceVolume) {
     setVoiceVolume(els.voiceVolume.value);
   });
 }
+// Close voice menu on outside click / Escape
+document.addEventListener("click", (e) => {
+  if (!isVoiceMenuOpen()) return;
+  if (els.voiceControls && els.voiceControls.contains(e.target)) return;
+  setVoiceMenuOpen(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && isVoiceMenuOpen()) {
+    setVoiceMenuOpen(false);
+  }
+});
 updateVoiceToggleUi();
 if (els.btnDismissSoftError) {
   els.btnDismissSoftError.addEventListener("click", () => hideSoftError());

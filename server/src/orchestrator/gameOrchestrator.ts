@@ -87,7 +87,7 @@ function normalizeState(state: GameState): GameState {
   let narratorVoice = state.narratorVoice || buildNarratorVoiceIdentity();
   if (
     !narratorVoice.profileVersion ||
-    narratorVoice.profileVersion < 2 ||
+    narratorVoice.profileVersion < 3 ||
     !narratorVoice.voiceId
   ) {
     narratorVoice = buildNarratorVoiceIdentity();
@@ -344,13 +344,26 @@ export async function resolveSpeakPayload(
   if (!text.trim()) return null;
 
   const { inferSceneEmotion } = await import("../services/voice/voiceIdentity.js");
+  const lastRisk =
+    state.turn?.lastRoll?.reason ||
+    state.turn?.options?.find((o) =>
+      (state.log.slice(-3).some(
+        (e) => e.kind === "player" && e.text.includes(String(o.id))
+      ))
+    )?.risk ||
+    null;
   const emotion =
     body.emotion ||
     inferSceneEmotion({
       phase: state.phase,
       integrity: state.ship?.integrity,
       missionStatus: state.mission?.status,
+      missionType: state.mission?.type || state.missionType,
       flags: state.mission?.flags,
+      text,
+      lastRisk,
+      location: state.mission?.location,
+      title: state.mission?.title,
     });
 
   return { state, text, voice, speakerLabel, emotion };

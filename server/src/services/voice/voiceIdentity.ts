@@ -11,8 +11,8 @@ import type {
   VoiceIdentity,
 } from "../../../../packages/game-core/src/index.js";
 
-/** Bump to force re-lock of stored voices (e.g. after diversity fix). */
-export const VOICE_PROFILE_VERSION = 2;
+/** Bump to force re-lock of stored voices (e.g. after diversity / delivery fix). */
+export const VOICE_PROFILE_VERSION = 3;
 
 /** Subset of xAI built-in TTS voices with distinct character. */
 const VOICES = {
@@ -356,8 +356,8 @@ export function buildCrewVoiceIdentity(
     `Bridge posture: ${role.posture}`,
     `Trek lore grounding: ${species.lore}`,
     `Speech tendencies: address the captain by rank when reporting; prefer concrete sensor/ship facts over speculation; stay in character as this Starfleet officer; no modern slang; no fourth-wall jokes.`,
-    `Emotional range: default ${role.baseline}; under threat stay professional; joy is restrained wonder; grief is quiet and brief.`,
-    `Delivery stability: same pitch register and formality every scene.`,
+    `Emotional range: default ${role.baseline}; UNDER FIRE / RED ALERT: clipped, urgent, less formal — short facts, raised energy, no leisurely banter; joy is restrained wonder; grief is quiet and brief.`,
+    `Delivery stability: keep the same voice_id and character identity, but vary energy with the scene (calm ops vs battle stations).`,
   ].join(" ");
 
   return {
@@ -381,15 +381,15 @@ export function buildCrewVoiceIdentity(
 export function buildNarratorVoiceIdentity(): VoiceIdentity {
   const voice = pickVoice(NARRATOR_VOICE);
   const voicePrompt = [
-    "VOICE LOCK for the Narrator (Gamemaster), Picard-toned Starfleet storyteller.",
+    "VOICE LOCK for the Narrator (Gamemaster), Picard-rooted Starfleet storyteller.",
     `xAI voice_id="${voice.voiceId}" (${voice.voiceName}: ${voice.feel}) — RESERVED for narration only; crew must use other voice_ids.`,
-    "Cadence: measured, eloquent, unhurried; natural pauses between thoughts; never rushed hype.",
-    "Diction: elevated Federation English; complete sentences; classical restraint; gentle gravitas.",
-    "Language style: captain's-log poetry without purple excess; prefer 'we' of the ship; ethical framing; wonder at the unknown.",
-    "Speech tendencies: open scenes with situational clarity; invite the captain's choice without bullying; never reveal dice or meta rules out loud.",
-    "Trek lore grounding: TNG / Strange New Worlds energy — exploration, diplomacy, ethics, hope.",
-    "Emotional range: default formal-calm; wonder for discovery; somber for loss; firm for crisis; warm pride for courage.",
-    "Delivery stability: same authoritative storyteller register every turn; no slang, no meme tone.",
+    "Identity: authoritative, moral, commanding — same voice across the voyage.",
+    "DEFAULT (calm ops / diplomacy / briefings): measured, eloquent; complete sentences; gentle gravitas; light captain's-log feel without purple excess.",
+    "BATTLE / RED ALERT / BOARDING: drop the flowers. Short, urgent sentences. Present-tense action. Immediate stakes. Energy up; pauses short. Still Picard-commanding, not shouting chaos or slang.",
+    "DISCOVERY / WONDER: warmer, slightly slower; room for awe.",
+    "LOSS / DEBRIEF FAILURE: spare, somber; few words; weight without melodrama.",
+    "Speech tendencies: open with situational clarity; invite the captain's choice without bullying; never reveal dice or meta rules out loud.",
+    "Trek lore grounding: TNG / Strange New Worlds — exploration, diplomacy, ethics, and real combat when it comes.",
   ].join(" ");
 
   return {
@@ -397,7 +397,8 @@ export function buildNarratorVoiceIdentity(): VoiceIdentity {
     voiceName: voice.voiceName,
     voicePrompt,
     baselineTone: "formal",
-    speed: 0.98,
+    // Slightly brisker base so calm scenes are not sleepy; urgency layers on top
+    speed: 1.02,
     tags: ["narrator", "picard", "gamemaster", voice.voiceId, `v${VOICE_PROFILE_VERSION}`],
     profileVersion: VOICE_PROFILE_VERSION,
   };
@@ -470,8 +471,28 @@ export function chunkTextForTts(text: string, maxChunk = 420): string[] {
 }
 
 /**
- * Lightly style spoken text with xAI speech tags based on locked voice + scene emotion.
- * Keeps tags light — heavy wrapping of long text hurts latency and clarity.
+ * TTS speed multiplier from scene emotion (applied on top of locked voice.speed).
+ * Range stays within xAI limits 0.7–1.5.
+ */
+export function ttsSpeedForEmotion(
+  baseSpeed: number,
+  emotion?: VoiceEmotion | string | null
+): number {
+  const emo = (emotion || "calm").toLowerCase();
+  let mult = 1;
+  if (emo === "urgent") mult = 1.14;
+  else if (emo === "tense") mult = 1.08;
+  else if (emo === "warm") mult = 1.02;
+  else if (emo === "wonder") mult = 0.98;
+  else if (emo === "somber") mult = 0.92;
+  else if (emo === "formal") mult = 0.97;
+  else mult = 1.0;
+  return Math.min(1.5, Math.max(0.7, (baseSpeed || 1) * mult));
+}
+
+/**
+ * Style spoken text with xAI speech tags from locked voice + scene emotion.
+ * Urgent scenes get firmer delivery; avoid heavy tags on very long clips.
  */
 export function styleTextForTts(
   text: string,
@@ -491,19 +512,73 @@ export function styleTextForTts(
   }
 
   const emo = (emotion || voice.baselineTone || "calm").toLowerCase();
-  // Only style short clips — long wraps add synthesis cost for little gain
-  if (cleaned.length > 500) return cleaned;
 
-  if (emo === "urgent") return `<emphasis>${cleaned}</emphasis>`;
-  if (emo === "somber") return `<soft>${cleaned}</soft>`;
+  // Urgent/tense: collapse long pauses so delivery does not drag
+  if (emo === "urgent" || emo === "tense") {
+    cleaned = cleaned
+      .replace(/\[long-pause\]/gi, "[pause]")
+      .replace(/\n\n+/g, "\n")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  // Prefer tagging a lead sentence for long clips (full wrap can sound flat or slow)
+  const leadMatch = cleaned.match(/^(.+?[.!?…])(\s+|$)/s);
+  const lead = leadMatch?.[1]?.trim() || "";
+  const rest = leadMatch ? cleaned.slice(leadMatch[0].length).trim() : "";
+
+  const wrapLead = (open: string, close: string) => {
+    if (!lead || lead.length > 280) {
+      if (cleaned.length <= 420) return `${open}${cleaned}${close}`;
+      return cleaned;
+    }
+    return rest
+      ? `${open}${lead}${close} ${rest}`
+      : `${open}${lead}${close}`;
+  };
+
+  if (emo === "urgent") {
+    return wrapLead("<emphasis>", "</emphasis>");
+  }
+  if (emo === "tense") {
+    // Firm without full shout
+    return wrapLead("<emphasis>", "</emphasis>");
+  }
+  if (emo === "somber") {
+    if (cleaned.length <= 420) return `<soft>${cleaned}</soft>`;
+    return wrapLead("<soft>", "</soft>");
+  }
+  if (emo === "wonder" && cleaned.length <= 360) {
+    return cleaned;
+  }
   return cleaned;
 }
 
+const COMBAT_TEXT =
+  /\b(battle|combat|fire|phaser|torpedo|shields?|boarding|boarded|raid|raider|cloak|ambush|incoming|red alert|weapons|evasive|hull breach|under fire|enemy ship|squadron|dogfight|volley|impact|critical hit|destroyer|warship)\b/i;
+
+const WONDER_TEXT =
+  /\b(wonder|first contact|uncharted|anomaly|nebula|ancient|beauty|awe|discovery|strange new)\b/i;
+
+const SOMBER_TEXT =
+  /\b(casualt|lost|fail|wreck|dead|dying|grief|funeral|destroyed|no survivors|sacrifice)\b/i;
+
+/**
+ * Infer delivery emotion for TTS from mission state + spoken text.
+ * Battle / red-alert → urgent; discovery → wonder; etc.
+ */
 export function inferSceneEmotion(input: {
   phase?: string;
   integrity?: number;
   missionStatus?: string | null;
+  missionType?: string | null;
   flags?: string[];
+  /** Text about to be spoken (narration or crew line) */
+  text?: string | null;
+  /** Last player action / option risk if known */
+  lastRisk?: string | null;
+  location?: string | null;
+  title?: string | null;
 }): VoiceEmotion {
   if (input.phase === "debrief") {
     return input.missionStatus === "failed" ? "somber" : "warm";
@@ -511,11 +586,44 @@ export function inferSceneEmotion(input: {
   if (input.phase === "tutorial" || input.phase === "tutorial_offer") {
     return "warm";
   }
-  if ((input.integrity ?? 100) <= 25) return "urgent";
-  if ((input.integrity ?? 100) <= 50) return "tense";
+  if (input.phase === "mission_brief" || input.phase === "ask_name") {
+    return "formal";
+  }
+
+  const integrity = input.integrity ?? 100;
   const flags = (input.flags || []).join(" ").toLowerCase();
-  if (/critical|trap|combat|board|raid|cloak|failure/.test(flags)) return "tense";
-  if (/discover|first.?contact|anomaly|wonder/.test(flags)) return "wonder";
-  if (input.phase === "mission_brief" || input.phase === "ask_name") return "formal";
+  const blob = [
+    input.text || "",
+    flags,
+    input.missionType || "",
+    input.location || "",
+    input.title || "",
+    input.lastRisk || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // Hard urgency: ship dying or explicit combat fiction
+  if (integrity <= 30) return "urgent";
+  if (COMBAT_TEXT.test(blob) || input.missionType === "battle") {
+    if (integrity <= 55 || /critical|trap|board|destroy|breach/.test(blob)) {
+      return "urgent";
+    }
+    return "tense";
+  }
+  if (/critical_failure|chose_trap|boarding|combat|raid|cloak|under_fire/.test(flags)) {
+    return "urgent";
+  }
+  if (input.lastRisk === "high" || input.lastRisk === "trap") {
+    return integrity <= 70 ? "urgent" : "tense";
+  }
+  if (SOMBER_TEXT.test(blob) && integrity <= 60) return "somber";
+  if (integrity <= 50) return "tense";
+  if (WONDER_TEXT.test(blob) || input.missionType === "exploration") {
+    return "wonder";
+  }
+  if (input.missionType === "search_rescue" && integrity < 80) return "tense";
+  if (input.missionType === "science") return "calm";
+
   return "calm";
 }

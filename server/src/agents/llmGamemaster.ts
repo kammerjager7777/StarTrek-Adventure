@@ -239,17 +239,43 @@ async function callXaiJson(
             "You are the live Gamemaster for the PLAYING phase.",
             "The host already resolved dice and integrity. Treat mechanicalResults as absolute truth.",
             "Return JSON only matching the play-turn schema.",
+            "",
+            "SCENE INTENSITY (critical for narration + crewDialogue — both are spoken aloud):",
+            "- Match energy to the fiction. Do NOT default to slow, flowery Picard poetry every turn.",
+            "- BATTLE / RED ALERT / BOARDING / UNDER FIRE: short sentences, present-tense action, urgent stakes, little ornament. Crew lines clipped, tense, professional — reports not speeches.",
+            "- HIGH DAMAGE (low integrity) or critical failure: urgency and strain in every line.",
+            "- DISCOVERY / FIRST CONTACT / WONDER: warmer, room for awe, still clear for TTS.",
+            "- DIPLOMACY / BRIEFINGS: formal, careful, measured.",
+            "- LOSS / CASUALTIES: spare and somber — few words, no melodrama.",
+            "- Crew dialogue must share the same intensity as narration (tactical shouts in battle, calm analysis in science).",
+            "- Prefer TTS-friendly prose: clear beats, no bullet lists in narration, no raw dice numbers.",
           ].join("\n"),
         },
         {
           role: "user",
           content: JSON.stringify({
             purpose,
+            sceneGuidance: {
+              missionType: state.mission?.type || state.missionType,
+              integrity: state.ship?.integrity,
+              flags: state.mission?.flags || [],
+              intensityHint:
+                state.mission?.type === "battle" ||
+                (state.ship?.integrity ?? 100) <= 50 ||
+                (state.mission?.flags || []).some((f) =>
+                  /combat|trap|board|critical|raid|cloak/i.test(f)
+                )
+                  ? "urgent_or_tense — keep narration and crew dialogue tight and emotive"
+                  : state.mission?.type === "exploration"
+                    ? "wonder_or_calm — discovery tone allowed"
+                    : "match_the_moment",
+            },
             game: stateSnapshot(state),
             crewRoster: state.ship?.crew.map((c) => ({
               name: c.name,
               role: c.role,
               species: c.species,
+              personality: c.personality,
             })),
             recentLog: state.log.slice(-10).map((e) => ({
               kind: e.kind,
@@ -320,12 +346,15 @@ export async function generatePlayScene(
       instruction: [
         "Narrate the outcome of the captain's order using mechanicalResults.",
         "Then present the next situation with 3-4 options.",
+        "Match intensity: if combat, weapons fire, boarding, or low integrity — urgent short sentences and tense crew lines, not florid logs.",
+        "If the risk was high/trap or dice critically failed, let the bridge feel it in tone.",
         "Default endMission to null.",
         "Only set endMission to success if the MAIN objective is clearly completed after a substantial arc — not after a single lucky or failed exchange.",
         "Only set endMission to failed if the main objective is truly lost or the ship is effectively finished.",
         "Partial progress = keep playing (endMission null).",
         "Do not mention raw d20 numbers in narration.",
         `Current playTurnCount=${state.mission?.playTurnCount ?? 0}.`,
+        `Ship integrity now ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}.`,
       ].join(" "),
       fallbackNarration: mechanical.notes.join(" "),
     },

@@ -6,9 +6,9 @@ Schema:
 
 ```json
 {
-  "narration": "2-5 short paragraphs. Picard/Narrator voice. Include stardate feel. Reflect dice/integrity results exactly — do not contradict them.",
+  "narration": "2-5 short paragraphs (or fewer in battle). Picard-rooted Narrator — MATCH INTENSITY. Battle = urgent, short, less flowery. Calm = measured. Reflect dice/integrity exactly.",
   "crewDialogue": [
-    { "speaker": "Crew name from roster", "line": "In-character line" }
+    { "speaker": "Crew name from roster", "line": "In-character line — same intensity as narration (clipped in combat, calmer in science)" }
   ],
   "options": [
     { "id": 1, "text": "Short actionable order", "risk": "low" },
@@ -39,3 +39,5 @@ Schema:
 - Use real crew names from the ship roster when possible
 - Keep narration TTS-friendly (no tables, no bullet lists of options in narration)
 - Do **not** include raw d20 numbers in narration or crew dialogue
+- **Tone:** never stay in florid captain's-log mode during red alert, weapons fire, boarding, or critical damage — tighten prose and raise energy
+- Crew dialogue must feel like the same moment (tactical under fire ≠ leisurely banter)

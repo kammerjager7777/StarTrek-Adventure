@@ -10,7 +10,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { VoiceEmotion, VoiceIdentity } from "../../../../packages/game-core/src/index.js";
 import { getApiKey } from "./connectivity.js";
-import { styleTextForTts } from "../voice/voiceIdentity.js";
+import {
+  styleTextForTts,
+  ttsSpeedForEmotion,
+} from "../voice/voiceIdentity.js";
 import { logError, logSystemMessage } from "../../debug/sessionDebugLog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -93,7 +96,8 @@ export async function synthesizeSpeech(req: TtsRequest): Promise<TtsResult> {
   }
 
   const voiceId = req.voice.voiceId || "orion";
-  const speed = Math.min(1.5, Math.max(0.7, req.voice.speed ?? 1.0));
+  // Scene emotion modulates delivery speed (urgent battle > calm ops)
+  const speed = ttsSpeedForEmotion(req.voice.speed ?? 1.0, req.emotion);
   const contentType = "audio/mpeg";
 
   let cacheMs = 0;
@@ -191,6 +195,7 @@ export async function synthesizeSpeech(req: TtsRequest): Promise<TtsResult> {
           chars: styledText.length,
           bytes: audio.length,
           emotion: req.emotion || req.voice.baselineTone,
+          speed,
           cached: false,
           timing: { cacheMs, xaiMs, writeMs, totalMs, attempts },
         });

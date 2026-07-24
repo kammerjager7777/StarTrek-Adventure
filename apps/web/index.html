@@ -13,39 +13,62 @@
           <span class="pip"></span>
           <h1>Star Trek Adventure</h1>
           <span class="sub">Narrator // Phase 1 Bridge</span>
-          <span id="narrator-badge" class="badge narrator-badge">narrator: …</span>
+          <!-- Debug-only model badge kept in DOM but hidden; model also in Run panel -->
+          <span id="narrator-badge" class="badge narrator-badge sr-only" aria-hidden="true">narrator: …</span>
         </div>
         <div class="top-actions">
           <div class="voice-controls" id="voice-controls">
-            <button
-              type="button"
-              id="btn-voice"
-              class="lcars-btn secondary voice-toggle"
-              title="Auto-play Grok voice for narrator and crew"
-              aria-pressed="false"
+            <div class="voice-btn-group">
+              <button
+                type="button"
+                id="btn-voice"
+                class="lcars-btn secondary voice-toggle"
+                title="Toggle auto-play voice"
+                aria-pressed="false"
+              >
+                Voice: Off
+              </button>
+              <button
+                type="button"
+                id="btn-voice-menu"
+                class="lcars-btn secondary voice-menu-toggle"
+                title="Voice options"
+                aria-label="Voice options"
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-controls="voice-menu"
+              >
+                ▾
+              </button>
+            </div>
+            <div
+              id="voice-menu"
+              class="voice-menu hidden"
+              role="dialog"
+              aria-label="Voice options"
             >
-              Voice: Off
-            </button>
-            <div id="voice-transport" class="voice-transport hidden" aria-label="Voice transport">
-              <button
-                type="button"
-                id="btn-voice-pause"
-                class="lcars-btn secondary voice-ctrl"
-                title="Pause or resume speech"
-                disabled
-              >
-                Pause
-              </button>
-              <button
-                type="button"
-                id="btn-voice-stop"
-                class="lcars-btn secondary voice-ctrl"
-                title="Stop speech"
-                disabled
-              >
-                Stop
-              </button>
-              <label class="voice-speed-label" title="Playback speed">
+              <div class="voice-menu-head">Voice options</div>
+              <div class="voice-menu-row">
+                <button
+                  type="button"
+                  id="btn-voice-pause"
+                  class="lcars-btn secondary voice-ctrl"
+                  title="Pause or resume speech"
+                  disabled
+                >
+                  Pause
+                </button>
+                <button
+                  type="button"
+                  id="btn-voice-stop"
+                  class="lcars-btn secondary voice-ctrl"
+                  title="Stop speech"
+                  disabled
+                >
+                  Stop
+                </button>
+              </div>
+              <label class="voice-menu-field" title="Playback speed">
                 <span>Speed</span>
                 <select id="voice-speed" aria-label="Voice playback speed">
                   <option value="0.75">0.75×</option>
@@ -54,8 +77,8 @@
                   <option value="1.5">1.5×</option>
                 </select>
               </label>
-              <label class="voice-volume-label" title="Volume">
-                <span>Vol</span>
+              <label class="voice-menu-field" title="Volume">
+                <span>Volume</span>
                 <input
                   id="voice-volume"
                   type="range"
@@ -65,6 +88,9 @@
                   aria-label="Voice volume"
                 />
               </label>
+              <p class="voice-menu-hint">
+                Click a paragraph or crew line in the log to replay it.
+              </p>
             </div>
           </div>
           <button type="button" id="btn-new" class="lcars-btn">New Game</button>
