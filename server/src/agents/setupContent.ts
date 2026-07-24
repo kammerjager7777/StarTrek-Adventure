@@ -14,7 +14,10 @@ import type {
   Ship,
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
-import { DEFAULT_SYSTEMS } from "../../../packages/game-core/src/index.js";
+import {
+  DEFAULT_SYSTEMS,
+  normalizeRegistryNumber,
+} from "../../../packages/game-core/src/index.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { ensureCrewVoices } from "../services/voice/voiceIdentity.js";
 import { isLlmConfigured } from "./llmGamemaster.js";
@@ -22,6 +25,8 @@ import { isLlmConfigured } from "./llmGamemaster.js";
 export type SetupShipOffer = {
   id: string;
   name: string;
+  /** e.g. NCC-71899 or NX-01 */
+  registryNumber: string;
   className: string;
   era: string;
   stardate: string;
@@ -248,12 +253,13 @@ export async function generateShipOffers(
 Return {
   narration: string (brief intro asking which vessel to command; mention option 5 can be custom),
   ships: [{
-    name, className, era, stardate, description, capabilities: string[3-6],
+    name, registryNumber, className, era, stardate, description, capabilities: string[3-6],
     shipVisualPrompt: string (exterior lock for image gen),
     crew: [{ name, role, species, sex, height, skinTone, hair, eyes, build, clothing, scarsMarks, personality, bio, imagePrompt }]
   }]
 }
 Exactly 4 ships. Crew 4-6 each. imagePrompt must be detailed portrait locks for consistency.
+registryNumber is required: Starfleet hull number like "NCC-1701", "NCC-74656", "NX-01" (era-appropriate; unique per ship).
 Include recognizable Trek-era flavor (NX era, Constitution era, Galaxy era, Intrepid era, etc.) with original or classic ship identities as appropriate.`,
     }
   );
@@ -263,9 +269,15 @@ Include recognizable Trek-era flavor (NX era, Constitution era, Galaxy era, Intr
   const ships: SetupShipOffer[] = rawShips.slice(0, 4).map((s, i) => {
     const sh = s as Record<string, unknown>;
     const crewRaw = Array.isArray(sh.crew) ? sh.crew : [];
+    const name = String(sh.name || `USS Vessel ${i + 1}`);
+    const registryNumber = normalizeRegistryNumber(
+      String(sh.registryNumber || sh.registry || sh.ncc || ""),
+      name.length * 97 + i * 1301
+    );
     return {
       id: String(sh.id || `gen-ship-${i + 1}-${randomUUID().slice(0, 8)}`),
-      name: String(sh.name || `USS Vessel ${i + 1}`),
+      name,
+      registryNumber,
       className: String(sh.className || "Starfleet class"),
       era: String(sh.era || "24th century"),
       stardate: String(sh.stardate || "47600.1"),
@@ -275,7 +287,7 @@ Include recognizable Trek-era flavor (NX era, Constitution era, Galaxy era, Intr
         : ["Warp drive", "Phasers", "Shields"],
       shipVisualPrompt: String(
         sh.shipVisualPrompt ||
-          `Federation starship ${sh.name}, ${sh.className}, cinematic exterior, no text`
+          `Federation starship ${name} ${registryNumber}, ${sh.className}, cinematic exterior, no text`
       ),
       crew: crewRaw.slice(0, 6).map((c) => {
         const m = c as Record<string, unknown>;
@@ -351,9 +363,15 @@ export function shipOfferToShip(offer: SetupShipOffer): Ship {
   // Assign distinct locked voices (never the Narrator voice)
   const crewed = ensureCrewVoices(crew);
 
+  const registryNumber = normalizeRegistryNumber(
+    offer.registryNumber,
+    [...offer.name].reduce((a, c) => a + c.charCodeAt(0), 0)
+  );
+
   return {
     id: offer.id,
     name: offer.name,
+    registryNumber,
     className: offer.className,
     era: offer.era,
     stardate: offer.stardate,
@@ -361,13 +379,17 @@ export function shipOfferToShip(offer: SetupShipOffer): Ship {
     capabilities: offer.capabilities,
     integrity: 100,
     maxIntegrity: 100,
+    shieldIntegrity: 100,
+    maxShieldIntegrity: 100,
+    shieldGridOnline: true,
+    shieldRechargeTurns: 0,
     systems: { ...DEFAULT_SYSTEMS },
     crew: crewed,
     scars: [],
     visual: {
       subjectId: `ship:${offer.id}`,
       imagePrompt: offer.shipVisualPrompt,
-      tags: [offer.className, offer.era, offer.name],
+      tags: [offer.className, offer.era, offer.name, registryNumber],
     },
     exteriorImageUrl: null,
   };
@@ -398,17 +420,24 @@ export async function generateCustomShip(
       instruction: `Build a complete custom Starfleet ship for name="${ussName}" class="${className}".
 The ship name MUST keep the USS prefix exactly as given.
 Return {
-  era, stardate, description, capabilities: string[],
+  registryNumber, era, stardate, description, capabilities: string[],
   shipVisualPrompt,
   crew: [4-6 officers with name, role, species, sex, height, skinTone, hair, eyes, build, clothing, scarsMarks, personality, bio, imagePrompt]
 }
+registryNumber is required (e.g. "NCC-74205") — era-appropriate unique Starfleet hull number.
 Era/stardate should match the class era. Crew must fit that stardate period.`,
     }
+  );
+
+  const registryNumber = normalizeRegistryNumber(
+    String(obj.registryNumber || obj.registry || obj.ncc || ""),
+    [...ussName, className].join("").length * 131
   );
 
   const offer: SetupShipOffer = {
     id: `custom-${randomUUID().slice(0, 8)}`,
     name: ussName,
+    registryNumber,
     className,
     era: String(obj.era || "24th century"),
     stardate: String(obj.stardate || "47600.1"),
@@ -418,7 +447,7 @@ Era/stardate should match the class era. Crew must fit that stardate period.`,
       : ["Warp drive", "Phasers", "Shields"],
     shipVisualPrompt: String(
       obj.shipVisualPrompt ||
-        `${ussName}, ${className} Federation starship exterior, cinematic, no text`
+        `${ussName} ${registryNumber}, ${className} Federation starship exterior, cinematic, no text`
     ),
     crew: Array.isArray(obj.crew)
       ? obj.crew.map((c) => {
@@ -461,7 +490,12 @@ export async function generateMissionTypePrompt(
     {
       task: "mission_type",
       ship: ship
-        ? { name: ship.name, className: ship.className, era: ship.era }
+        ? {
+            name: ship.name,
+            registryNumber: ship.registryNumber,
+            className: ship.className,
+            era: ship.era,
+          }
         : null,
       captainName: state.playerName,
       instruction: `The captain has the bridge. Ask what manner of mission they seek.
@@ -669,17 +703,17 @@ export function formatShipChoices(
   narration: string
 ): { text: string; choices: TurnOption[] } {
   const lines = ships
-    .map(
-      (s, i) =>
-        `${i + 1}. ${s.name} — ${s.className} (${s.era})\n   ${s.description}`
-    )
+    .map((s, i) => {
+      const reg = s.registryNumber || "";
+      return `${i + 1}. ${s.name}${reg ? ` ${reg}` : ""} — ${s.className} (${s.era})\n   ${s.description}`;
+    })
     .join("\n\n");
   const customN = ships.length + 1;
   const text = `${narration}\n\n${lines}\n\n${customN}. Create a custom ship`;
   const choices: TurnOption[] = [
     ...ships.map((s, i) => ({
       id: i + 1,
-      text: `${s.name} — ${s.className} (${s.era})`,
+      text: `${s.name}${s.registryNumber ? ` ${s.registryNumber}` : ""} — ${s.className} (${s.era})`,
       risk: "low" as const,
     })),
     {

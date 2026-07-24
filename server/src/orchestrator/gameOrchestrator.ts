@@ -3,6 +3,7 @@ import type { GameState, PublicGameView } from "../../../packages/game-core/src/
 import {
   emptyViewscreen,
   metaCommandList,
+  normalizeShip,
 } from "../../../packages/game-core/src/index.js";
 import {
   advanceSetup,
@@ -12,6 +13,7 @@ import {
 } from "../agents/gamemaster.js";
 import {
   changeDifficulty,
+  toolDivertPowerToShields,
   toolHint,
   toolMissionStatus,
   toolRecap,
@@ -94,10 +96,13 @@ function normalizeState(state: GameState): GameState {
   }
 
   let ship = state.ship;
-  if (ship?.crew?.length) {
-    const crew = ensureCrewVoices(ship.crew, narratorVoice.voiceId);
-    const changed = crew.some((c, i) => c !== ship!.crew[i]);
-    if (changed) ship = { ...ship, crew };
+  if (ship) {
+    ship = normalizeShip(ship);
+    if (ship.crew?.length) {
+      const crew = ensureCrewVoices(ship.crew, narratorVoice.voiceId);
+      const changed = crew.some((c, i) => c !== ship!.crew[i]);
+      if (changed) ship = { ...ship, crew };
+    }
   }
   return {
     ...state,
@@ -444,6 +449,26 @@ export async function playerAction(
         state = await finalizeAction(before, state);
         return toView(state);
       }
+      if (
+        lower === "divert power to shields" ||
+        lower === "divert power" ||
+        lower === "reinforce shields" ||
+        /divert.*shield/.test(lower)
+      ) {
+        const r = tracedTool(
+          runId,
+          state.phase,
+          "divert_power_to_shields",
+          {},
+          toolDivertPowerToShields(state)
+        );
+        if (r.state) state = r.state;
+        state = appendSystem(state, r.message);
+        state = { ...state, pendingQuestion: r.message };
+        await logSystemMessage(runId, state.phase, r.message);
+        state = await finalizeAction(before, state);
+        return toView(state);
+      }
       if (lower.startsWith("change difficulty")) {
         const part = lower.replace("change difficulty", "").trim();
         const diff = ["easy", "medium", "hard", "hardcore"].find((d) =>
@@ -495,6 +520,17 @@ export async function playerAction(
             ship: {
               ...state.ship,
               integrity: state.ship.maxIntegrity,
+              maxIntegrity: state.ship.maxIntegrity || 100,
+              shieldIntegrity:
+                state.ship.maxShieldIntegrity ||
+                state.ship.maxIntegrity ||
+                100,
+              maxShieldIntegrity:
+                state.ship.maxShieldIntegrity ||
+                state.ship.maxIntegrity ||
+                100,
+              shieldGridOnline: true,
+              shieldRechargeTurns: 0,
               systems: {
                 shields: "ok",
                 torpedoes: "ok",

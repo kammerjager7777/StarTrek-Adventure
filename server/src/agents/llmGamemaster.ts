@@ -11,7 +11,7 @@ import type {
   OptionRisk,
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
-import { loadSkillPacks } from "../content/loader.js";
+import { loadSkillPacksCompact } from "../content/loader.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { stateSnapshot } from "../debug/sessionDebugLog.js";
 
@@ -50,13 +50,19 @@ export function isLlmConfigured(): boolean {
   return Boolean(process.env.XAI_API_KEY?.trim());
 }
 
-function getClient() {
+/** Play-turn LLM timeout (ms). Keep below client abort so the UI gets a clean error. */
+const LLM_TIMEOUT_MS = Number(process.env.XAI_LLM_TIMEOUT_MS || 75_000);
+/** Cap completion length — long Picard monologues are the main latency sink */
+const PLAY_MAX_TOKENS = Number(process.env.XAI_PLAY_MAX_TOKENS || 1400);
+
+function getClient(timeoutMs = LLM_TIMEOUT_MS) {
   const key = process.env.XAI_API_KEY?.trim();
   if (!key) return null;
   return new OpenAI({
     apiKey: key,
     baseURL: process.env.XAI_BASE_URL || "https://api.x.ai/v1",
-    timeout: 60_000,
+    timeout: timeoutMs,
+    maxRetries: 1, // one retry on transient errors; don't stack 3× long waits
   });
 }
 
@@ -218,18 +224,22 @@ async function callXaiJson(
   const client = getClient();
   if (!client) return null;
 
-  const skills = await loadSkillPacks();
+  // Compact skills + lean context = much lower time-to-first-token
+  const skills = await loadSkillPacksCompact(10_000);
   const model = process.env.XAI_MODEL || "grok-4.5";
 
   try {
     await logLlm(state.runId, state.phase, `LLM request: ${purpose}`, {
       model,
       purpose,
+      timeoutMs: LLM_TIMEOUT_MS,
+      maxTokens: PLAY_MAX_TOKENS,
     });
 
     const response = await client.chat.completions.create({
       model,
-      temperature: 0.9,
+      temperature: 0.85,
+      max_tokens: PLAY_MAX_TOKENS,
       messages: [
         {
           role: "system",
@@ -238,17 +248,13 @@ async function callXaiJson(
             "",
             "You are the live Gamemaster for the PLAYING phase.",
             "The host already resolved dice and integrity. Treat mechanicalResults as absolute truth.",
-            "Return JSON only matching the play-turn schema.",
-            "",
-            "SCENE INTENSITY (critical for narration + crewDialogue — both are spoken aloud):",
-            "- Match energy to the fiction. Do NOT default to slow, flowery Picard poetry every turn.",
-            "- BATTLE / RED ALERT / BOARDING / UNDER FIRE: short sentences, present-tense action, urgent stakes, little ornament. Crew lines clipped, tense, professional — reports not speeches.",
-            "- HIGH DAMAGE (low integrity) or critical failure: urgency and strain in every line.",
-            "- DISCOVERY / FIRST CONTACT / WONDER: warmer, room for awe, still clear for TTS.",
-            "- DIPLOMACY / BRIEFINGS: formal, careful, measured.",
-            "- LOSS / CASUALTIES: spare and somber — few words, no melodrama.",
-            "- Crew dialogue must share the same intensity as narration (tactical shouts in battle, calm analysis in science).",
-            "- Prefer TTS-friendly prose: clear beats, no bullet lists in narration, no raw dice numbers.",
+            "Return ONE JSON object only (no markdown fences) with keys:",
+            "narration, crewDialogue[{speaker,line}], options[{id,text,risk}], viewscreenPrompt, newIntel[], setFlags[], objectiveUpdates[{id,status}], endMission.",
+            "Narration: 1–3 short paragraphs max (TTS-friendly). crewDialogue: 0–2 short lines.",
+            "options: exactly 3–4, risk one of low|medium|high|trap. endMission: null unless mission truly ends.",
+            "Do NOT invent mock dice. Do NOT mention raw d20 numbers.",
+            "Intensity: battle/low hull = short urgent sentences; wonder = calmer; match the fiction.",
+            "Never offer options that need destroyed systems as if they still work.",
           ].join("\n"),
         },
         {
@@ -257,35 +263,47 @@ async function callXaiJson(
             purpose,
             sceneGuidance: {
               missionType: state.mission?.type || state.missionType,
-              integrity: state.ship?.integrity,
+              hull: state.ship?.integrity,
+              shields: state.ship?.shieldIntegrity,
+              shieldGridOnline: state.ship?.shieldGridOnline,
+              systems: state.ship?.systems,
               flags: state.mission?.flags || [],
               intensityHint:
                 state.mission?.type === "battle" ||
                 (state.ship?.integrity ?? 100) <= 50 ||
+                state.ship?.shieldGridOnline === false ||
                 (state.mission?.flags || []).some((f) =>
                   /combat|trap|board|critical|raid|cloak/i.test(f)
                 )
-                  ? "urgent_or_tense — keep narration and crew dialogue tight and emotive"
+                  ? "urgent_or_tense"
                   : state.mission?.type === "exploration"
-                    ? "wonder_or_calm — discovery tone allowed"
+                    ? "wonder_or_calm"
                     : "match_the_moment",
             },
             game: stateSnapshot(state),
-            crewRoster: state.ship?.crew.map((c) => ({
+            crewRoster: (state.ship?.crew || []).slice(0, 6).map((c) => ({
               name: c.name,
               role: c.role,
               species: c.species,
-              personality: c.personality,
             })),
-            recentLog: state.log.slice(-10).map((e) => ({
+            systemConstraints: state.ship
+              ? Object.entries(state.ship.systems)
+                  .filter(([, st]) => st !== "ok")
+                  .map(([k, st]) => `${k}: ${st}`)
+              : [],
+            // Lean log: last 5 beats, short snippets
+            recentLog: state.log.slice(-5).map((e) => ({
               kind: e.kind,
-              phase: e.phase,
-              text: e.text.slice(0, 400),
+              text: e.text.slice(0, 220),
             })),
             previousScene: state.turn
               ? {
-                  narration: state.turn.narration?.slice(0, 500),
-                  options: state.turn.options,
+                  narration: state.turn.narration?.slice(0, 320),
+                  options: state.turn.options?.map((o) => ({
+                    id: o.id,
+                    text: o.text.slice(0, 100),
+                    risk: o.risk,
+                  })),
                 }
               : null,
             ...userPayload,
@@ -346,15 +364,20 @@ export async function generatePlayScene(
       instruction: [
         "Narrate the outcome of the captain's order using mechanicalResults.",
         "Then present the next situation with 3-4 options.",
-        "Match intensity: if combat, weapons fire, boarding, or low integrity — urgent short sentences and tense crew lines, not florid logs.",
+        "Match intensity: if combat, weapons fire, boarding, or low hull — urgent short sentences and tense crew lines, not florid logs.",
         "If the risk was high/trap or dice critically failed, let the bridge feel it in tone.",
+        "Respect ship systems: NEVER offer an option that requires a destroyed system as if it still works (warp jump if warp destroyed, torpedo salvo if torpedoes destroyed, full sensor sweep if sensors destroyed, hails if comms destroyed).",
+        "Damaged systems may still be attempted but options should acknowledge the impairment (partial scans, unstable warp, weak phasers).",
+        "Reflect hull vs shield state in the fiction: shields absorb energy weapons poorly when low; torpedoes slam harder once shields fall; grid offline means recharge delay.",
+        "If mechanicalResults notes system damage or shield collapse, the crew must react to it.",
         "Default endMission to null.",
         "Only set endMission to success if the MAIN objective is clearly completed after a substantial arc — not after a single lucky or failed exchange.",
         "Only set endMission to failed if the main objective is truly lost or the ship is effectively finished.",
         "Partial progress = keep playing (endMission null).",
         "Do not mention raw d20 numbers in narration.",
         `Current playTurnCount=${state.mission?.playTurnCount ?? 0}.`,
-        `Ship integrity now ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}.`,
+        `Hull ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}; Shields ${state.ship?.shieldIntegrity ?? "?"}/${state.ship?.maxShieldIntegrity ?? "?"} (${state.ship?.shieldGridOnline ? "online" : `offline, recharge ${state.ship?.shieldRechargeTurns ?? "?"}`}).`,
+        `Systems: ${state.ship ? Object.entries(state.ship.systems).map(([k, v]) => `${k}=${v}`).join(", ") : "n/a"}.`,
       ].join(" "),
       fallbackNarration: mechanical.notes.join(" "),
     },
@@ -394,25 +417,26 @@ export async function generateDebriefNarration(
   state: GameState,
   success: boolean
 ): Promise<string | null> {
-  const client = getClient();
+  const client = getClient(45_000);
   if (!client) return null;
   const model = process.env.XAI_MODEL || "grok-4.5";
   try {
     const response = await client.chat.completions.create({
       model,
-      temperature: 0.8,
+      temperature: 0.75,
+      max_tokens: 700,
       messages: [
         {
           role: "system",
           content:
-            "You are Narrator. Write a concise mission debrief in Picard tone (3-6 short paragraphs). Include casualties/damage implications from the snapshot. Plain text only.",
+            "You are Narrator. Write a concise mission debrief in Picard tone (2–4 short paragraphs). Include casualties/damage implications from the snapshot. Plain text only.",
         },
         {
           role: "user",
           content: JSON.stringify({
             success,
             game: stateSnapshot(state),
-            recentLog: state.log.slice(-12).map((e) => e.text.slice(0, 300)),
+            recentLog: state.log.slice(-6).map((e) => e.text.slice(0, 200)),
           }),
         },
       ],

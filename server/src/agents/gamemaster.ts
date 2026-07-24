@@ -393,12 +393,24 @@ export async function advanceSetup(
         next.missionOffers = null;
         next.status = "active";
         if (next.ship) {
+          const maxShield =
+            next.ship.maxShieldIntegrity ?? next.ship.maxIntegrity;
           next.ship = {
             ...next.ship,
             integrity: Math.min(
               next.ship.maxIntegrity,
               next.ship.integrity + 25
             ),
+            maxShieldIntegrity: maxShield,
+            shieldIntegrity: Math.min(
+              maxShield,
+              (next.ship.shieldIntegrity ?? 0) + 30
+            ),
+            shieldGridOnline:
+              next.ship.systems.shields !== "destroyed"
+                ? true
+                : false,
+            shieldRechargeTurns: 0,
           };
         }
         next = await goMissionType(next);
@@ -454,6 +466,8 @@ async function goShipSelect(state: GameState): Promise<GameState> {
     setupShips: ships,
     pendingQuestion: formatted.text,
     pendingChoices: formatted.choices,
+    // Drop tutorial (or any prior) scene — no bridge crew until a ship is chosen
+    turn: null,
   };
 }
 
@@ -466,6 +480,7 @@ async function goMissionType(state: GameState): Promise<GameState> {
     phase: "mission_type",
     pendingQuestion: narration,
     pendingChoices: numbered(choices),
+    turn: null,
   };
 }
 
@@ -478,6 +493,7 @@ async function goDifficulty(state: GameState): Promise<GameState> {
     phase: "difficulty",
     pendingQuestion: narration,
     pendingChoices: numbered(choices),
+    turn: null,
   };
 }
 
@@ -494,6 +510,7 @@ async function offerMissions(
     missionOffers: offers,
     pendingQuestion: narration,
     pendingChoices: numbered(offers.map((o) => o.title)),
+    turn: null,
   };
 }
 
@@ -506,6 +523,7 @@ async function goMissionBrief(state: GameState): Promise<GameState> {
     phase: "mission_brief",
     pendingQuestion: narration,
     pendingChoices: numbered(choices),
+    turn: null,
   };
 }
 
@@ -812,59 +830,127 @@ async function applyMechanics(
   playerAction: string,
   risk: OptionRisk | string
 ): Promise<MechanicsOutcome> {
-  const { toolRollD20, toolUpdateIntegrity, toolSetSystem } = await import(
-    "../tools/registry.js"
-  );
+  const {
+    toolRollD20,
+    toolUpdateIntegrity,
+    toolSetSystem,
+    toolDivertPowerToShields,
+  } = await import("../tools/registry.js");
+  const {
+    classifyDamageKind,
+    evaluateSystemConstraints,
+    normalizeShip,
+    tickShieldRecharge,
+  } = await import("../../../packages/game-core/src/index.js");
 
   let next = state;
-  const integrityBefore = next.ship?.integrity ?? 100;
-  let integrityDelta = 0;
   const systemChanges: string[] = [];
   const flagsAdded: string[] = [];
   const notes: string[] = [];
   let rollData: MechanicalResults["roll"] = null;
 
-  if (risk === "low") {
+  // Normalize ship + tick shield recharge at the start of every mechanical beat
+  if (next.ship) {
+    let ship = normalizeShip(next.ship);
+    const tick = tickShieldRecharge(ship);
+    ship = tick.ship;
+    next = { ...next, ship };
+    if (tick.note) notes.push(tick.note);
+  }
+
+  // Divert power to shields (explicit order)
+  if (
+    next.ship &&
+    /divert.*(?:power|energy).*shield|reinforce (?:the )?shield|emergency shield|power to (?:the )?shield/i.test(
+      playerAction
+    )
+  ) {
+    const div = toolDivertPowerToShields(next);
+    if (div.state) next = div.state;
+    notes.push(div.message);
+  }
+
+  // System constraints change dice difficulty / block impossible orders
+  const constraints = next.ship
+    ? evaluateSystemConstraints(playerAction, next.ship.systems)
+    : [];
+  const blocked = constraints.filter((c) => c.severity === "blocked");
+  const impaired = constraints.filter((c) => c.severity === "impaired");
+  for (const c of constraints) notes.push(c.note);
+
+  let effectiveRisk = risk;
+  let actionModifier = 0;
+  if (blocked.length) {
+    // Order depends on destroyed systems — treat as trap-level failure risk
+    effectiveRisk = "trap";
+    actionModifier = 4;
+    notes.push(
+      "Order relies on destroyed systems — attempt is desperate and likely to fail."
+    );
+    flagsAdded.push("system_blocked_order");
+  } else if (impaired.length) {
+    actionModifier += impaired.length * 2;
+    if (risk === "low") effectiveRisk = "medium";
+    else if (risk === "medium") effectiveRisk = "high";
+    notes.push("Damaged systems raise the difficulty of this action.");
+  }
+
+  // Life support damaged: everything is harder
+  if (next.ship?.systems.lifeSupport === "damaged") {
+    actionModifier += 1;
+    notes.push("Life support strain is fraying crew performance.");
+  } else if (next.ship?.systems.lifeSupport === "destroyed") {
+    actionModifier += 3;
+    notes.push("Life support offline — the crew is fighting for air and time.");
+    flagsAdded.push("life_support_critical");
+  }
+
+  let integrityDelta = 0;
+  const damageKind = classifyDamageKind(playerAction);
+
+  if (effectiveRisk === "low") {
     notes.push(
       "Measured approach: sensors improve the picture; low immediate risk."
     );
-    if (next.mission) {
+    if (next.mission && next.ship?.systems.sensors !== "destroyed") {
       next = {
         ...next,
         mission: {
           ...next.mission,
           knownIntel: [
             ...next.mission.knownIntel,
-            "Detailed sensor map acquired",
+            next.ship?.systems.sensors === "damaged"
+              ? "Partial sensor map (arrays damaged)"
+              : "Detailed sensor map acquired",
           ],
         },
       };
+    } else if (next.ship?.systems.sensors === "destroyed") {
+      notes.push("Sensors offline — no new intel from this scan.");
     }
-  } else if (risk === "medium") {
+  } else if (effectiveRisk === "medium") {
     const roll = tracedTool(
       next.runId,
       next.phase,
       "roll_d20",
-      { reason: playerAction, actionModifier: 0, risk },
-      toolRollD20(next, playerAction, 0)
+      { reason: playerAction, actionModifier, risk: effectiveRisk },
+      toolRollD20(next, playerAction, actionModifier)
     );
     if (roll.state) next = roll.state;
-    rollData = next.turn?.lastRoll
-      ? { ...next.turn.lastRoll }
-      : null;
+    rollData = next.turn?.lastRoll ? { ...next.turn.lastRoll } : null;
     if (roll.data?.success) {
       notes.push("d20 success on a moderate action.");
     } else {
       notes.push("d20 failure on a moderate action — minor setback.");
-      integrityDelta = 5;
+      integrityDelta = 5 + (impaired.length ? 3 : 0);
     }
-  } else if (risk === "high") {
+  } else if (effectiveRisk === "high") {
     const roll = tracedTool(
       next.runId,
       next.phase,
       "roll_d20",
-      { reason: playerAction, actionModifier: 2, risk },
-      toolRollD20(next, playerAction, 2)
+      { reason: playerAction, actionModifier: actionModifier + 2, risk: effectiveRisk },
+      toolRollD20(next, playerAction, actionModifier + 2)
     );
     if (roll.state) next = roll.state;
     rollData = next.turn?.lastRoll ? { ...next.turn.lastRoll } : null;
@@ -876,20 +962,15 @@ async function applyMechanics(
       notes.push("Critical failure on high-risk action.");
       integrityDelta = 25;
       flagsAdded.push("critical_failure_event");
-      const sys = tracedTool(
-        next.runId,
-        next.phase,
-        "set_system_status",
-        { system: "shields", status: "damaged" },
-        toolSetSystem(next, "shields", "damaged")
-      );
-      if (sys.state) next = sys.state;
-      systemChanges.push("shields → damaged");
     } else if (roll.data?.success) {
       notes.push("High-risk action succeeded.");
+      // Even success in combat can graze the ship
+      if (/fire|attack|torpedo|phaser|combat|engage|volley/.test(playerAction.toLowerCase())) {
+        integrityDelta = 4;
+      }
     } else {
       notes.push("High-risk action failed.");
-      integrityDelta = 15;
+      integrityDelta = 15 + impaired.length * 2;
     }
   } else {
     // trap
@@ -897,25 +978,67 @@ async function applyMechanics(
       next.runId,
       next.phase,
       "roll_d20",
-      { reason: playerAction, actionModifier: 3, risk },
-      toolRollD20(next, playerAction, 3)
+      { reason: playerAction, actionModifier: actionModifier + 3, risk: effectiveRisk },
+      toolRollD20(next, playerAction, actionModifier + 3)
     );
     if (roll.state) next = roll.state;
     rollData = next.turn?.lastRoll ? { ...next.turn.lastRoll } : null;
     notes.push("Trap/risky impulse path resolved by dice.");
-    integrityDelta = roll.data?.success ? 10 : 20;
+    integrityDelta = roll.data?.success ? 10 : 20 + impaired.length * 3;
     flagsAdded.push("chose_trap_option");
+    if (blocked.length) {
+      integrityDelta += 5;
+      notes.push("Destroyed systems made the attempt even more punishing.");
+    }
   }
 
-  if (integrityDelta > 0) {
+  const integrityBefore = next.ship?.integrity ?? 100;
+  const shieldsBefore = next.ship?.shieldIntegrity ?? 100;
+
+  if (integrityDelta > 0 && next.ship) {
     const dmg = tracedTool(
       next.runId,
       next.phase,
       "update_ship_integrity",
-      { amount: integrityDelta, note: playerAction.slice(0, 80) },
-      toolUpdateIntegrity(next, integrityDelta, playerAction.slice(0, 80))
+      {
+        amount: integrityDelta,
+        note: playerAction.slice(0, 80),
+        kind: damageKind,
+      },
+      toolUpdateIntegrity(
+        next,
+        integrityDelta,
+        playerAction.slice(0, 80),
+        damageKind
+      )
     );
     if (dmg.state) next = dmg.state;
+    if (Array.isArray(dmg.data?.events)) {
+      for (const e of dmg.data.events as string[]) notes.push(e);
+    }
+    if (dmg.data?.systemHit) {
+      const hit = dmg.data.systemHit as {
+        key: string;
+        from: string;
+        to: string;
+      };
+      systemChanges.push(`${hit.key} → ${hit.to}`);
+    }
+  }
+
+  // Extra system stress if life support / warp already damaged and we took hull hits
+  if (
+    next.ship &&
+    integrityDelta >= 15 &&
+    next.ship.systems.warp === "damaged" &&
+    Math.random() < 0.35
+  ) {
+    const sys = toolSetSystem(next, "warp", "destroyed");
+    if (sys.state) {
+      next = sys.state;
+      systemChanges.push("warp → destroyed");
+      notes.push("Warp nacelles fail completely under the strain.");
+    }
   }
 
   for (const flag of flagsAdded) {
@@ -938,11 +1061,24 @@ async function applyMechanics(
   }
 
   const integrityAfter = next.ship?.integrity ?? integrityBefore;
+  const shieldsAfter = next.ship?.shieldIntegrity ?? shieldsBefore;
+  if (shieldsBefore !== shieldsAfter) {
+    notes.push(
+      `Shields ${shieldsBefore} → ${shieldsAfter}` +
+        (next.ship && !next.ship.shieldGridOnline ? " (grid offline)" : "")
+    );
+  } else if (integrityDelta > 0 && integrityAfter < integrityBefore) {
+    // Hull moved but shields didn't — explain why (bypass / offline / already empty)
+    if (next.ship && !next.ship.shieldGridOnline) {
+      notes.push("Hull took the hit with shields offline.");
+    }
+  }
+
   return {
     state: next,
     results: {
       playerAction,
-      risk,
+      risk: effectiveRisk,
       roll: rollData,
       integrityBefore,
       integrityAfter,
@@ -1002,9 +1138,26 @@ async function finishMission(
   requireLlm();
   let next = { ...state, phase: "debrief" as const, status: "completed" as const };
   if (next.mission) {
+    // Finalize objectives so the bridge never shows [active] after the mission ends
+    const objectives = next.mission.objectives.map((o) => {
+      if (o.status !== "active") return o;
+      if (success) {
+        // Main goals complete on success; secondaries left incomplete stay "missed"
+        return {
+          ...o,
+          status: o.kind === "main" ? ("completed" as const) : ("missed" as const),
+        };
+      }
+      // Failure: open main goals failed; open secondaries missed
+      return {
+        ...o,
+        status: o.kind === "main" ? ("failed" as const) : ("missed" as const),
+      };
+    });
     next.mission = {
       ...next.mission,
       status: success ? "success" : "failed",
+      objectives,
     };
   }
 
@@ -1017,7 +1170,7 @@ async function finishMission(
   }
 
   const debrief = [
-    success ? "=== Mission Complete ===" : "=== Mission Failed ===",
+    success ? "=== Mission Successful ===" : "=== Mission Failed ===",
     "",
     llmDebrief.trim(),
     "",
@@ -1059,7 +1212,7 @@ function buildDebriefStats(state: GameState): string {
   return [
     mission ? `Mission: ${mission.title}` : "",
     ship
-      ? `Ship: ${ship.name} — integrity ${ship.integrity}/${ship.maxIntegrity}`
+      ? `Ship: ${ship.name}${ship.registryNumber ? ` ${ship.registryNumber}` : ""} — hull ${ship.integrity}/${ship.maxIntegrity}; shields ${ship.shieldIntegrity ?? "?"}/${ship.maxShieldIntegrity ?? "?"} (${ship.shieldGridOnline === false ? "offline" : "online"})`
       : "",
     ship?.scars.length
       ? `Damage log: ${ship.scars.join("; ")}`

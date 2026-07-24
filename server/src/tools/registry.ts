@@ -4,13 +4,18 @@
  */
 
 import {
+  applyCombatDamage,
   applyIntegrityDamage,
+  classifyDamageKind,
+  divertPowerToShields,
   evaluateD20,
   hintsAllowed,
+  normalizeShip,
   rollD20,
   setSystem,
   shipStatusSummary,
   systemLabel,
+  type DamageKind,
   type Difficulty,
   type GameState,
   type ShipSystems,
@@ -76,32 +81,60 @@ export function toolRollD20(
 export function toolUpdateIntegrity(
   state: GameState,
   amount: number,
-  note: string
+  note: string,
+  kind?: DamageKind | string
 ): ToolResult {
   if (!state.ship) return { ok: false, message: "No ship selected." };
-  const { ship, destroyed, abandonSuggested } = applyIntegrityDamage(
-    state.ship,
-    amount
-  );
-  let next: GameState = {
-    ...state,
-    ship: {
-      ...ship,
-      scars:
-        amount > 0 && note
-          ? [...ship.scars, note].slice(-12)
-          : ship.scars,
-    },
-  };
+  const damageKind: DamageKind =
+    kind &&
+    ["phaser", "laser", "torpedo", "collision", "boarding", "internal", "general"].includes(
+      String(kind)
+    )
+      ? (kind as DamageKind)
+      : classifyDamageKind(note);
 
-  if (destroyed && next.mission) {
+  const combat = applyCombatDamage(state.ship, amount, damageKind);
+  let ship = combat.ship;
+  // Scars are lasting damage records only — never log the captain's order text.
+  // System hits already add scars inside applyCombatDamage; add a structural scar
+  // only for serious hull trauma or destruction.
+  if (combat.hullDamage >= 15 || combat.destroyed) {
+    const structural = combat.destroyed
+      ? "Hull integrity lost — vessel combat-ineffective"
+      : `Severe hull trauma (−${combat.hullDamage})`;
+    // Avoid duplicate consecutive structural notes
+    const last = ship.scars[ship.scars.length - 1];
+    if (last !== structural) {
+      ship = {
+        ...ship,
+        scars: [...ship.scars, structural].slice(-12),
+      };
+    }
+  }
+
+  let next: GameState = { ...state, ship };
+
+  if (combat.destroyed && next.mission) {
+    const objectives = next.mission.objectives.map((o) => {
+      if (o.status !== "active") return o;
+      return {
+        ...o,
+        status: o.kind === "main" ? ("failed" as const) : ("missed" as const),
+      };
+    });
     next = {
       ...next,
       phase: "debrief",
-      mission: { ...next.mission, status: "failed" },
+      mission: {
+        ...next.mission,
+        status: "failed",
+        objectives,
+      },
       status: "completed",
-      debrief: `Ship integrity collapsed to zero. ${note}`,
-      pendingQuestion: "Mission failed. Review the debrief, then start a new mission when ready.",
+      debrief: `Hull integrity collapsed to zero. ${note}`,
+      pendingQuestion:
+        "=== Mission Failed ===\n\nHull integrity collapsed to zero. " +
+        `${note}\n\nReview the debrief, then start a new mission when ready.`,
       pendingChoices: [
         { id: 1, text: "New mission", risk: "low" },
         { id: 2, text: "Review ship status", risk: "low" },
@@ -109,13 +142,50 @@ export function toolUpdateIntegrity(
     };
   }
 
+  const n = normalizeShip(next.ship!);
+  const bits = [
+    `Hull ${n.integrity}/${n.maxIntegrity}`,
+    n.shieldGridOnline
+      ? `Shields ${n.shieldIntegrity}/${n.maxShieldIntegrity}`
+      : n.systems.shields === "destroyed"
+        ? "Shields DESTROYED"
+        : `Shields OFFLINE (recharge ${n.shieldRechargeTurns})`,
+  ];
+  if (combat.events.length) bits.push(...combat.events);
+  if (combat.abandonSuggested) bits.push("Abandon ship should be considered.");
+  if (combat.destroyed) bits.push("Mission failure.");
+
   return {
     ok: true,
-    message: `Integrity now ${next.ship!.integrity}/${next.ship!.maxIntegrity}.${
-      abandonSuggested ? " Abandon ship should be considered." : ""
-    }${destroyed ? " Mission failure." : ""}`,
+    message: bits.join(" · "),
     state: next,
-    data: { destroyed, abandonSuggested, integrity: next.ship!.integrity },
+    data: {
+      destroyed: combat.destroyed,
+      abandonSuggested: combat.abandonSuggested,
+      integrity: n.integrity,
+      shieldIntegrity: n.shieldIntegrity,
+      shieldGridOnline: n.shieldGridOnline,
+      hullDamage: combat.hullDamage,
+      shieldDamage: combat.shieldDamage,
+      systemHit: combat.systemHit,
+      damageKind,
+      events: combat.events,
+    },
+  };
+}
+
+export function toolDivertPowerToShields(state: GameState): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  const result = divertPowerToShields(state.ship);
+  return {
+    ok: result.ok,
+    message: result.message,
+    state: { ...state, ship: result.ship },
+    data: {
+      shieldIntegrity: result.ship.shieldIntegrity,
+      shieldGridOnline: result.ship.shieldGridOnline,
+      shieldRechargeTurns: result.ship.shieldRechargeTurns,
+    },
   };
 }
 
@@ -125,18 +195,55 @@ export function toolSetSystem(
   status: "ok" | "damaged" | "destroyed"
 ): ToolResult {
   if (!state.ship) return { ok: false, message: "No ship selected." };
-  const systems = setSystem(state.ship.systems, system, status);
+  let ship = normalizeShip(state.ship);
+  // Shield hardware only when grid is down / collapsing
+  if (
+    system === "shields" &&
+    status !== "ok" &&
+    ship.shieldGridOnline &&
+    ship.shieldIntegrity > 0
+  ) {
+    return {
+      ok: false,
+      message:
+        "Shield emitters are protected while the grid is still holding. They can only be damaged once shields fall.",
+      state,
+    };
+  }
+  const systems = setSystem(ship.systems, system, status);
+  // Only record a scar when status worsens to damaged/destroyed (not repairs to ok)
   const scar =
     status === "destroyed"
       ? `${systemLabel(system)} destroyed`
       : status === "damaged"
         ? `${systemLabel(system)} damaged`
         : null;
-  const ship = {
-    ...state.ship,
+  const already =
+    scar &&
+    ship.scars.some((s) => s.toLowerCase() === scar.toLowerCase());
+  ship = {
+    ...ship,
     systems,
-    scars: scar ? [...state.ship.scars, scar].slice(-12) : state.ship.scars,
+    scars:
+      scar && !already ? [...ship.scars, scar].slice(-12) : ship.scars,
   };
+  if (system === "shields" && status === "destroyed") {
+    ship = {
+      ...ship,
+      shieldIntegrity: 0,
+      shieldGridOnline: false,
+      shieldRechargeTurns: 0,
+    };
+  }
+  if (system === "shields" && status === "ok" && !ship.shieldGridOnline) {
+    // Repair restores grid online with partial charge
+    ship = {
+      ...ship,
+      shieldGridOnline: true,
+      shieldRechargeTurns: 0,
+      shieldIntegrity: Math.max(ship.shieldIntegrity, 25),
+    };
+  }
   return {
     ok: true,
     message: `${systemLabel(system)} is now ${status}.`,

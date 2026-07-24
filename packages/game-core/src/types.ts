@@ -109,13 +109,29 @@ export type CrewMember = {
 export type Ship = {
   id: string;
   name: string;
+  /**
+   * Starfleet registry, e.g. "NCC-1701" or "NX-01".
+   * Always present on new ships; may be synthesized for older saves.
+   */
+  registryNumber: string;
   className: string;
   era: string;
   stardate: string;
   description: string;
   capabilities: string[];
+  /** Hull integrity (legacy field name: integrity) */
   integrity: number;
   maxIntegrity: number;
+  /** Shield grid energy 0–max; absorbs fire while online */
+  shieldIntegrity: number;
+  maxShieldIntegrity: number;
+  /**
+   * When false, the grid collapsed and is recharging — no shield absorption
+   * until shieldRechargeTurns hits 0 and a partial restore occurs.
+   */
+  shieldGridOnline: boolean;
+  /** Turns remaining until shield grid can restore after collapse */
+  shieldRechargeTurns: number;
   systems: ShipSystems;
   crew: CrewMember[];
   /** Permanent scars for attachment / history */
@@ -125,6 +141,16 @@ export type Ship = {
   /** Optional exterior hero image */
   exteriorImageUrl?: string | null;
 };
+
+/** How incoming damage interacts with shields vs hull */
+export type DamageKind =
+  | "phaser"
+  | "laser"
+  | "torpedo"
+  | "collision"
+  | "boarding"
+  | "internal"
+  | "general";
 
 export type ObjectiveStatus = "active" | "completed" | "failed" | "missed";
 
@@ -255,6 +281,7 @@ export type GameState = {
   setupShips?: Array<{
     id: string;
     name: string;
+    registryNumber?: string;
     className: string;
     era: string;
     stardate: string;

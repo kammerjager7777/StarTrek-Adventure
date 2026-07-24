@@ -270,6 +270,8 @@ export function stateSnapshot(state: GameState): Record<string, unknown> {
           name: state.ship.name,
           className: state.ship.className,
           integrity: state.ship.integrity,
+          shieldIntegrity: state.ship.shieldIntegrity,
+          shieldGridOnline: state.ship.shieldGridOnline,
           systems: state.ship.systems,
           scars: state.ship.scars,
         }

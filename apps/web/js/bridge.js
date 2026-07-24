@@ -1,7 +1,31 @@
 /** Star Trek Adventure — Bridge UI (Phase 1) */
 
+import {
+  initLcarsFx,
+  isLcarsSfxEnabled,
+  isLcarsTheme,
+  lcarsUiSound,
+  playIncomingTransmission,
+  playTypeTick,
+  setLcarsSfxEnabled,
+  startWaitingLoop,
+  stopWaitingLoop,
+  unlockLcarsAudio,
+} from "./lcarsFx.js";
+import {
+  initBridgeAmbient,
+  isBridgeAmbientEnabled,
+  setBridgeAmbientDucked,
+  setBridgeAmbientEnabled,
+  startBridgeAmbient,
+} from "./bridgeAmbient.js";
+
 const els = {
   log: document.getElementById("mission-log"),
+  logHistory: document.getElementById("mission-log-history"),
+  logHistoryPanel: document.getElementById("log-history"),
+  logHistoryToggle: document.getElementById("log-history-toggle"),
+  logHistorySummary: document.getElementById("log-history-summary"),
   options: document.getElementById("options-bar"),
   form: document.getElementById("command-form"),
   input: document.getElementById("command-input"),
@@ -17,6 +41,12 @@ const els = {
   viewscreen: document.getElementById("viewscreen-content"),
   viewscreenCaption: document.getElementById("viewscreen-caption"),
   viewscreenMeta: document.getElementById("viewscreen-meta"),
+  viewscreenPanel: document.getElementById("viewscreen-panel"),
+  viewscreenToggle: document.getElementById("viewscreen-toggle"),
+  viewscreenCollapseSummary: document.getElementById(
+    "viewscreen-collapse-summary"
+  ),
+  logPanel: document.getElementById("log-panel"),
   narratorBadge: document.getElementById("narrator-badge"),
   aiBanner: document.getElementById("ai-error-banner"),
   aiReason: document.getElementById("ai-error-reason"),
@@ -41,14 +71,91 @@ const els = {
   btnVoicePause: document.getElementById("btn-voice-pause"),
   btnVoiceStop: document.getElementById("btn-voice-stop"),
   voiceSpeed: document.getElementById("voice-speed"),
-  voiceVolume: document.getElementById("voice-volume"),
+  lcarsSfxToggle: document.getElementById("lcars-sfx-toggle"),
+  bridgeAmbientToggle: document.getElementById("bridge-ambient-toggle"),
   softErrorToast: document.getElementById("soft-error-toast"),
   softErrorText: document.getElementById("soft-error-text"),
   btnDismissSoftError: document.getElementById("btn-dismiss-soft-error"),
+  themeToggle: document.getElementById("theme-toggle"),
+  btnThemeClassic: document.getElementById("btn-theme-classic"),
+  btnThemeLcars: document.getElementById("btn-theme-lcars"),
+  initOverlay: document.getElementById("init-overlay"),
+  initTitle: document.getElementById("init-title"),
+  initSubtitle: document.getElementById("init-subtitle"),
+  initNetwork: document.getElementById("init-network"),
+  initStatus: document.getElementById("init-status"),
+  initChecklist: document.getElementById("init-checklist"),
+  initProgressFill: document.getElementById("init-progress-fill"),
+  initStepLabel: document.getElementById("init-step-label"),
+  initPercent: document.getElementById("init-percent"),
 };
 
 let current = null;
 let aiReady = false;
+
+/** UI theme: classic (current design) | lcars — pure visual, localStorage only */
+const THEME_PREF_KEY = "sta-ui-theme";
+
+function getUiTheme() {
+  const t = document.documentElement.getAttribute("data-ui-theme");
+  return t === "lcars" ? "lcars" : "classic";
+}
+
+function applyUiTheme(theme, { persist = true, silent = false } = {}) {
+  const prev = getUiTheme();
+  const next = theme === "lcars" ? "lcars" : "classic";
+  document.documentElement.setAttribute("data-ui-theme", next);
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_PREF_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (els.btnThemeClassic) {
+    els.btnThemeClassic.setAttribute(
+      "aria-pressed",
+      next === "classic" ? "true" : "false"
+    );
+  }
+  if (els.btnThemeLcars) {
+    els.btnThemeLcars.setAttribute(
+      "aria-pressed",
+      next === "lcars" ? "true" : "false"
+    );
+  }
+  if (!silent && prev !== next) {
+    unlockLcarsAudio();
+    lcarsUiSound(next === "lcars" ? "nav" : "close");
+  }
+  syncLcarsSfxToggleUi();
+}
+
+function syncLcarsSfxToggleUi() {
+  if (!els.lcarsSfxToggle) return;
+  els.lcarsSfxToggle.checked = isLcarsSfxEnabled();
+  // Dim when not in LCARS (still editable so preference sticks)
+  const wrap = els.lcarsSfxToggle.closest(".voice-menu-field");
+  if (wrap) {
+    wrap.classList.toggle("is-inactive-theme", !isLcarsTheme());
+  }
+}
+
+function initUiTheme() {
+  let saved = "classic";
+  try {
+    const t = localStorage.getItem(THEME_PREF_KEY);
+    if (t === "lcars" || t === "classic") saved = t;
+  } catch {
+    /* ignore */
+  }
+  // Prefer attribute already set by head script; fall back to storage
+  const fromDom = document.documentElement.getAttribute("data-ui-theme");
+  applyUiTheme(fromDom === "lcars" || fromDom === "classic" ? fromDom : saved, {
+    persist: false,
+    silent: true,
+  });
+}
 /** Prevent double-clicks / concurrent actions (causes overlapping LLM + typewriter restarts) */
 let actionInFlight = false;
 let actionSeq = 0;
@@ -56,7 +163,6 @@ const STORAGE_KEY = "sta-active-run";
 /** Local preference mirrored to server when a run is active */
 const VOICE_PREF_KEY = "sta-speech-on";
 const VOICE_SPEED_KEY = "sta-voice-speed";
-const VOICE_VOLUME_KEY = "sta-voice-volume";
 
 function loadVoiceSpeed() {
   const n = Number(localStorage.getItem(VOICE_SPEED_KEY) || "1");
@@ -64,13 +170,7 @@ function loadVoiceSpeed() {
   return 1;
 }
 
-function loadVoiceVolume() {
-  const n = Number(localStorage.getItem(VOICE_VOLUME_KEY) || "100");
-  if (Number.isFinite(n)) return Math.min(100, Math.max(0, n)) / 100;
-  return 1;
-}
-
-/** Grok TTS auto-play queue + transport */
+/** Grok TTS auto-play queue + transport (volume always full) */
 let voice = {
   enabled: localStorage.getItem(VOICE_PREF_KEY) === "1",
   token: 0,
@@ -79,7 +179,7 @@ let voice = {
   speaking: false,
   paused: false,
   speed: loadVoiceSpeed(),
-  volume: loadVoiceVolume(),
+  volume: 1,
   /** Resolvers waiting while paused before/during a chunk */
   pauseWaiters: [],
   /** performance.now() when latest narration text became available in the UI */
@@ -170,17 +270,55 @@ function networkErrorMessage(err) {
   return { message: raw || "Request failed", detail: "" };
 }
 
+/**
+ * Fetch with timeout so the bridge never waits forever.
+ * Default 90s (play turns); pass longer for portraits / heavy setup.
+ * @param {string} path
+ * @param {RequestInit & { timeoutMs?: number }} [options]
+ */
 async function api(path, options = {}) {
+  const { timeoutMs = 90_000, headers, signal: outerSignal, ...rest } = options;
+  const controller = new AbortController();
+  const timer =
+    timeoutMs > 0
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  // Combine with caller signal if provided
+  if (outerSignal) {
+    if (outerSignal.aborted) controller.abort();
+    else
+      outerSignal.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
+  }
+
   let res;
   try {
     res = await fetch(`/api${path}`, {
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-      ...options,
+      headers: { "Content-Type": "application/json", ...(headers || {}) },
+      signal: controller.signal,
+      ...rest,
     });
   } catch (err) {
+    if (timer) clearTimeout(timer);
+    if (err?.name === "AbortError") {
+      throw new ApiError(
+        "Narrator response timed out.",
+        {
+          reason: "Narrator response timed out.",
+          detail:
+            "The request took too long and was cancelled. Your voyage is still saved — try the same order again.",
+          network: true,
+          timeout: true,
+        },
+        0
+      );
+    }
     const { message, detail } = networkErrorMessage(err);
     throw new ApiError(message, { reason: message, detail, network: true }, 0);
   }
+  if (timer) clearTimeout(timer);
 
   const text = await res.text();
   let payload = {};
@@ -214,6 +352,7 @@ function showSoftError(message, detail = "") {
   if (els.softErrorToast) els.softErrorToast.classList.remove("hidden");
   if (softErrorTimer) clearTimeout(softErrorTimer);
   softErrorTimer = setTimeout(() => hideSoftError(), 12_000);
+  lcarsUiSound("deny");
 }
 
 function hideSoftError() {
@@ -337,13 +476,21 @@ function sleep(ms) {
  * Types text into an element. Returns early if cancelled or skipped.
  * Click the current log entry (or press Enter again) to skip via typewriter.skip.
  */
-async function typeText(el, text, token) {
+/**
+ * @param {HTMLElement} el
+ * @param {string} text
+ * @param {number} token
+ * @param {{ sfx?: boolean }} [opts] — LCARS typewriter ticks when sfx:true
+ */
+async function typeText(el, text, token, opts = {}) {
+  const withSfx = Boolean(opts.sfx);
   typewriter.fullText = text;
   typewriter.textEl = el;
   el.textContent = "";
   el.classList.add("typing");
 
   let i = 0;
+  let ticks = 0;
   while (i < text.length) {
     if (token !== typewriter.token) return false;
     if (typewriter.skip) {
@@ -354,6 +501,11 @@ async function typeText(el, text, token) {
     el.textContent = text.slice(0, i);
     // Keep the newest message visible while text grows
     if (i % 12 === 0) scrollLogToTop();
+    // Soft LCARS tick while Narrator prose is typed (not every char)
+    if (withSfx) {
+      ticks += 1;
+      if (ticks % 2 === 0) playTypeTick();
+    }
     // Slightly faster on spaces/newlines so it doesn't feel sluggish
     const ch = text[i - 1];
     const delay =
@@ -388,7 +540,8 @@ function render(view, opts = {}) {
   }
   updateVoiceToggleUi();
 
-  els.phase.textContent = s.phase;
+  // Phase badge: during debrief show clear success / failure
+  updatePhaseBadge(s);
   // Model badge is header-hidden (debug); keep Run panel as the debug surface
   if (els.narratorBadge) {
     const mode = view.narrator || "unknown";
@@ -410,7 +563,7 @@ function render(view, opts = {}) {
 
   renderShip(s.ship);
   renderCrew(s.ship);
-  renderObjectives(s.mission);
+  renderObjectives(s.mission, s);
   renderMeta(view.metaCommands, s.phase);
   // Options appear after typewriter finishes (unless no narration)
   renderLog(s, { forceTypewriter });
@@ -448,7 +601,7 @@ function updateVoiceToggleUi() {
       Boolean(voice.speaking && !voice.paused)
     );
     els.btnVoice.title = voice.enabled
-      ? "Auto-voice on — click to disable. Use ▾ for speed, volume, pause."
+      ? "Auto-voice on — click to disable. Use ▾ for speed and pause."
       : "Auto-voice off — click to enable. Use ▾ for options.";
   }
 
@@ -465,16 +618,12 @@ function updateVoiceToggleUi() {
   if (els.voiceSpeed && String(els.voiceSpeed.value) !== String(voice.speed)) {
     els.voiceSpeed.value = String(voice.speed);
   }
-  if (els.voiceVolume) {
-    const pct = Math.round(voice.volume * 100);
-    if (Number(els.voiceVolume.value) !== pct) els.voiceVolume.value = String(pct);
-  }
 
-  // Reflect live speed/volume on current audio element
+  // Reflect live speed; volume always full
   if (voice.audio) {
     try {
       voice.audio.playbackRate = voice.speed;
-      voice.audio.volume = voice.volume;
+      voice.audio.volume = 1;
     } catch {
       /* ignore */
     }
@@ -503,6 +652,7 @@ function stopVoicePlayback() {
     }
     voice.objectUrl = null;
   }
+  setBridgeAmbientDucked(false);
   updateVoiceToggleUi();
 }
 
@@ -526,7 +676,7 @@ function resumeVoicePlayback() {
   notifyPauseWaiters();
   if (voice.audio) {
     voice.audio.playbackRate = voice.speed;
-    voice.audio.volume = voice.volume;
+    voice.audio.volume = 1;
     voice.audio.play().catch((err) => {
       console.warn("Resume blocked:", err?.message || err);
     });
@@ -553,19 +703,6 @@ function setVoiceSpeed(speed) {
     }
   }
   updateVoiceToggleUi();
-}
-
-function setVoiceVolume(pct) {
-  const v = Math.min(100, Math.max(0, Number(pct) || 0)) / 100;
-  voice.volume = v;
-  localStorage.setItem(VOICE_VOLUME_KEY, String(Math.round(v * 100)));
-  if (voice.audio) {
-    try {
-      voice.audio.volume = v;
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 /** Split narration into clickable paragraphs for per-section replay. */
@@ -632,6 +769,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
   const token = voice.token;
   voice.paused = false;
   voice.speaking = true;
+  setBridgeAmbientDucked(true);
   clearSpeakableHighlight();
   if (highlightEl) highlightEl.classList.add("is-speaking-line");
   updateVoiceToggleUi();
@@ -682,6 +820,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
     if (token === voice.token) {
       voice.speaking = false;
       voice.paused = false;
+      setBridgeAmbientDucked(false);
       clearSpeakableHighlight();
       updateVoiceToggleUi();
     }
@@ -786,7 +925,7 @@ async function playBlob(blob, token, meta = {}) {
   voice.objectUrl = url;
   const audio = new Audio(url);
   audio.playbackRate = voice.speed;
-  audio.volume = voice.volume;
+  audio.volume = 1;
   voice.audio = audio;
   voice.speaking = true;
   updateVoiceToggleUi();
@@ -853,6 +992,21 @@ async function playBlob(blob, token, meta = {}) {
  * Expand a dialogue line into TTS units (speaker + short text chunks).
  * Narration is chunked; short crew lines stay one unit.
  */
+/** Crew dialogue only during tutorial / active mission / debrief — never bare setup */
+function phaseAllowsCrewDialogue(phase) {
+  return (
+    phase === "tutorial" ||
+    phase === "playing" ||
+    phase === "debrief" ||
+    phase === "post_mission"
+  );
+}
+
+function activeCrewDialogue(state) {
+  if (!phaseAllowsCrewDialogue(state?.phase)) return [];
+  return state.turn?.crewDialogue || [];
+}
+
 function buildSpeechQueue(state) {
   const units = [];
   if (state.pendingQuestion?.trim()) {
@@ -860,13 +1014,11 @@ function buildSpeechQueue(state) {
       units.push({ speaker: "narrator", text: chunk });
     }
   }
-  if (state.turn?.crewDialogue?.length) {
-    for (const line of state.turn.crewDialogue) {
-      if (!line?.line?.trim()) continue;
-      const chunks = chunkTextForSpeech(line.line.trim(), 360);
-      for (const chunk of chunks) {
-        units.push({ speaker: line.speaker, text: chunk });
-      }
+  for (const line of activeCrewDialogue(state)) {
+    if (!line?.line?.trim()) continue;
+    const chunks = chunkTextForSpeech(line.line.trim(), 360);
+    for (const chunk of chunks) {
+      units.push({ speaker: line.speaker, text: chunk });
     }
   }
   return units;
@@ -901,6 +1053,7 @@ async function autoSpeakBeat(state) {
   }
 
   voice.speaking = true;
+  setBridgeAmbientDucked(true);
   updateVoiceToggleUi();
 
   voiceLog("beat_start", {
@@ -921,13 +1074,13 @@ async function autoSpeakBeat(state) {
     });
 
     for (let i = 0; i < units.length; i++) {
-      if (token !== voice.token || !voice.enabled) return;
+      if (token !== voice.token || !voice.enabled) break;
 
       await waitWhilePaused(token);
-      if (token !== voice.token || !voice.enabled) return;
+      if (token !== voice.token || !voice.enabled) break;
 
       const result = await nextFetch;
-      if (token !== voice.token || !voice.enabled) return;
+      if (token !== voice.token || !voice.enabled) break;
 
       const sinceText = Math.round(performance.now() - voice.textReadyAt);
       voiceLog("chunk_ready", {
@@ -974,6 +1127,7 @@ async function autoSpeakBeat(state) {
     if (token === voice.token) {
       voice.speaking = false;
       voice.paused = false;
+      setBridgeAmbientDucked(false);
       updateVoiceToggleUi();
     }
   }
@@ -1069,6 +1223,35 @@ function closeScarModal() {
   els.scarModal?.classList.add("hidden");
 }
 
+function systemDisplayName(key) {
+  const names = {
+    shields: "Shields",
+    torpedoes: "Torpedoes",
+    warp: "Warp",
+    communications: "Comms",
+    sensors: "Sensors",
+    lifeSupport: "Life support",
+  };
+  return names[key] || key;
+}
+
+function renderIntegrityBar(label, value, max, tone, statusText) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((value / max) * 100))) : 0;
+  const low = pct <= 25 ? " is-critical" : pct <= 50 ? " is-low" : "";
+  return `<div class="integrity-bar integrity-${tone}${low}" role="meter"
+      aria-label="${escapeHtml(label)}" aria-valuenow="${value}" aria-valuemin="0" aria-valuemax="${max}">
+    <div class="integrity-bar-head">
+      <span class="integrity-bar-label">${escapeHtml(label)}</span>
+      <span class="integrity-bar-value">${value}/${max}${
+        statusText ? ` · ${escapeHtml(statusText)}` : ""
+      }</span>
+    </div>
+    <div class="integrity-bar-track">
+      <div class="integrity-bar-fill" style="width:${pct}%"></div>
+    </div>
+  </div>`;
+}
+
 function renderShip(ship) {
   if (!ship) {
     els.ship.className = "panel-body muted";
@@ -1076,13 +1259,39 @@ function renderShip(ship) {
     return;
   }
   els.ship.className = "panel-body ship-panel";
-  const systems = Object.entries(ship.systems)
-    .map(
-      ([k, v]) =>
-        `<div class="sys-row"><span>${escapeHtml(k)}</span><span class="sys-${escapeHtml(
-          v
-        )}">${escapeHtml(v)}</span></div>`
-    )
+
+  const maxHull = ship.maxIntegrity ?? 100;
+  const hull = typeof ship.integrity === "number" ? ship.integrity : maxHull;
+  const maxShield = ship.maxShieldIntegrity ?? maxHull;
+  const shield =
+    typeof ship.shieldIntegrity === "number" ? ship.shieldIntegrity : maxShield;
+  const gridOnline =
+    typeof ship.shieldGridOnline === "boolean"
+      ? ship.shieldGridOnline
+      : shield > 0;
+  const recharge = ship.shieldRechargeTurns ?? 0;
+  const shieldSys = ship.systems?.shields || "ok";
+
+  let shieldStatus = "online";
+  if (shieldSys === "destroyed") shieldStatus = "destroyed";
+  else if (!gridOnline) {
+    shieldStatus =
+      recharge > 0 ? `recharging ${recharge}t` : "offline";
+  } else if (shieldSys === "damaged") {
+    shieldStatus = "damaged";
+  }
+
+  const systems = Object.entries(ship.systems || {})
+    .map(([k, v]) => {
+      const offline =
+        v !== "ok" ? ` sys-${escapeHtml(v)}` : "";
+      return `<div class="sys-row${offline}" title="${escapeHtml(
+        systemDisplayName(k)
+      )}: ${escapeHtml(v)}">
+        <span class="sys-name">${escapeHtml(systemDisplayName(k))}</span>
+        <span class="sys-status sys-${escapeHtml(v)}">${escapeHtml(v)}</span>
+      </div>`;
+    })
     .join("");
 
   const scars = Array.isArray(ship.scars) ? ship.scars : [];
@@ -1109,14 +1318,32 @@ function renderShip(ship) {
         <div class="scar-empty-text">No lasting damage recorded</div>
       </div>`;
 
+  const registry =
+    ship.registryNumber ||
+    (String(ship.name || "").match(/\b((?:NCC|NX)[-\s]?\d[\w-]*)\b/i) ||
+      [])[1] ||
+    "";
   els.ship.innerHTML = `
     <div class="ship-identity">
       <strong>${escapeHtml(ship.name)}</strong>
+      ${
+        registry
+          ? `<div class="ship-registry">${escapeHtml(
+              String(registry).toUpperCase().replace(/\s+/g, "-").replace(/^(NCC|NX)(?!-)/, "$1-")
+            )}</div>`
+          : ""
+      }
       <div class="ship-meta">${escapeHtml(ship.className)}</div>
       <div class="ship-meta">Stardate ${escapeHtml(ship.stardate)}</div>
-      <div class="ship-integrity">Integrity: ${ship.integrity}/${ship.maxIntegrity}</div>
     </div>
-    <div class="ship-systems-block">${systems}</div>
+    <div class="integrity-bars">
+      ${renderIntegrityBar("Hull", hull, maxHull, "hull", "")}
+      ${renderIntegrityBar("Shields", shield, maxShield, "shields", shieldStatus)}
+    </div>
+    <div class="ship-systems-block">
+      <div class="systems-label">Systems</div>
+      ${systems}
+    </div>
     ${scarGrid}
   `;
 
@@ -1137,6 +1364,24 @@ let portraitsGenerating = false;
 let viewscreenRotateTimer = null;
 let viewscreenPollTimer = null;
 let viewscreenDisplayIndex = 0;
+
+/** Starfleet “Incoming Communication” poster for mission-start boot */
+const INCOMING_COMM_URL = "/assets/incoming-communication.png";
+
+/**
+ * Mission start gate (after name + ship + accept brief):
+ * 1) Expand viewscreen with Incoming Communication
+ * 2) Generate crew profiles (images + voice locks)
+ * 3) Collapse viewscreen
+ * 4) Then type/play the first gamemaster message
+ */
+let missionBoot = {
+  active: false,
+  token: 0,
+  runId: null,
+  /** Full game view held until crew is ready, then rendered as opening beat */
+  pendingView: null,
+};
 
 function crewInitials(name) {
   return String(name || "?")
@@ -1230,14 +1475,79 @@ function renderCrew(ship) {
       })
       .join("");
 
-  // Lazy-generate missing portraits once per run
-  maybeRequestPortraits();
+  bindCrewCardExpandHandlers(ship.crew);
+  // Image crew once a ship is assigned (ship select init, mission boot, or playing)
+  if (current?.state?.ship?.crew?.length) {
+    maybeRequestPortraits();
+  }
+}
+
+/** Debounce hail/greeting per officer so hover spam does not stack */
+const crewHailCooldown = new Map();
+
+function buildCrewGreeting(member) {
+  const name = (member.name || "Officer").replace(/^Cmdr\.?\s*/i, "Commander ");
+  const role = member.role || "bridge officer";
+  const species = member.species ? ` ${member.species}` : "";
+  // Short, TTS-friendly bridge hail
+  return `Channel open. ${name}, ${role}${species}, standing by, Captain.`;
+}
+
+/**
+ * On crew card hover-expand: incoming transmission SFX, then spoken greeting.
+ */
+function bindCrewCardExpandHandlers(crew) {
+  if (!els.crew) return;
+  els.crew.querySelectorAll(".crew-tab[data-crew-id]").forEach((tab) => {
+    tab.addEventListener("mouseenter", () => {
+      void onCrewCardExpand(tab, crew);
+    });
+    // Keyboard / touch: focus also counts as expand
+    tab.tabIndex = 0;
+    tab.addEventListener("focus", () => {
+      void onCrewCardExpand(tab, crew);
+    });
+  });
+}
+
+async function onCrewCardExpand(tab, crewList) {
+  const id = tab.getAttribute("data-crew-id");
+  if (!id) return;
+  // Avoid re-fire while this card is already hailing
+  if (tab.classList.contains("is-hailing")) return;
+  const now = Date.now();
+  const last = crewHailCooldown.get(id) || 0;
+  // 12s cooldown per officer
+  if (now - last < 12_000) return;
+  crewHailCooldown.set(id, now);
+
+  const member = (crewList || []).find((c) => c.id === id);
+  if (!member) return;
+  // Need an active run for TTS
+  if (!current?.state?.runId || !aiReady) return;
+
+  tab.classList.add("is-hailing");
+  try {
+    // Incoming transmission cue (LCARS theme + SFX on)
+    await playIncomingTransmission();
+    // Spoken greeting in that officer's locked voice
+    const line = buildCrewGreeting(member);
+    await replaySpeech(member.name, line, tab);
+  } finally {
+    tab.classList.remove("is-hailing");
+  }
 }
 
 async function maybeRequestPortraits() {
   const runId = current?.state?.runId;
   const crew = current?.state?.ship?.crew;
-  if (!runId || !crew?.length || !aiReady) return;
+  if (!runId || !crew?.length || !aiReady) {
+    if (missionBoot.active) maybeFinishMissionBoot();
+    return;
+  }
+
+  // Skip if a full-screen crew init is driving the request (avoids double POST)
+  if (crewInitInFlight) return;
 
   const needs = crew.some(
     (c) =>
@@ -1248,21 +1558,33 @@ async function maybeRequestPortraits() {
   const needsRetry = crew.some((c) => c.portraitStatus === "failed" && !c.imageUrl);
   if (!needs && !needsRetry) {
     portraitsGenerating = false;
+    if (missionBoot.active) maybeFinishMissionBoot();
     return;
   }
-  if (portraitRequestFor === runId) return;
+  // Already imaging this run — keep mission boot waiting on the in-flight job
+  if (portraitRequestFor === runId) {
+    if (missionBoot.active) {
+      paintMissionBootViewscreen("Imaging crew profiles…");
+    }
+    return;
+  }
   portraitRequestFor = runId;
   portraitsGenerating = true;
 
   // Re-render immediately so imaging banner/spinners appear
   if (current?.state?.ship) {
-    renderCrew(current.state.ship);
+    // Avoid re-entry: renderCrew → maybeRequestPortraits; temporary flag
+    const ship = current.state.ship;
+    els.crew && renderCrewWithoutPortraitKick(ship);
+  }
+
+  if (missionBoot.active) {
+    paintMissionBootViewscreen("Imaging crew profiles…");
   }
 
   try {
     const view = await api(`/games/${runId}/crew/portraits`, { method: "POST" });
     portraitsGenerating = false;
-    // Only refresh ship/crew — never re-run typewriter for the same narration beat
     if (current?.state?.runId === runId) {
       current = {
         ...current,
@@ -1271,22 +1593,497 @@ async function maybeRequestPortraits() {
           ship: view.state.ship,
         },
       };
+      // Keep pending opening view's ship in sync
+      if (missionBoot.pendingView?.state) {
+        missionBoot.pendingView = {
+          ...missionBoot.pendingView,
+          state: {
+            ...missionBoot.pendingView.state,
+            ship: view.state.ship,
+          },
+        };
+      }
       renderShip(view.state.ship);
-      renderCrew(view.state.ship);
+      renderCrewWithoutPortraitKick(view.state.ship);
+    }
+    if (missionBoot.active) {
+      paintMissionBootViewscreen("Crew profiles online");
+      maybeFinishMissionBoot();
     }
   } catch (err) {
     console.warn("Portrait generation failed:", err.message);
     portraitsGenerating = false;
     portraitRequestFor = null;
     if (current?.state?.ship) {
-      renderCrew(current.state.ship);
+      renderCrewWithoutPortraitKick(current.state.ship);
     }
+    // Don't block the bridge forever if imaging fails
+    if (missionBoot.active) maybeFinishMissionBoot();
   }
 }
 
+/** True right after the player commissions a vessel (preset or custom) */
+function justAcquiredShip(phaseBefore, view) {
+  const ship = view?.state?.ship;
+  if (!ship?.crew?.length) return false;
+  if (phaseBefore === "ship_select" && view.state.phase !== "ship_custom") {
+    return true;
+  }
+  if (phaseBefore === "ship_custom" && view.state.phase === "mission_type") {
+    return true;
+  }
+  return false;
+}
+
+let crewInitInFlight = false;
+
+/**
+ * Full-screen init after ship select: assemble roster, lock voices, image portraits.
+ * Returns the view with ship/crew portraits applied when possible.
+ */
+async function initializeCrewAfterShipSelect(view) {
+  const runId = view?.state?.runId;
+  if (!runId || !view.state?.ship?.crew?.length) return view;
+
+  const steps = [
+    { key: "roster", label: "Assembling command roster", pct: 18 },
+    { key: "voice", label: "Assigning voice profiles", pct: 42 },
+    { key: "visual", label: "Locking visual identities", pct: 72 },
+    { key: "ready", label: "Roster online", pct: 100 },
+  ];
+
+  crewInitInFlight = true;
+  try {
+    return await withInitScreen(
+      {
+        title: "System Initialization",
+        subtitle: "Starfleet Command · Bridge crew configuration",
+        status: "INITIALIZING COMMAND ROSTER…",
+        network: "Personnel Database LCARS",
+        steps,
+        completeLabel: "Command roster online",
+      },
+      async (update) => {
+        // Show ship/crew panels under the overlay (log waits until init ends)
+        current = view;
+        setActiveRun(runId);
+        els.phase.textContent = view.state.phase || "mission_type";
+        renderShip(view.state.ship);
+        renderCrewWithoutPortraitKick(view.state.ship);
+        renderObjectives(view.state.mission, view.state);
+        renderMeta(view.metaCommands, view.state.phase);
+        renderOptions([]);
+
+        update({
+          key: "roster",
+          label: "Assembling command roster",
+          pct: 22,
+        });
+        await sleep(280);
+
+        update({
+          key: "voice",
+          label: "Assigning voice profiles",
+          pct: 48,
+        });
+        await sleep(200);
+
+        const needs = view.state.ship.crew.some(
+          (c) =>
+            !c.imageUrl &&
+            c.portraitStatus !== "ready" &&
+            c.portraitStatus !== "failed"
+        );
+
+        if (needs) {
+          update({
+            key: "visual",
+            label: "Locking visual identities…",
+            pct: 58,
+          });
+          portraitRequestFor = runId;
+          portraitsGenerating = true;
+          renderCrewWithoutPortraitKick(view.state.ship);
+          try {
+            const portraitView = await api(`/games/${runId}/crew/portraits`, {
+              method: "POST",
+              timeoutMs: 180_000,
+            });
+            portraitsGenerating = false;
+            if (portraitView?.state?.ship) {
+              view = {
+                ...view,
+                state: {
+                  ...view.state,
+                  ship: portraitView.state.ship,
+                },
+              };
+              current = {
+                ...current,
+                state: {
+                  ...current.state,
+                  ship: portraitView.state.ship,
+                },
+              };
+              renderShip(view.state.ship);
+              renderCrewWithoutPortraitKick(view.state.ship);
+            }
+          } catch (err) {
+            console.warn("Crew portrait init failed:", err?.message || err);
+            portraitsGenerating = false;
+            portraitRequestFor = null;
+          }
+        } else {
+          update({
+            key: "visual",
+            label: "Visual identities already on file",
+            pct: 80,
+          });
+        }
+
+        update({
+          key: "ready",
+          label: "Roster online",
+          pct: 100,
+          done: true,
+        });
+        return view;
+      }
+    );
+  } finally {
+    crewInitInFlight = false;
+    portraitsGenerating = false;
+  }
+}
+
+/** Render crew UI without kicking another portrait request */
+function renderCrewWithoutPortraitKick(ship) {
+  if (!ship?.crew?.length) {
+    els.crew.className = "panel-body crew-panel muted";
+    els.crew.textContent = "—";
+    return;
+  }
+  const pendingCount = ship.crew.filter(crewNeedsPortrait).length;
+  const showGenerating = portraitsGenerating && pendingCount > 0;
+  els.crew.className = "panel-body crew-panel";
+  els.crew.innerHTML =
+    (showGenerating
+      ? `<div class="crew-imaging-banner" role="status" aria-live="polite">
+          <span class="crew-imaging-spinner" aria-hidden="true"></span>
+          <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
+        </div>`
+      : "") +
+    ship.crew
+      .map((c) => {
+        const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
+        const needsImg = crewNeedsPortrait(c);
+        const generating = showGenerating && needsImg;
+        const status = generating
+          ? "generating"
+          : c.portraitStatus || (c.imageUrl ? "ready" : "none");
+        const photo = c.imageUrl
+          ? `<img class="crew-fill-photo" src="${escapeHtml(
+              c.imageUrl
+            )}" alt="${escapeHtml(c.name)}" loading="lazy" draggable="false" />`
+          : `<div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
+              crewInitials(c.name)
+            )}</div>`;
+
+        return `<article class="crew-tab${
+          generating ? " is-imaging" : ""
+        }" data-crew-id="${escapeHtml(c.id)}">
+        <div class="crew-card-face">
+          ${photo}
+          ${
+            generating
+              ? `<div class="crew-imaging-overlay" aria-hidden="true">
+                   <span class="crew-imaging-spinner"></span>
+                   <span class="crew-imaging-label">Imaging</span>
+                 </div>`
+              : ""
+          }
+          <div class="crew-card-gradient"></div>
+          <div class="crew-card-overlay">
+            <div class="crew-tab-name">${escapeHtml(c.name)}</div>
+            <div class="crew-tab-role">${escapeHtml(c.role)}</div>
+          </div>
+        </div>
+        <div class="crew-tab-details">
+          <div class="crew-detail-grid">
+            <div><span class="crew-label">Species</span>${escapeHtml(
+              c.species || "Unknown"
+            )}</div>
+            <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
+            <div class="crew-span"><span class="crew-label">Personality</span>${escapeHtml(
+              c.personality || "—"
+            )}</div>
+            <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
+              c.bio || "No dossier on file."
+            )}</div>
+            <div class="crew-span"><span class="crew-label">Voice</span>${escapeHtml(
+              c.voice
+                ? `${c.voice.voiceName || c.voice.voiceId} · ${c.voice.baselineTone || "locked"}`
+                : "unassigned"
+            )}</div>
+            <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
+              status
+            )}</div>
+          </div>
+        </div>
+      </article>`;
+      })
+      .join("");
+  bindCrewCardExpandHandlers(ship.crew);
+}
+
+/** True when the player is accepting the mission brief to begin play */
+function isMissionBeginAction(phase, text) {
+  if (phase !== "mission_brief") return false;
+  const t = String(text || "").trim();
+  // Choice 2 = return to mission list
+  if (/^2([.\s:]|$)/.test(t)) return false;
+  if (/\b(return|back|list|other mission|decline)\b/i.test(t)) return false;
+  return true;
+}
+
+function crewProfilesReady(ship) {
+  const crew = ship?.crew || [];
+  if (!crew.length) return true;
+  if (portraitsGenerating) return false;
+  // Treat failed as done so a bad image API cannot soft-lock the bridge
+  return !crew.some(
+    (c) =>
+      !c.imageUrl &&
+      c.portraitStatus !== "ready" &&
+      c.portraitStatus !== "failed"
+  );
+}
+
+function paintMissionBootViewscreen(statusLabel) {
+  if (!els.viewscreen) return;
+  stopViewscreenTimers();
+  els.viewscreen.classList.add("has-image", "mission-boot-active");
+  els.viewscreen.innerHTML = `<img class="viewscreen-image incoming-comm" src="${INCOMING_COMM_URL}" alt="Incoming communication from Starfleet Command" />`;
+  const status = statusLabel || "Incoming communication — stand by";
+  if (els.viewscreenCaption) {
+    els.viewscreenCaption.textContent = "Incoming Communication";
+  }
+  if (els.viewscreenMeta) {
+    els.viewscreenMeta.textContent = status;
+  }
+  if (els.viewscreenCollapseSummary) {
+    els.viewscreenCollapseSummary.textContent = status;
+  }
+  // Ensure expanded while booting (do not persist — temporary)
+  setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, true, {
+    persist: false,
+  });
+  if (els.viewscreenPanel) {
+    els.viewscreenPanel.classList.add("mission-boot-open");
+  }
+}
+
+/**
+ * Begin mission-start presentation: expand viewscreen with Starfleet poster.
+ * Holds the first gamemaster message until crew profiles (image + voice) are ready.
+ */
+function startMissionBoot(runId, statusLabel) {
+  missionBoot.token += 1;
+  missionBoot.active = true;
+  missionBoot.runId = runId || current?.state?.runId || null;
+  missionBoot.pendingView = null;
+  paintMissionBootViewscreen(
+    statusLabel || "Incoming communication — stand by"
+  );
+  // Lock command line until crew is ready and opening beat can play
+  if (els.input) els.input.disabled = true;
+  if (els.engageBtn) {
+    els.engageBtn.disabled = true;
+    els.engageBtn.textContent = "Waiting…";
+  }
+  if (els.form) els.form.classList.add("is-waiting");
+  if (els.options) {
+    els.options.classList.add("hidden");
+    els.options.innerHTML = "";
+  }
+  if (els.log) {
+    els.log.innerHTML = `<div class="log-entry system"><div class="who">Channel</div><div class="text">Incoming communication from Starfleet Command. Stand by…</div></div>`;
+  }
+  playIncomingTransmission();
+}
+
+/**
+ * Hold opening scene until crew images/voice locks finish, then collapse and play.
+ */
+function holdOpeningForMissionBoot(view) {
+  if (!missionBoot.active) return false;
+  missionBoot.pendingView = view;
+  current = view;
+  setActiveRun(view.state?.runId);
+  const s = view.state;
+  updatePhaseBadge(s);
+  renderShip(s.ship);
+  renderCrew(s.ship); // kicks portrait gen now that boot is active
+  renderObjectives(s.mission, s);
+  renderMeta(view.metaCommands, s.phase);
+  renderOptions([]);
+  paintMissionBootViewscreen(
+    portraitsGenerating || !crewProfilesReady(s.ship)
+      ? "Imaging crew profiles…"
+      : "Crew profiles online"
+  );
+  // If crew already fully ready, finish immediately
+  maybeFinishMissionBoot();
+  return true;
+}
+
+function maybeFinishMissionBoot() {
+  if (!missionBoot.active) return;
+  if (!crewProfilesReady(current?.state?.ship)) {
+    paintMissionBootViewscreen("Imaging crew profiles…");
+    return;
+  }
+  // Need the opening scene before we can hand off to the log
+  if (!missionBoot.pendingView) {
+    paintMissionBootViewscreen("Receiving Starfleet orders…");
+    return;
+  }
+  finishMissionBoot();
+}
+
+function finishMissionBoot() {
+  if (!missionBoot.active) return;
+  const pendingView = missionBoot.pendingView;
+  missionBoot.active = false;
+  missionBoot.token += 1;
+  missionBoot.runId = null;
+  missionBoot.pendingView = null;
+
+  if (els.viewscreenPanel) {
+    els.viewscreenPanel.classList.remove("mission-boot-open");
+  }
+  if (els.viewscreen) {
+    els.viewscreen.classList.remove("mission-boot-active");
+  }
+
+  // Collapse viewscreen — then start the first gamemaster message
+  setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, false, {
+    persist: true,
+  });
+  lcarsUiSound("close");
+
+  if (els.form) els.form.classList.remove("is-waiting");
+  if (els.options) {
+    els.options.classList.remove("hidden", "is-waiting");
+  }
+  if (els.engageBtn) {
+    els.engageBtn.disabled = !aiReady || actionInFlight;
+    els.engageBtn.textContent = "Engage";
+  }
+  if (els.input) els.input.disabled = !aiReady || actionInFlight;
+
+  if (pendingView) {
+    // Now the player hears/reads the opening beat
+    render(pendingView, { forceTypewriter: true });
+  } else if (current?.state) {
+    renderViewscreen(current.state);
+  }
+
+  if (aiReady && els.input && !actionInFlight) {
+    els.input.focus();
+  }
+}
+
+function cancelMissionBoot() {
+  if (!missionBoot.active && !missionBoot.pendingView) return;
+  missionBoot.active = false;
+  missionBoot.token += 1;
+  missionBoot.runId = null;
+  missionBoot.pendingView = null;
+  if (els.viewscreenPanel) {
+    els.viewscreenPanel.classList.remove("mission-boot-open");
+  }
+  if (els.viewscreen) {
+    els.viewscreen.classList.remove("mission-boot-active");
+  }
+  if (els.form && !actionInFlight) els.form.classList.remove("is-waiting");
+  if (els.options) {
+    els.options.classList.remove("hidden", "is-waiting");
+  }
+  if (els.engageBtn && !actionInFlight) {
+    els.engageBtn.disabled = !aiReady;
+    els.engageBtn.textContent = "Engage";
+  }
+  if (els.input && !actionInFlight) els.input.disabled = !aiReady;
+}
+
 function statusClass(status) {
-  // Active = green; anything else (completed / failed / missed) = inactive red
-  return status === "active" ? "obj-status-active" : "obj-status-inactive";
+  if (status === "active") return "obj-status-active";
+  if (status === "completed") return "obj-status-completed";
+  if (status === "failed") return "obj-status-failed";
+  // missed / other
+  return "obj-status-inactive";
+}
+
+/** Resolve mission success/failure for UI (works for older saves too). */
+function resolveMissionOutcome(mission, state) {
+  if (mission?.status === "success" || mission?.status === "failed") {
+    return mission.status;
+  }
+  const phase = state?.phase;
+  if (phase !== "debrief" && phase !== "post_mission") return null;
+  const text = `${state?.debrief || ""}\n${state?.pendingQuestion || ""}`;
+  if (/mission successful|mission complete/i.test(text)) return "success";
+  if (/mission failed|mission failure/i.test(text)) return "failed";
+  // Debrief without a clear banner — still treat as ended
+  return "failed";
+}
+
+/**
+ * Never show [active] after the mission is over.
+ * Open main goals → completed (success) or failed; open secondaries → missed.
+ */
+function objectivesForDisplay(mission, state) {
+  const list = mission?.objectives || [];
+  const outcome = resolveMissionOutcome(mission, state);
+  if (!outcome) return list;
+  return list.map((o) => {
+    if (o.status !== "active") return o;
+    if (outcome === "success") {
+      return {
+        ...o,
+        status: o.kind === "main" ? "completed" : "missed",
+      };
+    }
+    return {
+      ...o,
+      status: o.kind === "main" ? "failed" : "missed",
+    };
+  });
+}
+
+function updatePhaseBadge(state) {
+  if (!els.phase) return;
+  els.phase.classList.remove(
+    "is-success",
+    "is-failure",
+    "is-debrief-outcome"
+  );
+  const phase = state?.phase || "—";
+  if (phase === "debrief" || phase === "post_mission") {
+    const outcome = resolveMissionOutcome(state?.mission, state);
+    if (outcome === "success") {
+      els.phase.textContent = "successful";
+      els.phase.classList.add("is-success", "is-debrief-outcome");
+      return;
+    }
+    if (outcome === "failed") {
+      els.phase.textContent = "failure";
+      els.phase.classList.add("is-failure", "is-debrief-outcome");
+      return;
+    }
+  }
+  els.phase.textContent = phase;
 }
 
 function renderObjectiveList(objectives) {
@@ -1300,18 +2097,28 @@ function renderObjectiveList(objectives) {
     .join("");
 }
 
-function renderObjectives(mission) {
+function renderObjectives(mission, state = null) {
   if (!mission) {
     els.objectives.className = "panel-body muted";
     els.objectives.textContent = "—";
     return;
   }
 
-  const main = mission.objectives.filter((o) => o.kind === "main");
-  const secondary = mission.objectives.filter((o) => o.kind === "secondary");
+  const gameState = state || current?.state || null;
+  const objectives = objectivesForDisplay(mission, gameState);
+  const main = objectives.filter((o) => o.kind === "main");
+  const secondary = objectives.filter((o) => o.kind === "secondary");
+  const outcome = resolveMissionOutcome(mission, gameState);
+  let outcomeHtml = "";
+  if (outcome === "success") {
+    outcomeHtml = `<div class="mission-outcome is-success" role="status">Mission successful</div>`;
+  } else if (outcome === "failed") {
+    outcomeHtml = `<div class="mission-outcome is-failure" role="status">Mission failure</div>`;
+  }
 
   els.objectives.className = "panel-body objectives-panel";
   els.objectives.innerHTML = `
+    ${outcomeHtml}
     <div class="obj-mission-title">${escapeHtml(mission.title)}</div>
     <div class="obj-location">@ ${escapeHtml(mission.location)}</div>
     <div class="obj-group">
@@ -1338,23 +2145,44 @@ function renderMeta(commands, phase) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = cmd;
-    btn.addEventListener("click", () => sendAction(cmd));
+    btn.addEventListener("click", () => {
+      lcarsUiSound("secondary");
+      stopVoicePlayback();
+      sendAction(cmd);
+    });
     els.meta.appendChild(btn);
   }
 }
 
 function scrollLogToTop() {
-  // New messages are prepended at the top of the mission log
-  els.log.scrollTop = 0;
+  // Current beat sits at the top of the always-visible mission log
+  if (els.log) els.log.scrollTop = 0;
 }
 
+function updateHistorySummary(count) {
+  if (!els.logHistorySummary) return;
+  if (count <= 0) {
+    els.logHistorySummary.textContent = "No prior entries";
+  } else if (count === 1) {
+    els.logHistorySummary.textContent = "1 prior entry";
+  } else {
+    els.logHistorySummary.textContent = `${count} prior entries`;
+  }
+}
+
+/** Prior log entries only — lives in the collapsible History section */
 function appendPastLog(state) {
+  const host = els.logHistory || els.log;
+  if (!host) return;
+  host.innerHTML = "";
   const recent = [...state.log].slice(-40).reverse();
+  let count = 0;
   recent.forEach((item, index) => {
     // Skip only the exact current prompt (already shown as "Narrator · now")
     if (item.text === state.pendingQuestion && item.kind === "narration") return;
     // Hide mechanical dice rolls from the player-facing log
     if (item.kind === "roll") return;
+    count += 1;
     const entry = document.createElement("div");
     const ageBand = index < 2 ? "age-0" : index < 5 ? "age-1" : "age-2";
     entry.className = `log-entry past ${ageBand} ${item.kind}`;
@@ -1374,25 +2202,27 @@ function appendPastLog(state) {
     } else {
       textEl.textContent = item.text;
     }
-    els.log.appendChild(entry);
+    host.appendChild(entry);
   });
+  updateHistorySummary(count);
+  if (els.logHistoryPanel) {
+    els.logHistoryPanel.classList.toggle("is-empty", count === 0);
+  }
 }
 
 function renderLogStaticCurrent(state, options) {
-  /** Paint current narration fully (no typewriter) + history */
-  els.log.innerHTML = "";
-  if (state.pendingQuestion) {
+  /** Paint current narration fully (no typewriter) + rebuild history */
+  if (els.log) els.log.innerHTML = "";
+  if (state.pendingQuestion && els.log) {
     const entry = document.createElement("div");
     entry.className = "log-entry current narration";
     entry.innerHTML = `<div class="who">Narrator · now <span class="type-hint">click a line to hear it</span></div><div class="text"></div>`;
     const textEl = entry.querySelector(".text");
     fillSpeakableNarration(textEl, state.pendingQuestion);
-    if (state.turn?.crewDialogue?.length) {
-      for (const line of state.turn.crewDialogue) {
-        const d = document.createElement("div");
-        fillSpeakableCrewLine(d, line.speaker, line.line);
-        entry.appendChild(d);
-      }
+    for (const line of activeCrewDialogue(state)) {
+      const d = document.createElement("div");
+      fillSpeakableCrewLine(d, line.speaker, line.line);
+      entry.appendChild(d);
     }
     // Dice rolls stay server-side only — not shown to the player
     els.log.appendChild(entry);
@@ -1431,17 +2261,17 @@ function renderLog(state, opts = {}) {
   // New narration beat — cancel previous typer and start fresh
   cancelTypewriter();
   stopVoicePlayback();
-  els.log.innerHTML = "";
+  if (els.log) els.log.innerHTML = "";
   renderOptions([]); // hide choices while typing
 
-  if (state.pendingQuestion) {
+  if (state.pendingQuestion && els.log) {
     const entry = document.createElement("div");
     entry.className = "log-entry current narration";
     entry.title = "Click to skip typewriter; after it finishes, click a paragraph or crew line to hear it";
     entry.innerHTML = `<div class="who">Narrator · now <span class="type-hint">click to skip · then click a line to replay</span></div><div class="text"></div>`;
     const textEl = entry.querySelector(".text");
 
-    const crewLines = state.turn?.crewDialogue || [];
+    const crewLines = activeCrewDialogue(state);
     const extras = crewLines.map((line) => ({
       className: "crew-line",
       text: `${line.speaker}: "${line.line}"`,
@@ -1464,6 +2294,7 @@ function renderLog(state, opts = {}) {
     }
 
     els.log.appendChild(entry);
+    // History is separate — rebuild prior entries without clearing current
     appendPastLog(state);
 
     entry.addEventListener("click", (e) => {
@@ -1486,7 +2317,10 @@ function renderLog(state, opts = {}) {
     scrollLogToTop();
 
     (async () => {
-      const ok = await typeText(textEl, state.pendingQuestion, token);
+      // Narrator message typing: LCARS soft ticks
+      const ok = await typeText(textEl, state.pendingQuestion, token, {
+        sfx: true,
+      });
       if (!ok || token !== typewriter.token) return;
 
       // Convert plain typed narration into clickable paragraphs
@@ -1528,44 +2362,202 @@ function renderOptions(options) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "option-btn";
-    btn.disabled = actionInFlight;
+    btn.disabled = actionInFlight || missionBoot.active;
     btn.innerHTML = `<span class="num">${opt.id}.</span> ${escapeHtml(opt.text)}`;
     // Send full choice text so the mission log shows the order, not just "1"
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      lcarsUiSound("primary");
+      // New order makes current narrator/cast speech irrelevant
+      stopVoicePlayback();
       sendAction(`${opt.id}. ${opt.text}`);
     });
     els.options.appendChild(btn);
   }
 }
 
+/**
+ * Expand/collapse viewscreen + in-log History strip (smooth CSS grid animation).
+ * Mission log shell stays open so the current narration is always visible.
+ * Viewscreen auto-expands while the Narrator is responding.
+ */
+const PANEL_PREF_KEY = "sta-panel-expanded";
+
+function loadPanelExpandedPrefs() {
+  try {
+    const raw = localStorage.getItem(PANEL_PREF_KEY);
+    // Default: viewscreen collapsed until mission-start Incoming Communication
+    if (!raw) return { viewscreen: false, history: false };
+    const parsed = JSON.parse(raw);
+    return {
+      // Only open if the user explicitly expanded it
+      viewscreen: parsed.viewscreen === true,
+      // History is always collapsed unless the user explicitly expanded it
+      history: parsed.history === true,
+    };
+  } catch {
+    return { viewscreen: false, history: false };
+  }
+}
+
+function savePanelExpandedPrefs() {
+  try {
+    localStorage.setItem(
+      PANEL_PREF_KEY,
+      JSON.stringify({
+        viewscreen: isPanelExpanded(els.viewscreenPanel),
+        history: isPanelExpanded(els.logHistoryPanel),
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function isPanelExpanded(panel) {
+  return Boolean(panel && panel.classList.contains("is-expanded"));
+}
+
+function setPanelExpanded(panel, toggleBtn, expanded, { persist = true } = {}) {
+  if (!panel) return;
+  panel.classList.toggle("is-expanded", expanded);
+  panel.classList.toggle("is-collapsed", !expanded);
+  if (toggleBtn) {
+    toggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const chev = toggleBtn.querySelector(".collapse-chevron");
+    if (chev) chev.textContent = expanded ? "▾" : "▸";
+  }
+  if (persist) savePanelExpandedPrefs();
+}
+
+function togglePanel(panel, toggleBtn) {
+  const next = !isPanelExpanded(panel);
+  setPanelExpanded(panel, toggleBtn, next, { persist: true });
+  lcarsUiSound(next ? "open" : "close");
+}
+
+function initCollapsiblePanels() {
+  const prefs = loadPanelExpandedPrefs();
+  // Defaults: viewscreen collapsed; History strip collapsed; mission log always open
+  setPanelExpanded(
+    els.viewscreenPanel,
+    els.viewscreenToggle,
+    prefs.viewscreen,
+    { persist: false }
+  );
+  setPanelExpanded(
+    els.logHistoryPanel,
+    els.logHistoryToggle,
+    Boolean(prefs.history),
+    { persist: false }
+  );
+  // Clear stale open state from older builds once
+  try {
+    const raw = localStorage.getItem(PANEL_PREF_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.log != null) {
+        localStorage.setItem(
+          PANEL_PREF_KEY,
+          JSON.stringify({
+            viewscreen: parsed.viewscreen === true,
+            history: parsed.history === true,
+          })
+        );
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (els.viewscreenToggle) {
+    els.viewscreenToggle.addEventListener("click", () => {
+      togglePanel(els.viewscreenPanel, els.viewscreenToggle);
+    });
+  }
+  if (els.logHistoryToggle) {
+    els.logHistoryToggle.addEventListener("click", () => {
+      togglePanel(els.logHistoryPanel, els.logHistoryToggle);
+    });
+  }
+}
+
+/** Elapsed-time ticker while Narrator is thinking (proves the UI is not frozen) */
+let waitingElapsedTimer = null;
+let waitingStartedAt = 0;
+
+function stopWaitingElapsed() {
+  if (waitingElapsedTimer != null) {
+    clearInterval(waitingElapsedTimer);
+    waitingElapsedTimer = null;
+  }
+  waitingStartedAt = 0;
+}
+
+function startWaitingElapsed(baseDetail = "") {
+  stopWaitingElapsed();
+  waitingStartedAt = performance.now();
+  const paint = () => {
+    if (!els.waitingDetail || !actionInFlight) return;
+    const sec = Math.floor((performance.now() - waitingStartedAt) / 1000);
+    const trimmed = (baseDetail || "").replace(/\s+/g, " ").trim();
+    const order = trimmed
+      ? `Order: ${trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed}`
+      : "Contacting the Narrator…";
+    const hint =
+      sec >= 45
+        ? " · still working (long turns can take up to ~90s)"
+        : sec >= 20
+          ? " · composing scene…"
+          : "";
+    els.waitingDetail.textContent = `${order} · ${sec}s${hint}`;
+  };
+  paint();
+  waitingElapsedTimer = setInterval(paint, 1000);
+}
+
 function setActionBusy(busy, detail = "") {
   actionInFlight = busy;
-  if (els.input) els.input.disabled = busy || !aiReady;
+  const lockInput = busy || !aiReady || missionBoot.active;
+  if (els.input) els.input.disabled = lockInput;
   if (els.engageBtn) {
-    els.engageBtn.disabled = busy || !aiReady;
-    els.engageBtn.textContent = busy ? "Waiting…" : "Engage";
+    els.engageBtn.disabled = lockInput;
+    els.engageBtn.textContent =
+      busy || missionBoot.active ? "Waiting…" : "Engage";
   }
-  if (els.form) els.form.classList.toggle("is-waiting", busy);
-  // Hide choices while waiting — avoids looking like nothing happened / double-clicks
+  if (els.form) els.form.classList.toggle("is-waiting", busy || missionBoot.active);
+  // Hide choices while waiting or mission-booting
   if (els.options) {
-    els.options.classList.toggle("is-waiting", busy);
-    els.options.classList.toggle("hidden", busy);
+    const hideOpts = busy || missionBoot.active;
+    els.options.classList.toggle("is-waiting", hideOpts);
+    els.options.classList.toggle("hidden", hideOpts);
     els.options?.querySelectorAll("button.option-btn").forEach((btn) => {
-      btn.disabled = busy;
+      btn.disabled = hideOpts;
     });
   }
   if (els.waitingBanner) {
-    els.waitingBanner.classList.toggle("hidden", !busy);
+    // Mission boot uses the viewscreen poster; skip the small waiting banner
+    els.waitingBanner.classList.toggle("hidden", !busy || missionBoot.active);
   }
   if (els.waitingDetail) {
-    const trimmed = (detail || "").replace(/\s+/g, " ").trim();
-    els.waitingDetail.textContent = busy
-      ? trimmed
-        ? `Order: ${trimmed.length > 90 ? `${trimmed.slice(0, 90)}…` : trimmed}`
-        : "Contacting the Narrator. This can take several seconds."
-      : "Stand by on the bridge.";
+    if (busy && !missionBoot.active) {
+      startWaitingElapsed(detail);
+    } else {
+      stopWaitingElapsed();
+      els.waitingDetail.textContent = busy
+        ? "Stand by…"
+        : "Stand by on the bridge.";
+    }
+  }
+
+  // Waiting cue only — do not auto-expand viewscreen on every option
+  // (mission boot expands explicitly for Incoming Communication)
+  if (busy) {
+    startWaitingLoop();
+  } else {
+    stopWaitingLoop();
+    stopWaitingElapsed();
   }
 
   // Soft cue on the log header while waiting
@@ -1573,15 +2565,22 @@ function setActionBusy(busy, detail = "") {
     if (busy) {
       els.phase.dataset.prevText =
         els.phase.dataset.prevText || els.phase.textContent;
+      els.phase.classList.remove(
+        "is-success",
+        "is-failure",
+        "is-debrief-outcome"
+      );
       els.phase.textContent = "waiting";
       els.phase.classList.add("is-waiting-badge");
     } else {
       els.phase.classList.remove("is-waiting-badge");
-      // Prefer live game phase after render; fall back to pre-wait label
-      els.phase.textContent =
-        current?.state?.phase ||
-        els.phase.dataset.prevText ||
-        els.phase.textContent;
+      // Prefer live game state (includes success/failure on debrief)
+      if (current?.state) {
+        updatePhaseBadge(current.state);
+      } else {
+        els.phase.textContent =
+          els.phase.dataset.prevText || els.phase.textContent;
+      }
       delete els.phase.dataset.prevText;
     }
   }
@@ -1629,9 +2628,29 @@ function paintViewscreenFrame(frame, index, total, generating) {
     if (generating) bits.push("imaging…");
     els.viewscreenMeta.textContent = bits.join(" · ");
   }
+  // Collapsed header shows the same caption so the screen stays useful when closed
+  if (els.viewscreenCollapseSummary) {
+    const bits = [];
+    bits.push(frame?.caption || "Standby");
+    if (total > 0) bits.push(`${index + 1}/${total}`);
+    if (generating) bits.push("imaging…");
+    els.viewscreenCollapseSummary.textContent = bits.join(" · ");
+  }
 }
 
 function renderViewscreen(state) {
+  // Mission-start poster owns the viewscreen until crew profiles are ready
+  if (missionBoot.active) {
+    paintMissionBootViewscreen(
+      missionBoot.pendingView
+        ? crewProfilesReady(state?.ship)
+          ? "Crew profiles online"
+          : "Imaging crew profiles…"
+        : "Receiving Starfleet orders…"
+    );
+    return;
+  }
+
   const frames = readyViewscreenFrames(state);
   const generating = Boolean(state?.viewscreen?.generating);
   const pendingPrompt = state?.turn?.viewscreenPrompt;
@@ -1740,23 +2759,40 @@ async function sendAction(text) {
   // Block double-submit while waiting on LLM (prevents overlapping turns + typewriter restarts)
   if (actionInFlight) return;
 
+  // New player order — stop any narrator/cast audio still playing
+  stopVoicePlayback();
+  cancelTypewriter();
+
   if (!current?.state?.runId) {
     await newGame();
     if (!current?.state?.runId) return;
   }
   const runId = current.state.runId;
+  const phaseBefore = current.state.phase;
   const seq = ++actionSeq;
   const tAction0 = performance.now();
-  setActionBusy(true, text);
+  const startingMission = isMissionBeginAction(phaseBefore, text);
+
+  // Mission begin uses the viewscreen Incoming Communication poster
+  if (startingMission) {
+    startMissionBoot(runId, "Incoming communication — stand by");
+  }
+
   try {
-    const view = await api(`/games/${runId}/action`, {
+    setActionBusy(true, text);
+    if (startingMission) {
+      paintMissionBootViewscreen("Opening mission channel…");
+    }
+    // 90s client abort — prevents infinite "Waiting…" if the model stalls
+    let view = await api(`/games/${runId}/action`, {
       method: "POST",
       body: JSON.stringify({ text }),
+      timeoutMs: 90_000,
     });
+
     // Ignore stale responses if a newer action started (shouldn't happen with busy lock)
     if (seq !== actionSeq) return;
     const llmMs = Math.round(performance.now() - tAction0);
-    // Text arrived from server — mark ready before render kicks off TTS
     voice.textReadyAt = performance.now();
     voiceLog("action_text_received", {
       llmActionMs: llmMs,
@@ -1764,9 +2800,37 @@ async function sendAction(text) {
       narrationChars: (view.state?.pendingQuestion || "").length,
       speechOn: Boolean(view.state?.settings?.speechOn || voice.enabled),
     });
-    render(view, { forceTypewriter: true });
+
     els.input.value = "";
+
+    // Ship chosen → full-screen crew init (images + voice locks) before next setup beat
+    if (justAcquiredShip(phaseBefore, view)) {
+      setActionBusy(false);
+      view = await initializeCrewAfterShipSelect(view);
+      if (seq !== actionSeq) return;
+      render(view, { forceTypewriter: true });
+      return;
+    }
+
+    // Mission begin: Incoming Comm poster, then opening narration
+    // (crew profiles should already be ready from ship-select init)
+    if (startingMission && view.state?.phase === "playing") {
+      if (!missionBoot.active) {
+        startMissionBoot(runId, "Receiving Starfleet orders…");
+      }
+      holdOpeningForMissionBoot(view);
+      return;
+    }
+
+    // Begin action did not enter playing (e.g. chose return to list)
+    if (startingMission && view.state?.phase !== "playing") {
+      cancelMissionBoot();
+    }
+
+    render(view, { forceTypewriter: true });
   } catch (err) {
+    hideInitOverlay();
+    if (startingMission) cancelMissionBoot();
     // Keep the active game. Only hard-fail AI banner when the *server* is gone
     // and we have no session — mid-mission LLM/network blips use a soft toast.
     const reason =
@@ -1800,35 +2864,243 @@ async function sendAction(text) {
   } finally {
     if (seq === actionSeq) {
       setActionBusy(false);
-      if (aiReady) els.input.focus();
+      // Keep focus off free-text until mission boot releases the first question
+      if (aiReady && !missionBoot.active) els.input.focus();
     }
   }
 }
 
-async function newGame() {
-  // Always re-verify AI before starting
-  const ready = await checkAiLink(true);
-  if (!ready) return;
+/**
+ * Full-screen LCARS-style transmission / init screen with progress bar.
+ * Inspired by https://lcars-monitor.netlify.app/transmission
+ */
+const INIT_TITLES = ["Incoming Transmission", "Incoming Communication"];
+const INIT_SUBS = [
+  "Starfleet Command · Authorized access only",
+  "Starfleet Command · Command authorization required",
+  "From: Starfleet Command — Command authorization required",
+];
+const INIT_NETS = ["Subspace Comm Net", "System Monitor", "LCARS"];
+
+let initSession = {
+  active: false,
+  token: 0,
+  steps: [],
+  index: 0,
+};
+
+function pickInit(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function showInitOverlay(opts = {}) {
+  if (!els.initOverlay) return;
+  initSession.token += 1;
+  initSession.active = true;
+  initSession.steps = opts.steps || [];
+  initSession.index = 0;
+
+  if (els.initTitle) {
+    els.initTitle.textContent = opts.title || pickInit(INIT_TITLES);
+  }
+  if (els.initSubtitle) {
+    els.initSubtitle.textContent = opts.subtitle || pickInit(INIT_SUBS);
+  }
+  if (els.initNetwork) {
+    const net = opts.network || `${pickInit(INIT_NETS)} ${Math.floor(Math.random() * 9000 + 1000)}`;
+    els.initNetwork.textContent = net;
+  }
+  if (els.initStatus) {
+    els.initStatus.textContent = opts.status || "INITIALIZING BRIDGE SYSTEMS…";
+  }
+  if (els.initChecklist) {
+    els.initChecklist.innerHTML = "";
+    for (const step of initSession.steps) {
+      const li = document.createElement("li");
+      li.dataset.key = step.key || step.label;
+      li.innerHTML = `<span class="mark">○</span><span class="lbl">${escapeHtml(
+        step.label
+      )}</span>`;
+      els.initChecklist.appendChild(li);
+    }
+  }
+  setInitProgress(0, opts.steps?.[0]?.label || "Stand by…");
+  els.initOverlay.classList.remove("hidden");
+  document.body.classList.add("init-active");
+  lcarsUiSound("open");
+  startWaitingLoop();
+}
+
+function setInitProgress(pct, label) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  if (els.initProgressFill) els.initProgressFill.style.width = `${p}%`;
+  if (els.initPercent) els.initPercent.textContent = `${p}%`;
+  if (label && els.initStepLabel) els.initStepLabel.textContent = label;
+  if (label && els.initStatus) {
+    els.initStatus.textContent = label.toUpperCase();
+  }
+}
+
+function markInitStep(key, state) {
+  if (!els.initChecklist) return;
+  const items = [...els.initChecklist.querySelectorAll("li")];
+  for (const li of items) {
+    const k = li.dataset.key;
+    if (k === key) {
+      li.classList.toggle("is-done", state === "done");
+      li.classList.toggle("is-active", state === "active");
+      const mark = li.querySelector(".mark");
+      if (mark) {
+        mark.textContent =
+          state === "done" ? "●" : state === "active" ? "◎" : "○";
+      }
+    } else if (state === "active") {
+      // leave previous done states
+    }
+  }
+}
+
+function hideInitOverlay() {
+  initSession.active = false;
+  initSession.token += 1;
+  stopWaitingLoop();
+  if (els.initOverlay) els.initOverlay.classList.add("hidden");
+  document.body.classList.remove("init-active");
+  setInitProgress(0, "Stand by…");
+}
+
+/**
+ * Run async work under the transmission screen.
+ * steps: [{ key, label, pct }] progressive milestones while work runs.
+ * work(update) — update({ key?, label?, pct? }) to push progress.
+ */
+async function withInitScreen(opts, work) {
+  const steps = opts.steps || [];
+  showInitOverlay({ ...opts, steps });
+  const token = initSession.token;
+
+  // Soft auto-advance toward next milestone while waiting
+  let autoPct = steps[0]?.pct ?? 5;
+  const autoTimer = setInterval(() => {
+    if (token !== initSession.token) return;
+    autoPct = Math.min(autoPct + 1.2, 92);
+    const active =
+      steps.find((s, i) => {
+        const next = steps[i + 1];
+        return autoPct >= (s.pct || 0) && (!next || autoPct < next.pct);
+      }) || steps[steps.length - 1];
+    if (active) {
+      markInitStep(active.key || active.label, "active");
+      setInitProgress(autoPct, active.label);
+    }
+  }, 400);
+
+  const update = (patch = {}) => {
+    if (token !== initSession.token) return;
+    if (patch.key) {
+      // mark previous steps done
+      for (const s of steps) {
+        if (s.key === patch.key) break;
+        markInitStep(s.key || s.label, "done");
+      }
+      markInitStep(patch.key, patch.done ? "done" : "active");
+    }
+    if (typeof patch.pct === "number") {
+      autoPct = Math.max(autoPct, patch.pct);
+      setInitProgress(patch.pct, patch.label);
+    } else if (patch.label) {
+      setInitProgress(autoPct, patch.label);
+    }
+  };
 
   try {
-    stopVoicePlayback();
-    let view = await api("/games", { method: "POST" });
-    hideAiError();
-    localStorage.removeItem(STORAGE_KEY);
-    // Apply local voice preference to the new run
-    if (voice.enabled && !view.state.settings?.speechOn) {
-      try {
-        view = await api(`/games/${view.state.runId}/settings`, {
-          method: "PATCH",
-          body: JSON.stringify({ speechOn: true }),
-        });
-      } catch {
-        /* non-fatal */
-      }
+    const result = await work(update);
+    if (token === initSession.token) {
+      for (const s of steps) markInitStep(s.key || s.label, "done");
+      setInitProgress(100, opts.completeLabel || "Bridge ready");
+      await sleep(450);
     }
-    render(view);
-    els.input.focus();
+    return result;
+  } finally {
+    clearInterval(autoTimer);
+    if (token === initSession.token) hideInitOverlay();
+  }
+}
+
+async function newGame() {
+  cancelMissionBoot();
+  const steps = [
+    { key: "link", label: "Establishing subspace link", pct: 12 },
+    { key: "auth", label: "Authenticating LCARS core", pct: 28 },
+    { key: "matrix", label: "Allocating narrative matrix", pct: 48 },
+    { key: "voice", label: "Synchronizing voice protocols", pct: 68 },
+    { key: "interface", label: "Calibrating bridge interface", pct: 88 },
+    { key: "ready", label: "Bridge ready", pct: 100 },
+  ];
+
+  try {
+    await withInitScreen(
+      {
+        title: pickInit(INIT_TITLES),
+        subtitle: pickInit(INIT_SUBS),
+        status: "INCOMING TRANSMISSION — STAND BY",
+        steps,
+        completeLabel: "Transmission complete · Bridge online",
+      },
+      async (update) => {
+        update({ key: "link", label: "Establishing subspace link", pct: 15 });
+        const ready = await checkAiLink(true);
+        if (!ready) {
+          hideInitOverlay();
+          return;
+        }
+
+        update({ key: "auth", label: "Authenticating LCARS core", pct: 30 });
+        stopVoicePlayback();
+        await sleep(200);
+
+        update({
+          key: "matrix",
+          label: "Allocating narrative matrix…",
+          pct: 42,
+        });
+        let view = await api("/games", { method: "POST" });
+        hideAiError();
+        localStorage.removeItem(STORAGE_KEY);
+
+        update({
+          key: "voice",
+          label: "Synchronizing voice protocols",
+          pct: 72,
+        });
+        if (voice.enabled && !view.state.settings?.speechOn) {
+          try {
+            view = await api(`/games/${view.state.runId}/settings`, {
+              method: "PATCH",
+              body: JSON.stringify({ speechOn: true }),
+            });
+          } catch {
+            /* non-fatal */
+          }
+        }
+
+        update({
+          key: "interface",
+          label: "Calibrating bridge interface",
+          pct: 90,
+        });
+        await sleep(250);
+        update({ key: "ready", label: "Bridge ready", pct: 100, done: true });
+        render(view);
+        // New game: viewscreen starts collapsed until mission begin
+        setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, false, {
+          persist: true,
+        });
+        els.input.focus();
+      }
+    );
   } catch (err) {
+    hideInitOverlay();
     if (err instanceof ApiError) {
       showAiError(
         err.payload?.reason || err.message,
@@ -1923,10 +3195,16 @@ els.form.addEventListener("submit", (e) => {
   // If narration is still typing and input is empty, skip typewriter
   if (typewriter.running && !els.input.value.trim()) {
     typewriter.skip = true;
+    lcarsUiSound("soft");
     return;
   }
   const text = els.input.value.trim();
-  if (text) sendAction(text);
+  if (text) {
+    lcarsUiSound("primary");
+    sendAction(text);
+  } else {
+    lcarsUiSound("deny");
+  }
 });
 
 // Space with empty input also skips typewriter while focused on page
@@ -1938,11 +3216,56 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-els.btnNew.addEventListener("click", () => newGame());
-els.btnHistory.addEventListener("click", () => openHistory());
-els.btnCloseHistory.addEventListener("click", () => closeHistory());
+els.btnNew.addEventListener("click", () => {
+  lcarsUiSound("primary");
+  newGame();
+});
+els.btnHistory.addEventListener("click", () => {
+  lcarsUiSound("secondary");
+  openHistory();
+});
+els.btnCloseHistory.addEventListener("click", () => {
+  lcarsUiSound("close");
+  closeHistory();
+});
+
+// Classic / LCARS visual theme + SFX (no game logic)
+initLcarsFx();
+initBridgeAmbient();
+initUiTheme();
+if (els.btnThemeClassic) {
+  els.btnThemeClassic.addEventListener("click", () => applyUiTheme("classic"));
+}
+if (els.btnThemeLcars) {
+  els.btnThemeLcars.addEventListener("click", () => applyUiTheme("lcars"));
+}
+if (els.lcarsSfxToggle) {
+  els.lcarsSfxToggle.checked = isLcarsSfxEnabled();
+  els.lcarsSfxToggle.addEventListener("change", () => {
+    setLcarsSfxEnabled(els.lcarsSfxToggle.checked);
+    if (els.lcarsSfxToggle.checked) lcarsUiSound("soft");
+  });
+}
+if (els.bridgeAmbientToggle) {
+  els.bridgeAmbientToggle.checked = isBridgeAmbientEnabled();
+  els.bridgeAmbientToggle.addEventListener("change", () => {
+    setBridgeAmbientEnabled(els.bridgeAmbientToggle.checked);
+    if (els.bridgeAmbientToggle.checked) {
+      unlockLcarsAudio();
+      startBridgeAmbient();
+    }
+  });
+}
+syncLcarsSfxToggleUi();
+
+// Viewscreen + mission log expand/collapse
+initCollapsiblePanels();
+
 if (els.btnVoice) {
-  els.btnVoice.addEventListener("click", () => toggleVoice());
+  els.btnVoice.addEventListener("click", () => {
+    lcarsUiSound("secondary");
+    toggleVoice();
+  });
 }
 if (els.btnVoiceMenu) {
   els.btnVoiceMenu.addEventListener("click", (e) => {
@@ -1962,12 +3285,6 @@ if (els.voiceSpeed) {
     setVoiceSpeed(els.voiceSpeed.value);
   });
 }
-if (els.voiceVolume) {
-  els.voiceVolume.value = String(Math.round(voice.volume * 100));
-  els.voiceVolume.addEventListener("input", () => {
-    setVoiceVolume(els.voiceVolume.value);
-  });
-}
 // Close voice menu on outside click / Escape
 document.addEventListener("click", (e) => {
   if (!isVoiceMenuOpen()) return;
@@ -1985,24 +3302,28 @@ if (els.btnDismissSoftError) {
 }
 
 // Click (or keyboard) a narration paragraph / crew line to replay its voice
-if (els.log) {
-  els.log.addEventListener("click", (e) => {
+// (current beat + history strip)
+function bindSpeakableContainer(root) {
+  if (!root) return;
+  root.addEventListener("click", (e) => {
     if (typewriter.running) return;
     const target = e.target.closest(".speakable");
-    if (!target || !els.log.contains(target)) return;
+    if (!target || !root.contains(target)) return;
     e.preventDefault();
     e.stopPropagation();
     handleSpeakableActivate(target);
   });
-  els.log.addEventListener("keydown", (e) => {
+  root.addEventListener("keydown", (e) => {
     if (typewriter.running) return;
     if (e.key !== "Enter" && e.key !== " ") return;
     const target = e.target.closest(".speakable");
-    if (!target || !els.log.contains(target)) return;
+    if (!target || !root.contains(target)) return;
     e.preventDefault();
     handleSpeakableActivate(target);
   });
 }
+bindSpeakableContainer(els.log);
+bindSpeakableContainer(els.logHistory);
 if (els.btnCloseScar) {
   els.btnCloseScar.addEventListener("click", () => closeScarModal());
 }
