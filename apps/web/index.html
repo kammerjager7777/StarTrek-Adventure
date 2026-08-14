@@ -1,10 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-ui-theme="classic">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Star Trek Adventure — Bridge</title>
+    <!-- Apply saved theme before paint to avoid flash -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("sta-ui-theme");
+          if (t !== "lcars" && t !== "classic") t = "classic";
+          document.documentElement.setAttribute("data-ui-theme", t);
+        } catch (e) {
+          document.documentElement.setAttribute("data-ui-theme", "classic");
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/css/bridge.css" />
+    <link rel="stylesheet" href="/css/themes/lcars.css" />
   </head>
   <body>
     <div class="shell">
@@ -17,6 +30,33 @@
           <span id="narrator-badge" class="badge narrator-badge sr-only" aria-hidden="true">narrator: …</span>
         </div>
         <div class="top-actions">
+          <div
+            class="theme-toggle"
+            id="theme-toggle"
+            role="group"
+            aria-label="UI theme"
+          >
+            <button
+              type="button"
+              id="btn-theme-classic"
+              class="theme-toggle-btn"
+              data-theme="classic"
+              aria-pressed="true"
+              title="Classic bridge look"
+            >
+              Classic
+            </button>
+            <button
+              type="button"
+              id="btn-theme-lcars"
+              class="theme-toggle-btn"
+              data-theme="lcars"
+              aria-pressed="false"
+              title="LCARS interface look"
+            >
+              LCARS
+            </button>
+          </div>
           <div class="voice-controls" id="voice-controls">
             <div class="voice-btn-group">
               <button
@@ -77,15 +117,28 @@
                   <option value="1.5">1.5×</option>
                 </select>
               </label>
-              <label class="voice-menu-field" title="Volume">
-                <span>Volume</span>
+              <label
+                class="voice-menu-field voice-menu-check"
+                title="Subtle starship bridge engine hum and life-support air"
+              >
+                <span>Bridge ambient</span>
                 <input
-                  id="voice-volume"
-                  type="range"
-                  min="0"
-                  max="100"
-                  value="100"
-                  aria-label="Voice volume"
+                  type="checkbox"
+                  id="bridge-ambient-toggle"
+                  checked
+                  aria-label="Enable bridge ambient sound"
+                />
+              </label>
+              <label
+                class="voice-menu-field voice-menu-check lcars-only-control"
+                title="LCARS interface beeps (LCARS theme only)"
+              >
+                <span>LCARS SFX</span>
+                <input
+                  type="checkbox"
+                  id="lcars-sfx-toggle"
+                  checked
+                  aria-label="Enable LCARS interface sound effects"
                 />
               </label>
               <p class="voice-menu-hint">
@@ -127,27 +180,82 @@
         </aside>
 
         <section class="center">
-          <div class="viewscreen">
-            <div class="viewscreen-frame">
-              <div id="viewscreen-content" class="viewscreen-inner">
-                <p class="vs-placeholder">
-                  VIEWSCREEN STANDBY<br />
-                  <span>Journey book frames appear as the mission unfolds</span>
-                </p>
-              </div>
-              <div class="viewscreen-chrome">
-                <span id="viewscreen-caption" class="viewscreen-caption">Standby</span>
-                <span id="viewscreen-meta" class="viewscreen-meta"></span>
+          <div
+            class="viewscreen collapsible-panel is-expanded"
+            id="viewscreen-panel"
+            data-panel="viewscreen"
+          >
+            <button
+              type="button"
+              class="panel-collapse-toggle"
+              id="viewscreen-toggle"
+              aria-expanded="true"
+              aria-controls="viewscreen-body"
+              title="Expand or collapse viewscreen"
+            >
+              <span class="collapse-chevron" aria-hidden="true">▾</span>
+              <span class="collapse-label">Viewscreen</span>
+              <span class="collapse-summary" id="viewscreen-collapse-summary">Standby</span>
+            </button>
+            <div class="collapsible-body" id="viewscreen-body">
+              <div class="collapsible-body-inner">
+                <div class="viewscreen-frame">
+                  <div id="viewscreen-content" class="viewscreen-inner">
+                    <p class="vs-placeholder">
+                      VIEWSCREEN STANDBY<br />
+                      <span>Journey book frames appear as the mission unfolds</span>
+                    </p>
+                  </div>
+                  <div class="viewscreen-chrome">
+                    <span id="viewscreen-caption" class="viewscreen-caption">Standby</span>
+                    <span id="viewscreen-meta" class="viewscreen-meta"></span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="log-panel">
+          <div class="log-panel" id="log-panel">
             <div class="log-header">
               <h2>Mission Log</h2>
               <span id="phase-badge" class="badge">boot</span>
             </div>
-            <div id="mission-log" class="mission-log" aria-live="polite"></div>
+            <div class="log-panel-body">
+              <!-- Current narration always visible -->
+              <div
+                id="mission-log"
+                class="mission-log mission-log-current"
+                aria-live="polite"
+              ></div>
+              <!-- Prior entries: collapsed by default, expand on click -->
+              <div
+                class="log-history collapsible-panel is-collapsed"
+                id="log-history"
+              >
+                <button
+                  type="button"
+                  class="panel-collapse-toggle log-history-toggle"
+                  id="log-history-toggle"
+                  aria-expanded="false"
+                  aria-controls="log-history-body"
+                  title="Show or hide prior log entries"
+                >
+                  <span class="collapse-chevron" aria-hidden="true">▸</span>
+                  <span class="collapse-label">History</span>
+                  <span class="collapse-summary" id="log-history-summary"
+                    >No prior entries</span
+                  >
+                </button>
+                <div class="collapsible-body" id="log-history-body">
+                  <div class="collapsible-body-inner">
+                    <div
+                      id="mission-log-history"
+                      class="mission-log mission-log-history"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="options-bar" id="options-bar"></div>
@@ -192,8 +300,29 @@
               Close
             </button>
           </div>
+          <div id="history-account" class="history-account" aria-live="polite">
+            <div class="history-account-label">Signed in as</div>
+            <div id="history-account-email" class="history-account-email">…</div>
+            <p id="history-account-note" class="history-account-note muted">
+              Captains, missions, and saves are private to this account.
+            </p>
+            <div id="history-account-local" class="history-account-local hidden">
+              <label class="history-account-field">
+                <span>Local account email</span>
+                <input
+                  type="email"
+                  id="history-account-input"
+                  placeholder="you@example.com"
+                  autocomplete="username"
+                />
+              </label>
+              <button type="button" id="btn-set-account" class="lcars-btn secondary">
+                Use this account
+              </button>
+            </div>
+          </div>
           <p class="hint">
-            Resume a voyage or delete saves you no longer need.
+            Resume a voyage or delete saves for the account above.
           </p>
           <div id="history-list" class="history-list"></div>
         </div>
@@ -219,6 +348,51 @@
             Scars are a lasting record of damage and hard choices this voyage —
             not a second hit-point bar.
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outside .shell so body.init-active shell dimming does not darken this screen -->
+    <div
+      id="init-overlay"
+      class="init-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="init-title"
+      aria-live="polite"
+    >
+      <div class="init-screen">
+        <div class="init-rail init-rail-top" aria-hidden="true"></div>
+        <div class="init-body">
+          <div class="init-logo federation-logo" aria-hidden="true">
+            <img
+              src="/assets/ufp-logo.png?v=3"
+              alt=""
+              class="ufp-logo-img"
+              width="480"
+              height="380"
+              decoding="async"
+            />
+          </div>
+          <p class="init-network" id="init-network">Subspace Comm Net LCARS</p>
+          <h1 class="init-title" id="init-title">Incoming Transmission</h1>
+          <p class="init-subtitle" id="init-subtitle">
+            Starfleet Command · Authorized access only
+          </p>
+          <p class="init-status" id="init-status">INITIALIZING BRIDGE SYSTEMS…</p>
+          <ul class="init-checklist" id="init-checklist" aria-hidden="true"></ul>
+        </div>
+        <div class="init-footer">
+          <div class="init-progress" aria-label="Initialization progress">
+            <div class="init-progress-track">
+              <div class="init-progress-fill" id="init-progress-fill"></div>
+            </div>
+            <div class="init-progress-meta">
+              <span id="init-step-label">Stand by…</span>
+              <span id="init-percent">0%</span>
+            </div>
+          </div>
+          <div class="init-rail init-rail-bottom" aria-hidden="true"></div>
         </div>
       </div>
     </div>

@@ -14,6 +14,9 @@ data/saves/*
 !data/saves/.gitkeep
 data/debug/*
 !data/debug/.gitkeep
+data/users/*
+!data/users/.gitkeep
+data/profiles/*
 
 # OS / editor
 .DS_Store

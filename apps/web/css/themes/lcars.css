@@ -1,0 +1,1032 @@
+/**
+ * LCARS theme skin for Star Trek Adventure
+ * ------------------------------------------------
+ * Applied when: html[data-ui-theme="lcars"]
+ * Classic (default) uses bridge.css only.
+ *
+ * Rules:
+ * - Visual / chrome only (colors, fonts, borders, shadows, radii, backgrounds)
+ * - No layout grid or control structure changes
+ * - Delete this file + theme toggle to fully revert the experiment
+ */
+
+/* ─── Tokens ─────────────────────────────────────────────── */
+html[data-ui-theme="lcars"] {
+  --bg: #000000;
+  --panel: #000000;
+  --lcars-orange: #ff9900;
+  --lcars-peach: #ffcc99;
+  --lcars-pink: #cc6666;
+  --lcars-lilac: #cc99cc;
+  --lcars-blue: #9999ff;
+  --text: #ffcc99;
+  --muted: #997766;
+  --danger: #cc6666;
+  --ok: #99cc99;
+  --border: #ff9900;
+  --radius: 0px;
+  --lcars-bar: #ff9900;
+  --lcars-bar-2: #cc99cc;
+  --lcars-bar-3: #9999ff;
+  --lcars-bar-4: #ffcc66;
+  --lcars-elbow: 28px;
+  font-family: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ─── Page chrome ────────────────────────────────────────── */
+html[data-ui-theme="lcars"] body {
+  color: var(--text);
+  background: #000;
+  letter-spacing: 0.02em;
+}
+
+/* Init / transmission screen — same palette as normal LCARS bridge */
+html[data-ui-theme="lcars"] .init-overlay {
+  background: #000;
+  color: var(--text);
+}
+
+html[data-ui-theme="lcars"] .federation-logo {
+  filter: drop-shadow(0 0 20px rgba(255, 153, 0, 0.4));
+  background: transparent;
+}
+
+html[data-ui-theme="lcars"] .federation-logo img {
+  filter: brightness(1.4) contrast(1.1) saturate(1.2);
+}
+
+html[data-ui-theme="lcars"] .init-title {
+  color: var(--lcars-peach);
+  letter-spacing: 0.14em;
+}
+
+html[data-ui-theme="lcars"] .init-subtitle {
+  color: var(--lcars-blue);
+}
+
+html[data-ui-theme="lcars"] .init-network {
+  color: var(--lcars-blue);
+}
+
+html[data-ui-theme="lcars"] .init-status {
+  color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .init-checklist {
+  color: var(--muted);
+}
+
+html[data-ui-theme="lcars"] .init-checklist li.is-done {
+  color: var(--ok);
+}
+
+html[data-ui-theme="lcars"] .init-checklist li.is-active {
+  color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .init-rail-top,
+html[data-ui-theme="lcars"] .init-rail-bottom {
+  background: linear-gradient(
+    90deg,
+    var(--lcars-bar) 0 28%,
+    var(--lcars-bar-2) 28% 42%,
+    var(--lcars-bar-3) 42% 58%,
+    var(--lcars-peach) 58% 100%
+  );
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .init-progress-track {
+  border-color: var(--lcars-bar);
+  border-radius: 0 14px 0 0;
+  background: #111;
+}
+
+html[data-ui-theme="lcars"] .init-progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--lcars-bar),
+    var(--lcars-peach),
+    var(--lcars-bar-2),
+    var(--lcars-bar-3)
+  );
+}
+
+html[data-ui-theme="lcars"] .init-progress-meta,
+html[data-ui-theme="lcars"] #init-step-label {
+  color: var(--text);
+}
+
+html[data-ui-theme="lcars"] #init-percent {
+  color: var(--lcars-bar);
+}
+
+/* ─── LCARS motion (inspired by lcars-monitor) ───────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-ui-theme="lcars"] .lcars-btn:active,
+  html[data-ui-theme="lcars"] .option-btn:active,
+  html[data-ui-theme="lcars"] .theme-toggle-btn:active,
+  html[data-ui-theme="lcars"] .meta-list button:active {
+    transform: scale(0.96);
+    filter: brightness(1.15);
+  }
+
+  html[data-ui-theme="lcars"] .top-bar::after {
+    background-size: 200% 100%;
+    animation: lcars-rail-shift 8s linear infinite;
+  }
+
+  html[data-ui-theme="lcars"] .panel-title {
+    position: relative;
+    overflow: hidden;
+  }
+
+  html[data-ui-theme="lcars"] .panel-title::after {
+    content: "";
+    position: absolute;
+    left: -40%;
+    top: 0;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.35),
+      transparent
+    );
+    animation: lcars-scan 3.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  html[data-ui-theme="lcars"] .waiting-banner:not(.hidden) {
+    animation: lcars-wait-pulse 1.1s ease-in-out infinite;
+  }
+
+  html[data-ui-theme="lcars"] .sys-damaged {
+    animation: lcars-status-blink 1.2s steps(2, jump-none) infinite;
+  }
+
+  html[data-ui-theme="lcars"] .sys-destroyed {
+    animation: lcars-status-blink 0.7s steps(2, jump-none) infinite;
+  }
+
+  html[data-ui-theme="lcars"] .badge.is-waiting-badge {
+    animation: lcars-status-blink 0.9s steps(2, jump-none) infinite;
+  }
+
+  html[data-ui-theme="lcars"] .log-entry.current {
+    animation: lcars-entry-in 0.35s ease-out both;
+  }
+}
+
+@keyframes lcars-rail-shift {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.12);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@keyframes lcars-scan {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 120%;
+  }
+}
+
+@keyframes lcars-wait-pulse {
+  0%,
+  100% {
+    border-color: var(--lcars-bar-2);
+    box-shadow: 0 0 0 0 rgba(204, 153, 204, 0.15);
+  }
+  50% {
+    border-color: var(--lcars-peach);
+    box-shadow: 0 0 12px 0 rgba(255, 153, 0, 0.25);
+  }
+}
+
+@keyframes lcars-status-blink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes lcars-entry-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ui-theme="lcars"] .panel-title::after,
+  html[data-ui-theme="lcars"] .top-bar::after,
+  html[data-ui-theme="lcars"] .waiting-banner,
+  html[data-ui-theme="lcars"] .sys-damaged,
+  html[data-ui-theme="lcars"] .sys-destroyed {
+    animation: none !important;
+  }
+}
+
+html[data-ui-theme="lcars"] .shell {
+  max-width: none;
+  width: 100%;
+  gap: 8px;
+  padding: 10px 12px 14px;
+}
+
+/* ─── Top bar (elbow rail) ──────────────────────────────── */
+html[data-ui-theme="lcars"] .top-bar {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  border-bottom: 0;
+  padding: 0 0 0 0;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 52px;
+  /* Left elbow + bar */
+  box-shadow: inset 48px 0 0 0 var(--lcars-bar);
+  padding-left: 56px;
+  padding-right: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  position: relative;
+}
+
+html[data-ui-theme="lcars"] .top-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 48px;
+  height: 18px;
+  background: var(--lcars-bar);
+  border-radius: 0 0 var(--lcars-elbow) 0;
+}
+
+html[data-ui-theme="lcars"] .top-bar::after {
+  content: "";
+  position: absolute;
+  left: 48px;
+  right: 0;
+  bottom: 0;
+  height: 10px;
+  background: linear-gradient(
+    90deg,
+    var(--lcars-bar) 0 40%,
+    var(--lcars-bar-2) 40% 55%,
+    var(--lcars-bar-3) 55% 70%,
+    var(--lcars-bar-4) 70% 100%
+  );
+  border-radius: 0 12px 0 0;
+}
+
+html[data-ui-theme="lcars"] .brand {
+  padding: 4px 0 14px;
+  gap: 10px;
+}
+
+html[data-ui-theme="lcars"] .brand h1 {
+  color: var(--lcars-peach);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  font-size: 1.05rem;
+}
+
+html[data-ui-theme="lcars"] .brand .sub {
+  color: var(--lcars-lilac);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+html[data-ui-theme="lcars"] .pip {
+  background: var(--lcars-bar-3);
+  box-shadow: none;
+  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+}
+
+html[data-ui-theme="lcars"] .top-actions {
+  padding: 4px 0 14px;
+  gap: 6px;
+}
+
+/* Theme segmented control */
+html[data-ui-theme="lcars"] .theme-toggle {
+  border: none;
+  border-radius: 0 12px 0 0;
+  overflow: hidden;
+  gap: 3px;
+  background: transparent;
+}
+
+html[data-ui-theme="lcars"] .theme-toggle-btn {
+  background: #222;
+  color: var(--lcars-peach);
+  border-radius: 0 14px 0 0;
+  letter-spacing: 0.1em;
+  padding: 10px 14px;
+}
+
+html[data-ui-theme="lcars"] .theme-toggle-btn + .theme-toggle-btn {
+  border-left: none;
+}
+
+html[data-ui-theme="lcars"] .theme-toggle-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+html[data-ui-theme="lcars"] .theme-toggle-btn[aria-pressed="true"] {
+  background: var(--lcars-bar);
+  color: #000;
+}
+
+/* ─── Buttons ───────────────────────────────────────────── */
+html[data-ui-theme="lcars"] .lcars-btn {
+  border-radius: 0 18px 0 18px;
+  background: var(--lcars-bar);
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: none;
+  border: none;
+  padding: 10px 16px;
+}
+
+html[data-ui-theme="lcars"] .lcars-btn:hover {
+  filter: brightness(1.12);
+}
+
+html[data-ui-theme="lcars"] .lcars-btn.secondary {
+  background: var(--lcars-bar-2);
+  color: #000;
+  border-radius: 18px 0 18px 0;
+}
+
+html[data-ui-theme="lcars"] .lcars-btn.danger {
+  background: var(--lcars-pink);
+  color: #000;
+}
+
+/* Voice controls */
+html[data-ui-theme="lcars"] .voice-btn-group {
+  border: none;
+  border-radius: 0;
+  gap: 3px;
+  background: transparent;
+  overflow: visible;
+}
+
+html[data-ui-theme="lcars"] .voice-toggle,
+html[data-ui-theme="lcars"] .voice-menu-toggle {
+  background: var(--lcars-bar-4);
+  color: #000;
+  border: none;
+  border-radius: 0 16px 0 16px;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .voice-toggle[aria-pressed="true"],
+html[data-ui-theme="lcars"]
+  .voice-btn-group:has(.voice-toggle[aria-pressed="true"])
+  .voice-menu-toggle {
+  background: var(--lcars-bar-3);
+  color: #000;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .voice-menu {
+  background: #000;
+  border: 3px solid var(--lcars-bar);
+  border-radius: 0 20px 0 0;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .voice-menu-head {
+  color: #000;
+  background: var(--lcars-bar);
+  padding: 6px 10px;
+  margin: -12px -12px 4px;
+  letter-spacing: 0.12em;
+  border-radius: 0 16px 0 0;
+}
+
+html[data-ui-theme="lcars"] .voice-ctrl {
+  background: var(--lcars-bar-2);
+  color: #000;
+  border-radius: 0 14px 0 14px;
+}
+
+html[data-ui-theme="lcars"] .voice-ctrl.is-paused {
+  background: var(--lcars-bar-4);
+  color: #000;
+}
+
+html[data-ui-theme="lcars"] .voice-menu-field select {
+  background: #111;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 12px 0 0;
+  color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .voice-menu-field input[type="range"] {
+  accent-color: var(--lcars-bar);
+}
+
+/* ─── Bridge grid / panels ──────────────────────────────── */
+html[data-ui-theme="lcars"] .bridge {
+  gap: 8px;
+}
+
+html[data-ui-theme="lcars"] .panel {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  padding: 0 0 0 10px;
+  box-shadow: inset 10px 0 0 0 var(--lcars-bar);
+  gap: 6px;
+}
+
+html[data-ui-theme="lcars"] .panel.right {
+  box-shadow: inset -10px 0 0 0 var(--lcars-bar-2);
+  padding: 0 10px 0 0;
+}
+
+html[data-ui-theme="lcars"] .panel-title {
+  margin: 0;
+  padding: 6px 10px 6px 12px;
+  background: var(--lcars-bar);
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-radius: 0 18px 0 0;
+}
+
+html[data-ui-theme="lcars"] .panel.right .panel-title {
+  background: var(--lcars-bar-2);
+  border-radius: 18px 0 0 0;
+  text-align: right;
+}
+
+html[data-ui-theme="lcars"] .panel-body {
+  color: var(--text);
+  padding: 6px 4px 8px 8px;
+}
+
+html[data-ui-theme="lcars"] .panel-body.muted {
+  color: var(--muted);
+}
+
+html[data-ui-theme="lcars"] .panel.left #crew-panel::-webkit-scrollbar-thumb {
+  background: var(--lcars-bar);
+  border-radius: 0;
+}
+
+/* Ship systems */
+html[data-ui-theme="lcars"] .ship-identity strong {
+  color: var(--lcars-peach);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html[data-ui-theme="lcars"] .ship-meta,
+html[data-ui-theme="lcars"] .ship-integrity {
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+html[data-ui-theme="lcars"] .sys-row {
+  border-bottom: 1px solid #331100;
+  padding: 3px 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html[data-ui-theme="lcars"] .sys-ok {
+  color: var(--ok);
+}
+
+html[data-ui-theme="lcars"] .sys-damaged {
+  color: var(--lcars-bar-4);
+}
+
+html[data-ui-theme="lcars"] .sys-destroyed {
+  color: var(--danger);
+}
+
+html[data-ui-theme="lcars"] .scar-chip {
+  background: #111;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 12px 0 0;
+  color: var(--text);
+}
+
+html[data-ui-theme="lcars"] .scar-chip:hover {
+  background: #221100;
+  border-color: var(--lcars-peach);
+}
+
+/* Crew cards */
+html[data-ui-theme="lcars"] .crew-tab,
+html[data-ui-theme="lcars"] .crew-card {
+  border: 2px solid var(--lcars-bar-2);
+  border-radius: 0 16px 0 0;
+  background: #050505;
+}
+
+html[data-ui-theme="lcars"] .crew-tab.is-hailing {
+  border-color: var(--lcars-bar);
+  box-shadow: 0 0 0 2px var(--lcars-bar-3);
+  animation: lcars-wait-pulse 0.9s ease-in-out infinite;
+}
+
+html[data-ui-theme="lcars"] .crew-tab-name {
+  color: var(--lcars-peach);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+html[data-ui-theme="lcars"] .crew-tab-role {
+  color: var(--lcars-lilac);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+}
+
+html[data-ui-theme="lcars"] .crew-label {
+  color: var(--lcars-bar);
+  letter-spacing: 0.1em;
+}
+
+/* Objectives */
+html[data-ui-theme="lcars"] .integrity-bar-track {
+  background: #000;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 8px 0 0;
+}
+
+html[data-ui-theme="lcars"] .integrity-hull .integrity-bar-fill {
+  background: linear-gradient(90deg, var(--lcars-bar), var(--lcars-peach));
+  border-radius: 0;
+}
+
+html[data-ui-theme="lcars"] .integrity-shields .integrity-bar-fill {
+  background: linear-gradient(90deg, #3366cc, #99ccff);
+  border-radius: 0;
+}
+
+html[data-ui-theme="lcars"] .systems-label {
+  color: var(--lcars-bar);
+  letter-spacing: 0.14em;
+}
+
+html[data-ui-theme="lcars"] .ship-registry {
+  color: var(--lcars-peach);
+  letter-spacing: 0.12em;
+}
+
+html[data-ui-theme="lcars"] .obj-mission-title {
+  color: var(--lcars-peach);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+html[data-ui-theme="lcars"] .obj-group-label {
+  color: var(--lcars-bar);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  border-bottom: 2px solid var(--lcars-bar);
+  padding-bottom: 2px;
+}
+
+html[data-ui-theme="lcars"] .obj-status-active {
+  color: var(--ok);
+}
+
+html[data-ui-theme="lcars"] .obj-status-completed {
+  color: var(--ok);
+}
+
+html[data-ui-theme="lcars"] .obj-status-failed {
+  color: #ff6666;
+}
+
+html[data-ui-theme="lcars"] .obj-status-inactive {
+  color: var(--muted);
+}
+
+html[data-ui-theme="lcars"] .mission-outcome {
+  border-radius: 0 14px 0 0;
+  letter-spacing: 0.16em;
+}
+
+html[data-ui-theme="lcars"] .mission-outcome.is-success {
+  background: var(--ok);
+  color: #000;
+}
+
+html[data-ui-theme="lcars"] .mission-outcome.is-failure {
+  background: #cc3333;
+  color: #fff;
+}
+
+html[data-ui-theme="lcars"] .badge.is-debrief-outcome.is-success {
+  background: var(--ok);
+  color: #000;
+  border-radius: 0 10px 0 0;
+}
+
+html[data-ui-theme="lcars"] .badge.is-debrief-outcome.is-failure {
+  background: #cc3333;
+  color: #fff;
+  border-radius: 0 10px 0 0;
+}
+
+html[data-ui-theme="lcars"] .meta-list button {
+  background: var(--lcars-bar-3);
+  color: #000;
+  border: none;
+  border-radius: 0 14px 0 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html[data-ui-theme="lcars"] .meta-list button:hover {
+  filter: brightness(1.1);
+}
+
+/* ─── Center: viewscreen + log ──────────────────────────── */
+html[data-ui-theme="lcars"] .center {
+  gap: 8px;
+}
+
+html[data-ui-theme="lcars"] .viewscreen-frame {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 14px 0 0 0 var(--lcars-bar),
+    inset -14px 0 0 0 var(--lcars-bar-2),
+    inset 0 12px 0 0 var(--lcars-bar-4),
+    inset 0 -28px 0 0 #000;
+  padding: 14px 16px 32px;
+}
+
+html[data-ui-theme="lcars"] .viewscreen-inner {
+  border: 2px solid #332200;
+  border-radius: 0;
+  background: #050505;
+}
+
+html[data-ui-theme="lcars"] .viewscreen-inner.mission-boot-active {
+  background: #000;
+  border-color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .viewscreen.mission-boot-open .viewscreen-frame {
+  border-color: var(--lcars-bar);
+  box-shadow: inset 0 0 48px rgba(255, 153, 51, 0.12);
+}
+
+html[data-ui-theme="lcars"] .viewscreen-chrome {
+  background: transparent;
+  border: none;
+  padding: 6px 4px 0;
+}
+
+html[data-ui-theme="lcars"] .viewscreen-caption {
+  color: var(--lcars-peach);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 800;
+  font-size: 0.72rem;
+}
+
+html[data-ui-theme="lcars"] .viewscreen-meta {
+  color: var(--lcars-lilac);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+}
+
+html[data-ui-theme="lcars"] .vs-placeholder {
+  color: var(--muted);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* Collapsible toggles */
+html[data-ui-theme="lcars"] .panel-collapse-toggle {
+  background: #000;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 16px 0 0;
+  color: var(--text);
+}
+
+html[data-ui-theme="lcars"] .panel-collapse-toggle:hover {
+  background: #120a00;
+  border-color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .collapse-chevron {
+  color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .collapse-label {
+  color: #000;
+  background: var(--lcars-bar);
+  padding: 2px 10px;
+  border-radius: 0 10px 0 0;
+  letter-spacing: 0.14em;
+}
+
+html[data-ui-theme="lcars"] .collapse-summary {
+  color: var(--lcars-lilac);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+}
+
+/* Mission log (always open; only History strip collapses) */
+html[data-ui-theme="lcars"] .log-panel {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 0 10px 0 0 var(--lcars-bar),
+    inset 0 -8px 0 0 var(--lcars-bar-2);
+}
+
+html[data-ui-theme="lcars"] .log-header {
+  background: var(--lcars-bar);
+  border-bottom: none;
+  padding: 8px 12px;
+  border-radius: 0 20px 0 0;
+}
+
+html[data-ui-theme="lcars"] .log-header h2 {
+  color: #000;
+  letter-spacing: 0.16em;
+  font-weight: 900;
+}
+
+html[data-ui-theme="lcars"] .log-history {
+  border-top: 2px solid var(--lcars-bar-2);
+}
+
+html[data-ui-theme="lcars"] .log-history .log-history-toggle {
+  background: #000;
+  border: none;
+}
+
+html[data-ui-theme="lcars"] .log-history .collapse-label {
+  background: var(--lcars-bar-2);
+  color: #000;
+}
+
+html[data-ui-theme="lcars"] .viewscreen .collapsible-body-inner {
+  background: #000;
+  border-color: var(--lcars-bar);
+  border-radius: 0;
+}
+
+html[data-ui-theme="lcars"] .badge {
+  background: #000;
+  color: var(--lcars-peach);
+  border-radius: 0 10px 0 0;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+}
+
+html[data-ui-theme="lcars"] .badge.is-waiting-badge {
+  background: var(--lcars-bar-3);
+  color: #000;
+}
+
+html[data-ui-theme="lcars"] .mission-log {
+  background: #000;
+  padding: 10px 12px 14px;
+}
+
+html[data-ui-theme="lcars"] .log-entry {
+  background: #0a0a0a;
+  border-left: 8px solid var(--lcars-bar-2);
+  border-radius: 0 12px 0 0;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .log-entry.current {
+  background: #120a00;
+  border-left-color: var(--lcars-bar);
+  border-left-width: 10px;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .log-entry .who {
+  color: var(--lcars-bar);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+html[data-ui-theme="lcars"] .log-entry.current .who {
+  color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .log-entry .text {
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+html[data-ui-theme="lcars"] .log-entry.player {
+  border-left-color: var(--lcars-bar-3);
+}
+
+html[data-ui-theme="lcars"] .log-entry.system {
+  border-left-color: var(--lcars-bar-4);
+}
+
+html[data-ui-theme="lcars"] .crew-line {
+  border-left: 4px solid var(--lcars-lilac);
+  color: #99ccff; /* soft LCARS blue — distinct from narrator peach */
+  font-style: italic;
+  letter-spacing: 0.03em;
+}
+
+html[data-ui-theme="lcars"] .speakable:hover,
+html[data-ui-theme="lcars"] .speakable:focus-visible {
+  background: rgba(255, 153, 0, 0.12);
+  outline-color: var(--lcars-bar);
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .speakable.is-speaking-line {
+  background: rgba(255, 153, 0, 0.18);
+  box-shadow: inset 4px 0 0 var(--lcars-bar);
+  outline-color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .speakable.crew-line.is-speaking-line {
+  background: rgba(153, 204, 255, 0.12);
+  box-shadow: inset 4px 0 0 var(--lcars-lilac);
+  outline-color: var(--lcars-lilac);
+}
+
+html[data-ui-theme="lcars"] .log-entry.current .text.typing::after {
+  color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .log-entry.current .crew-line.typing::after {
+  color: #99ccff;
+}
+
+/* Options + command */
+html[data-ui-theme="lcars"] .option-btn {
+  background: #111;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 18px 0 0;
+  color: var(--text);
+  letter-spacing: 0.03em;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .option-btn:hover {
+  background: #1a0f00;
+  border-color: var(--lcars-peach);
+  color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .option-btn:focus-visible {
+  border-color: var(--lcars-bar-3);
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .option-btn .num {
+  color: var(--lcars-bar);
+  font-weight: 900;
+}
+
+html[data-ui-theme="lcars"] .command-form input {
+  background: #000;
+  border: 2px solid var(--lcars-bar);
+  border-radius: 0 16px 0 0;
+  color: var(--lcars-peach);
+  letter-spacing: 0.04em;
+}
+
+html[data-ui-theme="lcars"] .command-form input:focus {
+  border-color: var(--lcars-bar-3);
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .command-form input::placeholder {
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+/* Waiting banner */
+html[data-ui-theme="lcars"] .waiting-banner {
+  background: #000;
+  border: 2px solid var(--lcars-bar-2);
+  border-radius: 0 16px 0 0;
+}
+
+html[data-ui-theme="lcars"] .waiting-title {
+  color: var(--lcars-lilac);
+  letter-spacing: 0.12em;
+}
+
+html[data-ui-theme="lcars"] .waiting-spinner {
+  border-color: rgba(204, 153, 204, 0.25);
+  border-top-color: var(--lcars-bar-2);
+}
+
+/* Banners / toasts / modals */
+html[data-ui-theme="lcars"] .ai-error-banner {
+  background: #1a0000;
+  border: 3px solid var(--danger);
+  border-radius: 0 20px 0 0;
+}
+
+html[data-ui-theme="lcars"] .ai-error-title {
+  color: var(--lcars-peach);
+  letter-spacing: 0.12em;
+}
+
+html[data-ui-theme="lcars"] .soft-error-toast {
+  background: #000;
+  border: 3px solid var(--lcars-bar);
+  border-radius: 0 18px 0 0;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .soft-error-title {
+  color: var(--lcars-bar);
+  letter-spacing: 0.12em;
+}
+
+html[data-ui-theme="lcars"] .modal {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+html[data-ui-theme="lcars"] .modal-card {
+  background: #000;
+  border: 4px solid var(--lcars-bar);
+  border-radius: 0 28px 0 0;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .modal-head h2 {
+  color: var(--lcars-peach);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+html[data-ui-theme="lcars"] .hint {
+  color: var(--muted);
+}
+
+html[data-ui-theme="lcars"] .history-item {
+  border: 2px solid var(--lcars-bar-2);
+  border-radius: 0 14px 0 0;
+  background: #0a0a0a;
+}
+
+html[data-ui-theme="lcars"] .history-actions .lcars-btn {
+  border-radius: 0 14px 0 14px;
+}
+
+/* Scar modal */
+html[data-ui-theme="lcars"] .scar-modal-card {
+  border-color: var(--lcars-bar);
+}

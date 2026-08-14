@@ -142,9 +142,11 @@ async function generateImageFile(
 export async function captureViewscreenFrame(
   runId: string,
   momentPrompt: string,
-  opts?: { turnSceneId?: string; force?: boolean }
+  opts?: { turnSceneId?: string; force?: boolean; ownerEmail?: string | null }
 ): Promise<GameState | null> {
-  const state = await readSave(runId);
+  const ownerEmail = opts?.ownerEmail;
+  if (!ownerEmail) return null;
+  const state = await readSave(runId, ownerEmail);
   if (!state) return null;
   if (state.settings.viewscreenEnabled === false && !opts?.force) return state;
   if (!state.ship || !momentPrompt?.trim()) return state;
@@ -181,6 +183,7 @@ export async function captureViewscreenFrame(
   // Mark generating
   let working: GameState = {
     ...state,
+    ownerEmail,
     viewscreen: {
       ...(state.viewscreen || emptyViewscreen()),
       playlist: [...(state.viewscreen?.playlist || []), pending],
@@ -198,7 +201,7 @@ export async function captureViewscreenFrame(
   try {
     const imageUrl = await generateImageFile(runId, frameId, fullPrompt);
     // Re-read to merge concurrent updates
-    const latest = (await readSave(runId)) || working;
+    const latest = (await readSave(runId, ownerEmail)) || working;
     const playlist = (latest.viewscreen?.playlist || []).map((f) =>
       f.id === frameId
         ? { ...f, imageUrl, status: "ready" as const }
@@ -206,6 +209,7 @@ export async function captureViewscreenFrame(
     );
     working = {
       ...latest,
+      ownerEmail,
       viewscreen: {
         playlist,
         activeIndex: -1,
@@ -224,12 +228,13 @@ export async function captureViewscreenFrame(
     await logError(runId, state.phase, `ViewscreenAgent failed: ${message}`, {
       frameId,
     });
-    const latest = (await readSave(runId)) || working;
+    const latest = (await readSave(runId, ownerEmail)) || working;
     const playlist = (latest.viewscreen?.playlist || []).map((f) =>
       f.id === frameId ? { ...f, status: "failed" as const } : f
     );
     working = {
       ...latest,
+      ownerEmail,
       viewscreen: {
         playlist,
         activeIndex: latest.viewscreen?.activeIndex ?? -1,
@@ -255,8 +260,11 @@ export function scheduleViewscreenCapture(state: GameState): void {
   // Only during play / debrief journey moments
   if (state.phase !== "playing" && state.phase !== "debrief") return;
 
+  if (!state.ownerEmail) return;
+
   void captureViewscreenFrame(state.runId, moment, {
     turnSceneId: state.turn?.sceneId,
+    ownerEmail: state.ownerEmail,
   }).catch((err) => {
     console.warn("[viewscreen] capture failed:", err);
   });

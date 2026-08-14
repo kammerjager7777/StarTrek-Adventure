@@ -2,79 +2,108 @@
 
 Source: original Gamemaster prompt, structured for the application.
 
+> **Full mechanics (dice, shields, systems, end conditions):** **[GAME_MECHANICS.md](./GAME_MECHANICS.md)** — code-aligned reference.  
+> **Architecture / agents:** **[ARCHITECTURE.md](./ARCHITECTURE.md)** · **Roadmap:** **[ROADMAP.md](./ROADMAP.md)**
+
 ## Pitch
 
-You command a Starfleet starship. An AI Gamemaster — **Narrator** — narrates in the language and tone of Jean-Luc Picard. Missions are D&D-style: scenes, numbered choices, dice, consequences, and real failure.
+You command a Starfleet starship. An AI Gamemaster — **Narrator** — narrates in language rooted in Jean-Luc Picard, with **intensity that matches the moment** (urgent under fire, warmer in discovery). Missions are D&D-style: scenes, numbered choices, dice, consequences, and real failure.
 
 ## Voice
 
-- Role: text-based adventure Gamemaster
-- Persona: Picard’s language and tone
-- Address: known as **Narrator** or **Gamemaster**
-- Fun, interesting, challenging; realistic consequences
-- A game is not a game without failure — always include ways to lose
+- Role: text-based adventure Gamemaster  
+- Persona: Picard-rooted — moral, commanding, clear; **not** the same florid log every turn  
+- Address: **Narrator** or **Gamemaster**  
+- Fun, interesting, challenging; realistic consequences  
+- A game is not a game without failure — always include ways to lose  
+- Spoken aloud via Grok TTS when the player enables voice  
 
 ## Game stages
 
-1. **Start** — Player name; optional tutorial mission  
-2. **Ship selection** — 4 ships from different eras, or custom ship  
-3. **Custom ship (optional)** — name, class, stardate estimate, capabilities, era-correct crew  
-4. **Mission type** — Science, Exploration, Search & Rescue, Battle, Expanded (always Hardcore)  
-5. **Difficulty** — easy | medium | hard | hardcore  
-6. **Mission offer** — 3 missions; player may request more  
-7. **Mission brief** — background, main + 1–3 secondary objectives, ship status  
-8. **Playing** — captain’s log, crew dialogue, 3–4 options, challenges  
-9. **End** — debrief: casualties, integrity, lives saved, objectives, narrative recap  
+1. **Start** — Player name; optional tutorial  
+2. **Ship selection** — Era-diverse stock ships, or custom ship  
+3. **Custom ship (optional)** — name, class, stardate, capabilities, era-correct crew  
+4. **Mission type** — Science, Exploration, Search & Rescue, Battle, Expanded  
+5. **Difficulty** — easy \| medium \| hard \| hardcore  
+6. **Mission offer** — Several missions; player may request more  
+7. **Mission brief** — Background, main + secondary objectives, ship status  
+8. **Playing** — Captain’s log, crew dialogue, 3–4 options (or free-text), challenges  
+9. **End** — Debrief: damage, objectives, narrative recap  
 
-## Meta commands (any time during play)
+## How a play turn feels
+
+1. Narrator sets the situation (and may request bridge **SFX** for the moment).  
+2. You choose a numbered option **or** type an order/question.  
+3. The **referee** resolves dice and ship stress (shields first, then hull/systems).  
+4. Narrator describes the outcome using those numbers as truth, then presents new options.  
+
+Questions (“What do sensors show?”) do not burn a combat beat the same way orders do — see mechanics doc.
+
+## Meta commands (during play)
 
 | Command | Effect |
-|---|---|
-| Change difficulty | Set new difficulty |
+|---------|--------|
+| Mission status | Objectives, location, ship hull/shields/systems |
+| Hint | Guidance (**unavailable on Hardcore**) |
+| Recap | Summary so far |
+| Divert power to shields | Mechanical shield boost / faster restart |
+| Change difficulty | Adjust d20 threshold mid-run |
 | Restart | Restart current mission |
-| New Mission | Back to mission selection |
-| Mission status | Objectives, whereabouts, progress, ship integrity/damage |
-| Help / Hint | Hint (unavailable on Hardcore) |
-| Recap | Engaging summary so far |
-| Enemy / anomaly / missing ship status | Known intel only |
+| New mission | Back toward mission selection |
+| Enemy / anomaly status | **Known intel only** |
 
-## Rules the code enforces
+## Rules the code enforces (summary)
 
 - One question at a time during setup  
-- Multiple-choice options are numbered  
-- Stardates match ship era  
-- Player selects **one** option per turn  
-- At least one option should lean risky/negative  
-- Difficulty scales challenge count and failure severity  
-- d20 for critical decisions (see dice table)  
-- Ship integrity + system damage; 0 integrity = failure; low integrity may offer abandon ship  
+- Multiple-choice options are numbered; player picks **one** (or free-text)  
+- At least one option should lean high-risk / trap  
+- d20 for medium+ risks; thresholds by difficulty  
+- **Shields absorb external fire first**; boarding/internal can bypass  
+- Six subsystems: shields, torpedoes, warp, communications, sensors, life support  
+- System **destroyed** blocks related orders; **damaged** makes success harder  
+- Hull **0** → mission failure  
+- Early LLM win/loss is **clamped** so missions last a real arc  
+- Scars record lasting combat damage (not player order text)  
 
-## Dice thresholds
+### Dice thresholds (quick)
 
 | Difficulty | Success on | Critical failure |
-|---|---|---|
+|------------|------------|------------------|
 | Easy | ≥ 5 | 1 |
 | Medium | ≥ 10 | 1 |
 | Hard | ≥ 15 | 1 |
 | Hardcore | ≥ 18 | 1–3 |
 
-Natural 20 = critical success. Difficulty can raise DCs further for hard actions.
+Natural **20** = critical success. Action modifiers can raise DCs further.
 
 ## Ship systems (examples)
 
-- Shield array destroyed → no shields  
-- Photon torpedo launcher destroyed → no torpedoes  
-- Warp nacelle destroyed → no warp  
-- Communications destroyed → cannot coordinate with others  
+| System | If destroyed / critical |
+|--------|-------------------------|
+| Shield array | No shield grid; cannot divert |
+| Torpedo launcher | No photon/quantum salvos |
+| Warp nacelles | No warp / emergency jump |
+| Communications | Cannot hail / coordinate |
+| Sensors | No scans / weak targeting |
+| Life support | Global performance penalties; crisis flags |
 
 ## Long-term consequences
 
-Decisions set flags (ignored distress, diplomatic hostility, destroyed probes, etc.) that affect later scenes.
+Decisions set **flags** (trap choices, critical failures, diplomatic fallout, `red_alert_active`, etc.) that color later scenes and can drive UI/audio (e.g. red-alert bed).
 
-## Future (post Phase 1)
+## Bridge presentation (product)
 
-- Imagine Agent for scene art (Grok Imagine)  
-- Voice narration mode  
-- Full game history + resume UI  
-- Custom crew builder with portraits  
-- Attachment systems (loyalty, scars, campaigns)
+- **Themes:** Classic or LCARS  
+- **Viewscreen:** Journey-book images; Incoming Communication at mission start  
+- **Voice:** Auto-play Narrator + crew; per-line replay  
+- **Audio:** TNG bridge ambient + TrekCore SFX (orders, combat, narrator cues)  
+- **History:** Resume / delete prior runs  
+
+## Related
+
+| Doc | Role |
+|-----|------|
+| [GAME_MECHANICS.md](./GAME_MECHANICS.md) | Exhaustive rules |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Code structure |
+| [ROADMAP.md](./ROADMAP.md) | What’s shipped vs next |
+| [../apps/web/assets/sfx/README.md](../apps/web/assets/sfx/README.md) | Sound assets |

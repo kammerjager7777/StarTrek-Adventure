@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import {
   DEFAULT_SYSTEMS,
+  normalizeRegistryNumber,
   type CrewMember,
   type Ship,
   type VisualIdentity,
@@ -15,6 +16,8 @@ const ROOT = path.resolve(__dirname, "../../..");
 export type StockShipTemplate = {
   id: string;
   name: string;
+  /** Optional; synthesized if missing */
+  registryNumber?: string;
   className: string;
   era: string;
   stardate: string;
@@ -53,14 +56,33 @@ export async function loadStockShips(): Promise<StockShipTemplate[]> {
   return JSON.parse(raw) as StockShipTemplate[];
 }
 
+/** Cached skill pack text — avoid re-reading disk every LLM turn */
+let skillPacksCache: string | null = null;
+
 export async function loadSkillPacks(): Promise<string> {
+  if (skillPacksCache != null) return skillPacksCache;
   const dir = path.join(ROOT, "content/skills");
   const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
   const parts = [];
   for (const f of files) {
     parts.push(await fs.readFile(path.join(dir, f), "utf8"));
   }
-  return parts.join("\n\n---\n\n");
+  skillPacksCache = parts.join("\n\n---\n\n");
+  return skillPacksCache;
+}
+
+/**
+ * Compact skill pack for play turns (faster prompts).
+ * Caps total size so the system message does not dominate latency.
+ */
+export async function loadSkillPacksCompact(maxChars = 12_000): Promise<string> {
+  const full = await loadSkillPacks();
+  if (full.length <= maxChars) return full;
+  // Prefer head of pack (usually core tone) + note truncation
+  return (
+    full.slice(0, maxChars) +
+    "\n\n[Skill packs truncated for latency — keep Picard/Trek tone and JSON schema.]"
+  );
 }
 
 async function loadCrewVisuals(): Promise<Record<string, CrewVisualEntry>> {
@@ -182,9 +204,15 @@ export async function templateToShip(t: StockShipTemplate): Promise<Ship> {
 
   const shipVisual = shipCatalog[t.id] || shipCatalog.default;
 
+  const registryNumber = normalizeRegistryNumber(
+    t.registryNumber,
+    [...t.name, t.id].join("").length * 41
+  );
+
   return {
     id: t.id,
     name: t.name,
+    registryNumber,
     className: t.className,
     era: t.era,
     stardate: t.stardate,
@@ -192,13 +220,17 @@ export async function templateToShip(t: StockShipTemplate): Promise<Ship> {
     capabilities: t.capabilities,
     integrity: 100,
     maxIntegrity: 100,
+    shieldIntegrity: 100,
+    maxShieldIntegrity: 100,
+    shieldGridOnline: true,
+    shieldRechargeTurns: 0,
     systems: { ...DEFAULT_SYSTEMS },
     crew,
     scars: [],
     visual: {
       subjectId: `ship:${t.id}`,
       imagePrompt: shipVisual.imagePrompt,
-      tags: [t.className, t.era, t.name],
+      tags: [t.className, t.era, t.name, registryNumber],
     },
     exteriorImageUrl: null,
   };
@@ -206,10 +238,12 @@ export async function templateToShip(t: StockShipTemplate): Promise<Ship> {
 
 export function shipChoicesText(ships: StockShipTemplate[]): string {
   return ships
-    .map(
-      (s, i) =>
-        `${i + 1}. ${s.name} — ${s.className} (${s.era})\n   ${s.description}`
-    )
+    .map((s, i) => {
+      const reg = s.registryNumber
+        ? normalizeRegistryNumber(s.registryNumber)
+        : "";
+      return `${i + 1}. ${s.name}${reg ? ` ${reg}` : ""} — ${s.className} (${s.era})\n   ${s.description}`;
+    })
     .join("\n\n");
 }
 
@@ -217,7 +251,12 @@ export function shipChoicesText(ships: StockShipTemplate[]): string {
 export function formatVisualBible(ship: Ship | null | undefined): string {
   if (!ship) return "No ship selected.";
   const lines: string[] = [];
-  lines.push(`SHIP: ${ship.name} (${ship.className}, ${ship.era})`);
+  lines.push(
+    `SHIP: ${ship.name} ${ship.registryNumber || ""} (${ship.className}, ${ship.era})`.replace(
+      /\s+/g,
+      " "
+    )
+  );
   lines.push(`SHIP VISUAL LOCK: ${ship.visual?.imagePrompt || ship.description}`);
   lines.push(`SHIP STATUS: integrity ${ship.integrity}/${ship.maxIntegrity}`);
   if (ship.scars.length) lines.push(`SHIP SCARS: ${ship.scars.slice(-4).join(" | ")}`);

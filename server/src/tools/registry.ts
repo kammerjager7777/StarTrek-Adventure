@@ -4,14 +4,27 @@
  */
 
 import {
+  applyCombatDamage,
+  applyCrewDeath,
+  applyCrewInjury,
   applyIntegrityDamage,
+  applyReputation,
+  canCrewDie,
+  classifyDamageKind,
+  computeShipSkills,
+  divertPowerToShields,
   evaluateD20,
   hintsAllowed,
+  normalizeCrewMember,
+  normalizeShip,
   rollD20,
   setSystem,
   shipStatusSummary,
   systemLabel,
+  tickCrewService,
+  type DamageKind,
   type Difficulty,
+  type Faction,
   type GameState,
   type ShipSystems,
 } from "../../../packages/game-core/src/index.js";
@@ -76,32 +89,60 @@ export function toolRollD20(
 export function toolUpdateIntegrity(
   state: GameState,
   amount: number,
-  note: string
+  note: string,
+  kind?: DamageKind | string
 ): ToolResult {
   if (!state.ship) return { ok: false, message: "No ship selected." };
-  const { ship, destroyed, abandonSuggested } = applyIntegrityDamage(
-    state.ship,
-    amount
-  );
-  let next: GameState = {
-    ...state,
-    ship: {
-      ...ship,
-      scars:
-        amount > 0 && note
-          ? [...ship.scars, note].slice(-12)
-          : ship.scars,
-    },
-  };
+  const damageKind: DamageKind =
+    kind &&
+    ["phaser", "laser", "torpedo", "collision", "boarding", "internal", "general"].includes(
+      String(kind)
+    )
+      ? (kind as DamageKind)
+      : classifyDamageKind(note);
 
-  if (destroyed && next.mission) {
+  const combat = applyCombatDamage(state.ship, amount, damageKind);
+  let ship = combat.ship;
+  // Scars are lasting damage records only — never log the captain's order text.
+  // System hits already add scars inside applyCombatDamage; add a structural scar
+  // only for serious hull trauma or destruction.
+  if (combat.hullDamage >= 15 || combat.destroyed) {
+    const structural = combat.destroyed
+      ? "Hull integrity lost — vessel combat-ineffective"
+      : `Severe hull trauma (−${combat.hullDamage})`;
+    // Avoid duplicate consecutive structural notes
+    const last = ship.scars[ship.scars.length - 1];
+    if (last !== structural) {
+      ship = {
+        ...ship,
+        scars: [...ship.scars, structural].slice(-12),
+      };
+    }
+  }
+
+  let next: GameState = { ...state, ship };
+
+  if (combat.destroyed && next.mission) {
+    const objectives = next.mission.objectives.map((o) => {
+      if (o.status !== "active") return o;
+      return {
+        ...o,
+        status: o.kind === "main" ? ("failed" as const) : ("missed" as const),
+      };
+    });
     next = {
       ...next,
       phase: "debrief",
-      mission: { ...next.mission, status: "failed" },
+      mission: {
+        ...next.mission,
+        status: "failed",
+        objectives,
+      },
       status: "completed",
-      debrief: `Ship integrity collapsed to zero. ${note}`,
-      pendingQuestion: "Mission failed. Review the debrief, then start a new mission when ready.",
+      debrief: `Hull integrity collapsed to zero. ${note}`,
+      pendingQuestion:
+        "=== Mission Failed ===\n\nHull integrity collapsed to zero. " +
+        `${note}\n\nReview the debrief, then start a new mission when ready.`,
       pendingChoices: [
         { id: 1, text: "New mission", risk: "low" },
         { id: 2, text: "Review ship status", risk: "low" },
@@ -109,13 +150,50 @@ export function toolUpdateIntegrity(
     };
   }
 
+  const n = normalizeShip(next.ship!);
+  const bits = [
+    `Hull ${n.integrity}/${n.maxIntegrity}`,
+    n.shieldGridOnline
+      ? `Shields ${n.shieldIntegrity}/${n.maxShieldIntegrity}`
+      : n.systems.shields === "destroyed"
+        ? "Shields DESTROYED"
+        : `Shields OFFLINE (recharge ${n.shieldRechargeTurns})`,
+  ];
+  if (combat.events.length) bits.push(...combat.events);
+  if (combat.abandonSuggested) bits.push("Abandon ship should be considered.");
+  if (combat.destroyed) bits.push("Mission failure.");
+
   return {
     ok: true,
-    message: `Integrity now ${next.ship!.integrity}/${next.ship!.maxIntegrity}.${
-      abandonSuggested ? " Abandon ship should be considered." : ""
-    }${destroyed ? " Mission failure." : ""}`,
+    message: bits.join(" · "),
     state: next,
-    data: { destroyed, abandonSuggested, integrity: next.ship!.integrity },
+    data: {
+      destroyed: combat.destroyed,
+      abandonSuggested: combat.abandonSuggested,
+      integrity: n.integrity,
+      shieldIntegrity: n.shieldIntegrity,
+      shieldGridOnline: n.shieldGridOnline,
+      hullDamage: combat.hullDamage,
+      shieldDamage: combat.shieldDamage,
+      systemHit: combat.systemHit,
+      damageKind,
+      events: combat.events,
+    },
+  };
+}
+
+export function toolDivertPowerToShields(state: GameState): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  const result = divertPowerToShields(state.ship);
+  return {
+    ok: result.ok,
+    message: result.message,
+    state: { ...state, ship: result.ship },
+    data: {
+      shieldIntegrity: result.ship.shieldIntegrity,
+      shieldGridOnline: result.ship.shieldGridOnline,
+      shieldRechargeTurns: result.ship.shieldRechargeTurns,
+    },
   };
 }
 
@@ -125,18 +203,55 @@ export function toolSetSystem(
   status: "ok" | "damaged" | "destroyed"
 ): ToolResult {
   if (!state.ship) return { ok: false, message: "No ship selected." };
-  const systems = setSystem(state.ship.systems, system, status);
+  let ship = normalizeShip(state.ship);
+  // Shield hardware only when grid is down / collapsing
+  if (
+    system === "shields" &&
+    status !== "ok" &&
+    ship.shieldGridOnline &&
+    ship.shieldIntegrity > 0
+  ) {
+    return {
+      ok: false,
+      message:
+        "Shield emitters are protected while the grid is still holding. They can only be damaged once shields fall.",
+      state,
+    };
+  }
+  const systems = setSystem(ship.systems, system, status);
+  // Only record a scar when status worsens to damaged/destroyed (not repairs to ok)
   const scar =
     status === "destroyed"
       ? `${systemLabel(system)} destroyed`
       : status === "damaged"
         ? `${systemLabel(system)} damaged`
         : null;
-  const ship = {
-    ...state.ship,
+  const already =
+    scar &&
+    ship.scars.some((s) => s.toLowerCase() === scar.toLowerCase());
+  ship = {
+    ...ship,
     systems,
-    scars: scar ? [...state.ship.scars, scar].slice(-12) : state.ship.scars,
+    scars:
+      scar && !already ? [...ship.scars, scar].slice(-12) : ship.scars,
   };
+  if (system === "shields" && status === "destroyed") {
+    ship = {
+      ...ship,
+      shieldIntegrity: 0,
+      shieldGridOnline: false,
+      shieldRechargeTurns: 0,
+    };
+  }
+  if (system === "shields" && status === "ok" && !ship.shieldGridOnline) {
+    // Repair restores grid online with partial charge
+    ship = {
+      ...ship,
+      shieldGridOnline: true,
+      shieldRechargeTurns: 0,
+      shieldIntegrity: Math.max(ship.shieldIntegrity, 25),
+    };
+  }
   return {
     ok: true,
     message: `${systemLabel(system)} is now ${status}.`,
@@ -178,6 +293,115 @@ export function toolSetFlag(state: GameState, flag: string): ToolResult {
         flags: [...state.mission.flags, flag],
       },
     },
+  };
+}
+
+export function toolApplyCrewDeath(
+  state: GameState,
+  memberId: string,
+  cause: string
+): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  const ship = normalizeShip(state.ship);
+  const { crew, dead } = applyCrewDeath(ship.crew || [], memberId, cause);
+  if (!dead) {
+    return { ok: false, message: "Crew member not found or already dead.", state };
+  }
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  const scar = `${dead.name} (${dead.role}) — KIA: ${cause}`;
+  const nextShip = {
+    ...ship,
+    crew,
+    skills,
+    scars: [...ship.scars, scar].slice(-12),
+  };
+  let mission = state.mission;
+  if (mission) {
+    const flag = `crew_loss_${String(dead.role || "officer")
+      .toLowerCase()
+      .replace(/\s+/g, "_")}`;
+    mission = {
+      ...mission,
+      flags: mission.flags.includes(flag)
+        ? mission.flags
+        : [...mission.flags, flag, "crew_casualty"],
+    };
+  }
+  return {
+    ok: true,
+    message: `${dead.name} has been killed in action (${cause}).`,
+    state: { ...state, ship: nextShip, mission },
+    data: { memberId, name: dead.name, role: dead.role, cause },
+  };
+}
+
+export function toolSetCrewStatus(
+  state: GameState,
+  memberId: string,
+  status: "active" | "injured" | "dead" | "transferred",
+  cause?: string
+): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  if (status === "dead") {
+    return toolApplyCrewDeath(state, memberId, cause || "combat trauma");
+  }
+  let ship = normalizeShip(state.ship);
+  let crew = (ship.crew || []).map((c) => normalizeCrewMember(c, ship.stardate));
+  if (status === "injured") {
+    crew = applyCrewInjury(crew, memberId, 2);
+  } else {
+    crew = crew.map((c) =>
+      c.id === memberId
+        ? {
+            ...c,
+            status,
+            injuryTurnsRemaining: undefined,
+            deathCause: status === "transferred" ? c.deathCause : undefined,
+          }
+        : c
+    );
+  }
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  ship = { ...ship, crew, skills };
+  return {
+    ok: true,
+    message: `Crew ${memberId} → ${status}.`,
+    state: { ...state, ship },
+  };
+}
+
+export function toolUpdateReputation(
+  state: GameState,
+  deltas: Partial<Record<Faction, number>>
+): ToolResult {
+  if (!state.universe) {
+    return { ok: false, message: "No universe state on this run.", state };
+  }
+  // Clamp proposed deltas
+  const clamped: Partial<Record<Faction, number>> = {};
+  for (const [k, v] of Object.entries(deltas || {})) {
+    if (typeof v === "number") {
+      clamped[k as Faction] = Math.max(-15, Math.min(15, Math.round(v)));
+    }
+  }
+  const universe = applyReputation(state.universe, clamped);
+  return {
+    ok: true,
+    message: `Reputation updated: ${JSON.stringify(clamped)}`,
+    state: { ...state, universe },
+    data: { deltas: clamped, factionReputation: universe.factionReputation },
+  };
+}
+
+export function toolTickCrewService(state: GameState): ToolResult {
+  if (!state.ship) return { ok: true, message: "No ship.", state };
+  const ship = normalizeShip(state.ship);
+  const crew = tickCrewService(ship.crew || []);
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  return {
+    ok: true,
+    message: "Crew service clocks advanced.",
+    state: { ...state, ship: { ...ship, crew, skills } },
   };
 }
 

@@ -11,22 +11,35 @@ const mediaRoot = path.resolve(__dirname, "../../data/media");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const HOST = process.env.HOST || "127.0.0.1";
+/** Containers / Cloud Run need 0.0.0.0; local dev can stay loopback */
+const HOST =
+  process.env.HOST ||
+  (process.env.NODE_ENV === "production" || process.env.K_SERVICE
+    ? "0.0.0.0"
+    : "127.0.0.1");
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+// Health for Cloud Run / LB (no AI call)
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ ok: true, service: "star-trek-adventure" });
+});
+
 app.use("/api", apiRouter);
 app.use("/media", express.static(mediaRoot));
 app.use(express.static(webRoot));
 
 app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api")) return next();
+  if (req.path.startsWith("/api") || req.path.startsWith("/healthz")) {
+    return next();
+  }
   res.sendFile(path.join(webRoot, "index.html"));
 });
 
 app.listen(PORT, HOST, () => {
   console.log("");
-  console.log("  Star Trek Adventure — Phase 1");
+  console.log("  Star Trek Adventure");
   console.log(`  Bridge online: http://${HOST}:${PORT}`);
   console.log(
     process.env.XAI_API_KEY?.trim()

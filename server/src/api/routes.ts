@@ -1,12 +1,14 @@
 import { Router } from "express";
 import {
   AiUnavailableError,
+  continueProfile,
   deleteGame,
   generateCrewPortraits,
   getGame,
   listGames,
   LlmNarratorError,
   playerAction,
+  requestAdvice,
   resolveSpeakPayload,
   setSpeechEnabled,
   startNewGame,
@@ -18,6 +20,13 @@ import {
 } from "../debug/sessionDebugLog.js";
 import { checkXaiConnectivity } from "../services/xai/connectivity.js";
 import { synthesizeSpeech } from "../services/xai/tts.js";
+import {
+  deleteProfile,
+  listProfiles,
+  readProfile,
+} from "../store/profileStore.js";
+import { requireUser } from "../auth/identity.js";
+import { maybeMigrateLegacyForUser } from "../auth/userData.js";
 
 export const apiRouter = Router();
 
@@ -49,9 +58,30 @@ apiRouter.get("/ai/status", async (_req, res) => {
   res.json(probe);
 });
 
-apiRouter.post("/games", async (_req, res) => {
+/**
+ * All game/profile routes require a signed-in user (IAP email or local dev).
+ * Data is strictly scoped to that account.
+ */
+apiRouter.use(requireUser);
+
+/** Who am I — for UI account label */
+apiRouter.get("/me", async (req, res) => {
+  const user = req.user!;
   try {
-    const view = await startNewGame();
+    await maybeMigrateLegacyForUser(user.email);
+  } catch {
+    /* non-fatal */
+  }
+  res.json({
+    email: user.email,
+    slug: user.slug,
+    source: user.source,
+  });
+});
+
+apiRouter.post("/games", async (req, res) => {
+  try {
+    const view = await startNewGame(req.user!.email);
     res.status(201).json(view);
   } catch (err) {
     if (err instanceof AiUnavailableError) {
@@ -76,9 +106,9 @@ apiRouter.post("/games", async (_req, res) => {
   }
 });
 
-apiRouter.get("/games", async (_req, res) => {
+apiRouter.get("/games", async (req, res) => {
   try {
-    const games = await listGames();
+    const games = await listGames(req.user!.email);
     res.json({ games });
   } catch (err) {
     console.error(err);
@@ -88,7 +118,7 @@ apiRouter.get("/games", async (_req, res) => {
 
 apiRouter.get("/games/:runId", async (req, res) => {
   try {
-    const view = await getGame(req.params.runId);
+    const view = await getGame(req.params.runId, req.user!.email);
     if (!view) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -102,7 +132,7 @@ apiRouter.get("/games/:runId", async (req, res) => {
 
 apiRouter.delete("/games/:runId", async (req, res) => {
   try {
-    const ok = await deleteGame(req.params.runId);
+    const ok = await deleteGame(req.params.runId, req.user!.email);
     if (!ok) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -117,7 +147,7 @@ apiRouter.delete("/games/:runId", async (req, res) => {
 /** Generate / refresh crew portraits for a run (xAI Imagine) */
 apiRouter.post("/games/:runId/crew/portraits", async (req, res) => {
   try {
-    const view = await generateCrewPortraits(req.params.runId);
+    const view = await generateCrewPortraits(req.params.runId, req.user!.email);
     if (!view) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -136,7 +166,11 @@ apiRouter.patch("/games/:runId/settings", async (req, res) => {
       res.status(400).json({ error: "speechOn (boolean) is required" });
       return;
     }
-    const view = await setSpeechEnabled(req.params.runId, req.body.speechOn);
+    const view = await setSpeechEnabled(
+      req.params.runId,
+      req.user!.email,
+      req.body.speechOn
+    );
     if (!view) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -157,11 +191,15 @@ apiRouter.post("/games/:runId/voice/speak", async (req, res) => {
   const t0 = performance.now();
   try {
     const tResolve0 = performance.now();
-    const payload = await resolveSpeakPayload(req.params.runId, {
-      speaker: req.body?.speaker,
-      text: req.body?.text,
-      emotion: req.body?.emotion,
-    });
+    const payload = await resolveSpeakPayload(
+      req.params.runId,
+      req.user!.email,
+      {
+        speaker: req.body?.speaker,
+        text: req.body?.text,
+        emotion: req.body?.emotion,
+      }
+    );
     const resolveMs = Math.round(performance.now() - tResolve0);
     if (!payload) {
       res.status(404).json({
@@ -207,7 +245,7 @@ apiRouter.post("/games/:runId/voice/speak", async (req, res) => {
 /** Locked voice profiles for the current run (debug / UI tooltips) */
 apiRouter.get("/games/:runId/voice/profiles", async (req, res) => {
   try {
-    const view = await getGame(req.params.runId);
+    const view = await getGame(req.params.runId, req.user!.email);
     if (!view) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -236,7 +274,11 @@ apiRouter.post("/games/:runId/action", async (req, res) => {
       res.status(400).json({ error: "text is required" });
       return;
     }
-    const view = await playerAction(req.params.runId, text);
+    const view = await playerAction(
+      req.params.runId,
+      req.user!.email,
+      text
+    );
     if (!view) {
       res.status(404).json({ error: "Game not found" });
       return;
@@ -256,9 +298,14 @@ apiRouter.post("/games/:runId/action", async (req, res) => {
   }
 });
 
-/** Debug session log (JSON events) */
+/** Debug session log (JSON events) — only if the run belongs to this user */
 apiRouter.get("/games/:runId/debug", async (req, res) => {
   try {
+    const view = await getGame(req.params.runId, req.user!.email);
+    if (!view) {
+      res.status(404).json({ error: "Game not found" });
+      return;
+    }
     const events = await readDebugLog(req.params.runId);
     res.json({
       runId: req.params.runId,
@@ -274,6 +321,11 @@ apiRouter.get("/games/:runId/debug", async (req, res) => {
 /** Debug session log as plain text (easy to paste / share) */
 apiRouter.get("/games/:runId/debug.txt", async (req, res) => {
   try {
+    const view = await getGame(req.params.runId, req.user!.email);
+    if (!view) {
+      res.status(404).type("text/plain").send("Game not found");
+      return;
+    }
     const text = await readDebugLogText(req.params.runId);
     res.type("text/plain").send(text);
   } catch (err) {
@@ -282,12 +334,103 @@ apiRouter.get("/games/:runId/debug.txt", async (req, res) => {
   }
 });
 
-apiRouter.get("/debug", async (_req, res) => {
+apiRouter.get("/debug", async (req, res) => {
   try {
-    const logs = await listDebugLogs();
+    // Only list debug sessions for this user's runs
+    const games = await listGames(req.user!.email);
+    const runIds = new Set(games.map((g) => g.runId));
+    const logs = (await listDebugLogs()).filter((l) => runIds.has(l.runId));
     res.json({ logs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to list debug logs" });
+  }
+});
+
+// ── Campaign profiles (per-account) ────────────────────────────────
+
+apiRouter.get("/profiles", async (req, res) => {
+  try {
+    const profiles = await listProfiles(req.user!.email);
+    res.json({ profiles });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to list profiles" });
+  }
+});
+
+apiRouter.get("/profiles/:id", async (req, res) => {
+  try {
+    const profile = await readProfile(req.params.id, req.user!.email);
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+    res.json({ profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+apiRouter.delete("/profiles/:id", async (req, res) => {
+  try {
+    const ok = await deleteProfile(req.params.id, req.user!.email);
+    if (!ok) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+    res.json({ ok: true, id: req.params.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete profile" });
+  }
+});
+
+/** Resume active run or start next mission from a campaign profile */
+apiRouter.post("/profiles/:id/continue", async (req, res) => {
+  try {
+    const view = await continueProfile(req.params.id, req.user!.email);
+    if (!view) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+    res.json(view);
+  } catch (err) {
+    if (err instanceof AiUnavailableError || err instanceof LlmNarratorError) {
+      res.status(503).json({
+        error: "Cannot continue — AI narrator unavailable",
+        reason: err.reason,
+        detail: "detail" in err ? err.detail : undefined,
+      });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: "Failed to continue profile" });
+  }
+});
+
+/** Ask a bridge officer for advice (no dice / no play turn) */
+apiRouter.post("/games/:runId/crew/advice", async (req, res) => {
+  try {
+    const memberId = String(req.body?.memberId || "").trim();
+    if (!memberId) {
+      res.status(400).json({ error: "memberId is required" });
+      return;
+    }
+    const out = await requestAdvice(
+      req.params.runId,
+      req.user!.email,
+      memberId,
+      req.body?.question ? String(req.body.question) : undefined
+    );
+    if (!out) {
+      res.status(404).json({ error: "Game not found" });
+      return;
+    }
+    res.json(out);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to get advice" });
   }
 });
