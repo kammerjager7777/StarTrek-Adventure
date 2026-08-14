@@ -54,7 +54,26 @@ gcloud secrets add-iam-policy-binding XAI_API_KEY \
   --role="roles/secretmanager.secretAccessor" \
   --quiet
 
-echo "==> Deploy Cloud Run (no public invokers)"
+if ! gcloud secrets describe SESSION_SECRET >/dev/null 2>&1; then
+  echo "==> Create SESSION_SECRET"
+  openssl rand -hex 32 | gcloud secrets create SESSION_SECRET --data-file=-
+fi
+gcloud secrets add-iam-policy-binding SESSION_SECRET \
+  --member="serviceAccount:${RUNTIME_SA}" \
+  --role="roles/secretmanager.secretAccessor" \
+  --quiet
+
+ALLOWED_USERS="${ALLOWED_USERS:-$ALLOWED_USER}"
+GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+ACCESS_CONTACT_EMAIL="${ACCESS_CONTACT_EMAIL:-michaelstephens2011@gmail.com}"
+
+echo "==> Deploy Cloud Run (public HTML + app-level Google allow-list)"
+# ^|^ delimiter so ALLOWED_USERS may contain commas
+DEPLOY_ENV="^|^NODE_ENV=production|HOST=0.0.0.0|XAI_MODEL=${XAI_MODEL:-grok-4.5}|ALLOWED_USERS=${ALLOWED_USERS}|ACCESS_CONTACT_EMAIL=${ACCESS_CONTACT_EMAIL}"
+if [[ -n "$GOOGLE_CLIENT_ID" ]]; then
+  DEPLOY_ENV="${DEPLOY_ENV}|GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
+fi
+
 gcloud run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -67,27 +86,14 @@ gcloud run deploy "$SERVICE" \
   --min-instances=0 \
   --max-instances=3 \
   --cpu-boost \
-  --set-env-vars="NODE_ENV=production,HOST=0.0.0.0,XAI_MODEL=${XAI_MODEL:-grok-4.5}" \
-  --set-secrets="XAI_API_KEY=XAI_API_KEY:latest" \
-  --no-allow-unauthenticated \
-  --iap \
+  --set-env-vars="$DEPLOY_ENV" \
+  --set-secrets="XAI_API_KEY=XAI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest" \
+  --allow-unauthenticated \
+  --no-iap \
   --ingress=all
 
-# Only your account can invoke the service
-gcloud run services add-iam-policy-binding "$SERVICE" \
-  --region="$REGION" \
-  --member="user:${ALLOWED_USER}" \
-  --role="roles/run.invoker" \
-  --quiet
-
-# Also allow yourself as project owner is already enough for admin, but invoker is required for browser proxy patterns
 URL="$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
 echo ""
 echo "Deployed: $URL"
-echo "Access is restricted to: $ALLOWED_USER"
-echo ""
-echo "Browser access options:"
-echo "  1) gcloud run services proxy $SERVICE --region=$REGION --port=8080"
-echo "     then open http://127.0.0.1:8080"
-echo "  2) Enable IAP + Load Balancer for Google login (see deploy/gcp/README.md)"
+echo "Sign-in is the LCARS access page. Allowed: $ALLOWED_USERS"
 echo ""

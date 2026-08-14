@@ -466,6 +466,9 @@ async function api(path, options = {}) {
   }
 
   if (!res.ok) {
+    if (payload.gate && typeof payload.gate === "string") {
+      window.location.replace(payload.gate);
+    }
     const message =
       payload.reason ||
       payload.error ||
@@ -3866,9 +3869,30 @@ if (els.btnRetryAi) {
   });
 }
 
+async function enforceAccessGate() {
+  try {
+    const access = await fetch("/api/access").then((r) =>
+      r.ok ? r.json() : null
+    );
+    if (!access?.gateEnabled) return true;
+    if (!access.authenticated) {
+      window.location.replace("/access.html");
+      return false;
+    }
+    if (!access.allowed) {
+      window.location.replace("/access.html?gate=denied");
+      return false;
+    }
+  } catch {
+    /* local / offline: continue */
+  }
+  return true;
+}
+
 // Boot
 (async function init() {
   try {
+    if (!(await enforceAccessGate())) return;
     // Local: ensure browser has an account email before any game/history I/O
     // (IAP overrides this on Cloud Run).
     if (!getLocalUserEmail()) {

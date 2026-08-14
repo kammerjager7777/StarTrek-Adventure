@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Star Trek Adventure — Bridge</title>
+    <script>
+      (function () {
+        var q = location.search;
+        if (/[?&]gate=(login|denied|access_denied)\b/.test(q)) {
+          location.replace("/access.html" + q);
+          return;
+        }
+        fetch("/api/access")
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .then(function (a) {
+            if (!a || !a.gateEnabled) return;
+            if (!a.authenticated) location.replace("/access.html");
+            else if (!a.allowed) location.replace("/access.html?gate=denied");
+          })
+          .catch(function () {});
+      })();
+    </script>
     <!-- Apply saved theme before paint to avoid flash -->
     <script>
       (function () {

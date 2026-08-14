@@ -4,6 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { decodeSession, readCookie, SESSION_COOKIE } from "./session.js";
 
 export type AuthUser = {
   /** Normalized lowercase email */
@@ -11,7 +12,7 @@ export type AuthUser = {
   /** Filesystem-safe slug for data directories */
   slug: string;
   /** How the identity was obtained */
-  source: "iap" | "dev" | "env";
+  source: "iap" | "google" | "dev" | "env";
 };
 
 declare global {
@@ -42,6 +43,7 @@ export function emailToSlug(email: string): string {
 /**
  * Extract authenticated user email.
  * - Production / IAP: X-Goog-Authenticated-User-Email
+ * - Google Sign-In: signed sta_session cookie
  * - Local: DEV_USER_EMAIL or X-Dev-User-Email when ALLOW_DEV_AUTH / non-production
  */
 export function resolveAuthUser(req: Request): AuthUser | null {
@@ -53,6 +55,15 @@ export function resolveAuthUser(req: Request): AuthUser | null {
     if (email && email.includes("@")) {
       return { email, slug: emailToSlug(email), source: "iap" };
     }
+  }
+
+  const sessionEmail = decodeSession(readCookie(req, SESSION_COOKIE));
+  if (sessionEmail) {
+    return {
+      email: sessionEmail,
+      slug: emailToSlug(sessionEmail),
+      source: "google",
+    };
   }
 
   const allowDev =
@@ -87,9 +98,9 @@ export function requireUser(
   const user = resolveAuthUser(req);
   if (!user) {
     res.status(401).json({
-      error: "Authentication required",
-      detail:
-        "Sign in with an allowed Google account (IAP). Locally set DEV_USER_EMAIL or X-Dev-User-Email.",
+      error: "login_required",
+      detail: "Sign in with an authorized Google account.",
+      gate: "/access.html",
     });
     return;
   }

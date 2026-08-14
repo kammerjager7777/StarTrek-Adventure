@@ -25,8 +25,16 @@ import {
   listProfiles,
   readProfile,
 } from "../store/profileStore.js";
-import { requireUser } from "../auth/identity.js";
+import { requireUser, resolveAuthUser } from "../auth/identity.js";
 import { maybeMigrateLegacyForUser } from "../auth/userData.js";
+import {
+  accessPayload,
+  isEmailAllowed,
+  parseAllowedEmails,
+  requireAllowedUser,
+} from "../auth/access.js";
+import { googleClientId, verifyGoogleIdToken } from "../auth/google.js";
+import { clearSessionCookie, setSessionCookie } from "../auth/session.js";
 
 export const apiRouter = Router();
 
@@ -58,11 +66,57 @@ apiRouter.get("/ai/status", async (_req, res) => {
   res.json(probe);
 });
 
+/** Public access-gate payload (no login required). */
+apiRouter.get("/access", (req, res) => {
+  const user = resolveAuthUser(req);
+  const payload = accessPayload(user);
+  const local =
+    process.env.NODE_ENV !== "production" && !process.env.K_SERVICE;
+  res.json({
+    ...payload,
+    googleClientId: googleClientId() || null,
+    allowedEmails: local ? parseAllowedEmails() : undefined,
+  });
+});
+
+apiRouter.get("/auth/config", (_req, res) => {
+  res.json({
+    googleClientId: googleClientId() || null,
+    contact: accessPayload(null).contact,
+  });
+});
+
+apiRouter.post("/auth/google", async (req, res) => {
+  const idToken = String(req.body?.idToken || req.body?.credential || "");
+  const verified = await verifyGoogleIdToken(idToken);
+  if (!verified) {
+    res.status(401).json({
+      error: "login_failed",
+      detail: "Google sign-in could not be verified.",
+    });
+    return;
+  }
+  setSessionCookie(res, verified.email);
+  const allowed = isEmailAllowed(verified.email);
+  res.json({
+    ok: true,
+    email: verified.email,
+    allowed,
+    gate: allowed ? "/" : "/access.html?gate=denied",
+  });
+});
+
+apiRouter.post("/auth/logout", (_req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true, gate: "/access.html" });
+});
+
 /**
  * All game/profile routes require a signed-in user (IAP email or local dev).
  * Data is strictly scoped to that account.
  */
 apiRouter.use(requireUser);
+apiRouter.use(requireAllowedUser);
 
 /** Who am I — for UI account label */
 apiRouter.get("/me", async (req, res) => {

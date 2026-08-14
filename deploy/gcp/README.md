@@ -13,14 +13,17 @@ Private Cloud Run deployment for **Star Trek Adventure**.
 | **Allowed users** | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, `npgibbs@gmail.com` |
 | **Secrets** | `XAI_API_KEY` in Secret Manager |
 
-The service is **not public**. **Identity-Aware Proxy (IAP)** is enabled.
+The HTML access page is public. Game APIs require a Google account on the allow-list.
 
-- Unauthenticated visitors → **302** to Google sign-in  
-- Allowed Google accounts (IAP + Run invoker):
-  - `mrarcam00@gmail.com`
-  - `michaelstephens2011@gmail.com`
-  - `npgibbs@gmail.com`
-- IAP service agent is granted `roles/run.invoker` so the proxy can reach Cloud Run  
+- Unauthenticated visitors → LCARS **Restricted access** page  
+- Allowed Gmail → sign in and play  
+- Any other Google account → LCARS **Access denied** (contact Michael)  
+
+Allowed Google accounts:
+
+- `mrarcam00@gmail.com`
+- `michaelstephens2011@gmail.com`
+- `npgibbs@gmail.com`
 
 ## Access the app (browser)
 
@@ -28,7 +31,7 @@ Open:
 
 **https://sta-bridge-ledmkjy2mq-uc.a.run.app**
 
-Sign in with an **allowed Gmail** above. Other Google accounts should be denied by IAP.
+Sign in with an **allowed Gmail** above.
 
 Alternate URL (same service):  
 https://sta-bridge-1036417382463.us-central1.run.app
@@ -58,8 +61,8 @@ gcloud builds submit --tag us-central1-docker.pkg.dev/star-trek-adventure-3524d3
 gcloud run deploy sta-bridge \
   --image=us-central1-docker.pkg.dev/star-trek-adventure-3524d3/sta/sta-bridge:latest \
   --region=us-central1 \
-  --set-secrets=XAI_API_KEY=XAI_API_KEY:latest \
-  --no-allow-unauthenticated
+  --set-secrets=XAI_API_KEY=XAI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest \
+  --allow-unauthenticated
 ```
 
 ## Console links
@@ -68,26 +71,11 @@ gcloud run deploy sta-bridge \
 - [Secret Manager](https://console.cloud.google.com/security/secret-manager?project=star-trek-adventure-3524d3)
 - [Cloud Build history](https://console.cloud.google.com/cloud-build/builds?project=star-trek-adventure-3524d3)
 
-## IAP status
+## Access gate
 
-IAP is **on** (`run.googleapis.com/iap-enabled: true`). Verified:
+Unauthenticated `GET /` serves the LCARS login page. APIs return `401 login_required` or `403 access_denied`.
 
-| Check | Result |
-|-------|--------|
-| Unauthenticated `GET /` | HTTP **302** → `accounts.google.com` |
-| IAP principals | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, `npgibbs@gmail.com` |
-| Cloud Run invokers | those Gmails + IAP service agent |
-
-To add another trusted user later:
-
-```bash
-gcloud iap web add-iam-policy-binding \
-  --resource-type=cloud-run --service=sta-bridge --region=us-central1 \
-  --member="user:OTHER@gmail.com" \
-  --role="roles/iap.httpsResourceAccessor"
-gcloud run services add-iam-policy-binding sta-bridge --region=us-central1 \
-  --member="user:OTHER@gmail.com" --role="roles/run.invoker"
-```
+To add another trusted user later, append their Gmail to `ALLOWED_USERS` in `deploy/gcp/project.env` and redeploy. Also add them as an OAuth test user if the consent screen is still in Testing.
 
 ## Data note
 

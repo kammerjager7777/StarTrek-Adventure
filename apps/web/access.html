@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en" data-ui-theme="lcars">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Star Trek Adventure — Access</title>
+    <link rel="stylesheet" href="/css/access.css" />
+  </head>
+  <body class="access-body">
+    <div class="access-gate">
+      <div class="access-rail" aria-hidden="true"></div>
+      <div class="access-main">
+        <aside class="access-side" aria-hidden="true">
+          <div class="access-cap mid">47-221</div>
+          <div class="access-cap tall">Access<br />Control</div>
+          <div class="access-cap short">Auth</div>
+          <div class="access-cap peach">UFP</div>
+        </aside>
+
+        <section class="access-panel">
+          <div class="access-logo">
+            <img src="/assets/ufp-logo.png?v=3" alt="" width="220" height="174" />
+          </div>
+          <p class="access-kicker">Starfleet LCARS · Restricted channel</p>
+
+          <div id="state-login" class="access-state">
+            <h1 class="access-title">Restricted access</h1>
+            <p class="access-copy">
+              You must sign in with an authorized Google account before using
+              this starship. Unauthorized personnel cannot reach the bridge.
+            </p>
+            <div class="access-actions">
+              <button type="button" class="access-btn" id="btn-signin">
+                Sign in with Google
+              </button>
+            </div>
+            <div id="gis-fallback" class="access-gis hidden"></div>
+            <form id="local-signin" class="access-form hidden">
+              <label for="email">Local preview — Google account email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autocomplete="username"
+                placeholder="you@gmail.com"
+                required
+              />
+              <button type="submit" class="access-btn lilac">Continue</button>
+            </form>
+            <p class="access-note">Federation use only · Session monitored</p>
+          </div>
+
+          <div id="state-denied" class="access-state hidden">
+            <h1 class="access-title is-denied">Access denied</h1>
+            <p class="access-copy">
+              That Google account is <strong>not authorized</strong> for this
+              vessel. If you need clearance, contact
+              <strong>Michael</strong> and request access.
+            </p>
+            <p class="access-contact">
+              <a id="contact-link" href="mailto:michaelstephens2011@gmail.com"
+                >michaelstephens2011@gmail.com</a
+              >
+            </p>
+            <div class="access-actions">
+              <a
+                class="access-btn"
+                id="btn-mail"
+                href="mailto:michaelstephens2011@gmail.com?subject=Star%20Trek%20Adventure%20access%20request"
+                >Contact Michael</a
+              >
+              <button type="button" class="access-btn secondary" id="btn-other">
+                Try another account
+              </button>
+            </div>
+            <p class="access-note" id="denied-email"></p>
+          </div>
+
+          <div class="access-preview" id="preview-bar">
+            <p>Local preview</p>
+            <div class="access-preview-links">
+              <a href="/access.html">Login required</a>
+              <a href="/access.html?gate=denied">Access denied</a>
+              <a href="/">Bridge</a>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="access-rail" aria-hidden="true"></div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      (function () {
+        var CONTACT = "michaelstephens2011@gmail.com";
+        var ALLOWED = [
+          "mrarcam00@gmail.com",
+          "michaelstephens2011@gmail.com",
+          "npgibbs@gmail.com",
+        ];
+        var clientId = "";
+        var gisReady = false;
+        var params = new URLSearchParams(location.search);
+        var gate = params.get("gate") || params.get("reason") || "login";
+        if (gate === "access_denied") gate = "denied";
+        var isLocal =
+          location.hostname === "127.0.0.1" ||
+          location.hostname === "localhost";
+        var loginEl = document.getElementById("state-login");
+        var deniedEl = document.getElementById("state-denied");
+        var formEl = document.getElementById("local-signin");
+        var previewEl = document.getElementById("preview-bar");
+        var deniedEmail = document.getElementById("denied-email");
+        var gisFallback = document.getElementById("gis-fallback");
+
+        function show(which) {
+          loginEl.classList.toggle("hidden", which !== "login");
+          deniedEl.classList.toggle("hidden", which !== "denied");
+          document.title =
+            which === "denied"
+              ? "Star Trek Adventure — Access denied"
+              : "Star Trek Adventure — Sign in required";
+        }
+
+        function setContact(email) {
+          if (!email || email.indexOf("@") < 0) email = CONTACT;
+          CONTACT = email;
+          var link = document.getElementById("contact-link");
+          var mail = document.getElementById("btn-mail");
+          link.textContent = email;
+          link.href = "mailto:" + email;
+          mail.href =
+            "mailto:" +
+            email +
+            "?subject=Star%20Trek%20Adventure%20access%20request";
+        }
+
+        function isAllowed(email) {
+          email = String(email || "").trim().toLowerCase();
+          return ALLOWED.indexOf(email) !== -1;
+        }
+
+        function onGoogleCredential(resp) {
+          var token = resp && resp.credential;
+          if (!token) return;
+          fetch("/api/auth/google", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ idToken: token }),
+          })
+            .then(function (r) {
+              return r.json().then(function (body) {
+                return { ok: r.ok, body: body };
+              });
+            })
+            .then(function (out) {
+              if (!out.body) return;
+              if (out.body.allowed) {
+                window.location.replace("/");
+                return;
+              }
+              deniedEmail.textContent = out.body.email
+                ? "Account: " + out.body.email
+                : "";
+              show("denied");
+              history.replaceState({}, "", "/access.html?gate=denied");
+            })
+            .catch(function () {});
+        }
+
+        function initGis() {
+          if (!clientId || !window.google || !google.accounts || !google.accounts.id) {
+            return;
+          }
+          google.accounts.id.initialize({
+            client_id: clientId,
+            callback: onGoogleCredential,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+          gisReady = true;
+        }
+
+        function startGoogleSignIn() {
+          if (!clientId) {
+            formEl.classList.remove("hidden");
+            document.getElementById("email").focus();
+            return;
+          }
+          initGis();
+          if (!gisReady) {
+            formEl.classList.remove("hidden");
+            return;
+          }
+          google.accounts.id.prompt(function (notification) {
+            if (
+              notification &&
+              (notification.isNotDisplayed() || notification.isSkippedMoment())
+            ) {
+              gisFallback.classList.remove("hidden");
+              google.accounts.id.renderButton(gisFallback, {
+                theme: "filled_black",
+                size: "large",
+                text: "signin_with",
+                shape: "pill",
+                width: 280,
+              });
+            }
+          });
+        }
+
+        show(gate === "denied" ? "denied" : "login");
+        if (!isLocal) previewEl.classList.add("hidden");
+
+        fetch("/api/access")
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          .then(function (data) {
+            if (!data) return;
+            if (data.contact && data.contact.email) {
+              setContact(data.contact.email);
+            }
+            if (Array.isArray(data.allowedEmails) && data.allowedEmails.length) {
+              ALLOWED = data.allowedEmails;
+            }
+            if (data.googleClientId) clientId = data.googleClientId;
+            if (
+              (data.source === "google" || data.source === "iap") &&
+              data.authenticated &&
+              !data.allowed
+            ) {
+              deniedEmail.textContent = data.email ? "Account: " + data.email : "";
+              show("denied");
+            } else if (
+              data.authenticated &&
+              data.allowed &&
+              data.gateEnabled
+            ) {
+              window.location.replace("/");
+            }
+            initGis();
+          })
+          .catch(function () {});
+
+        window.addEventListener("load", initGis);
+
+        document.getElementById("btn-signin").addEventListener("click", function () {
+          startGoogleSignIn();
+        });
+
+        formEl.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var email = document.getElementById("email").value.trim().toLowerCase();
+          if (!email || email.indexOf("@") < 0) return;
+          try {
+            localStorage.setItem("sta-user-email", email);
+          } catch (err) {}
+          if (isAllowed(email)) {
+            window.location.href = "/";
+            return;
+          }
+          deniedEmail.textContent = "Account: " + email;
+          show("denied");
+          history.replaceState({}, "", "/access.html?gate=denied");
+        });
+
+        document.getElementById("btn-other").addEventListener("click", function () {
+          try {
+            localStorage.removeItem("sta-user-email");
+          } catch (err) {}
+          fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" })
+            .catch(function () {})
+            .finally(function () {
+              if (gisReady && google.accounts && google.accounts.id) {
+                google.accounts.id.disableAutoSelect();
+              }
+              show("login");
+              gisFallback.classList.add("hidden");
+              history.replaceState({}, "", "/access.html");
+              startGoogleSignIn();
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>
