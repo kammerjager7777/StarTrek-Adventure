@@ -10,7 +10,7 @@ Private Cloud Run deployment for **Star Trek Adventure**.
 | **Region** | `us-central1` |
 | **Service** | `sta-bridge` |
 | **URL** | `https://sta-bridge-ledmkjy2mq-uc.a.run.app` |
-| **Allowed users** | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com` |
+| **Allowed users** | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, `npgibbs@gmail.com` |
 | **Secrets** | `XAI_API_KEY` in Secret Manager |
 
 The service is **not public**. **Identity-Aware Proxy (IAP)** is enabled.
@@ -19,6 +19,7 @@ The service is **not public**. **Identity-Aware Proxy (IAP)** is enabled.
 - Allowed Google accounts (IAP + Run invoker):
   - `mrarcam00@gmail.com`
   - `michaelstephens2011@gmail.com`
+  - `npgibbs@gmail.com`
 - IAP service agent is granted `roles/run.invoker` so the proxy can reach Cloud Run  
 
 ## Access the app (browser)
@@ -74,7 +75,7 @@ IAP is **on** (`run.googleapis.com/iap-enabled: true`). Verified:
 | Check | Result |
 |-------|--------|
 | Unauthenticated `GET /` | HTTP **302** → `accounts.google.com` |
-| IAP principals | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com` |
+| IAP principals | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, `npgibbs@gmail.com` |
 | Cloud Run invokers | those Gmails + IAP service agent |
 
 To add another trusted user later:
