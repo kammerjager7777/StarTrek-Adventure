@@ -70,6 +70,7 @@ gcloud run deploy "$SERVICE" \
   --set-env-vars="NODE_ENV=production,HOST=0.0.0.0,XAI_MODEL=${XAI_MODEL:-grok-4.5}" \
   --set-secrets="XAI_API_KEY=XAI_API_KEY:latest" \
   --no-allow-unauthenticated \
+  --iap \
   --ingress=all
 
 # Only your account can invoke the service

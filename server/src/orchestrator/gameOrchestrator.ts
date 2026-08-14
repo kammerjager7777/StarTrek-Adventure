@@ -75,10 +75,10 @@ function freshState(ownerEmail: string): GameState {
     turn: null,
     log: [],
     settings: {
-      speechOn: false,
+      speechOn: true,
       imagesOn: true,
       tutorialCompleted: false,
-      voiceMode: "off",
+      voiceMode: "on",
       viewscreenEnabled: true,
     },
     narratorVoice: buildNarratorVoiceIdentity(),

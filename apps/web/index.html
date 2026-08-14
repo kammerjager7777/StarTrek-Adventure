@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-ui-theme="classic">
+<html lang="en" data-ui-theme="lcars">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,10 +9,10 @@
       (function () {
         try {
           var t = localStorage.getItem("sta-ui-theme");
-          if (t !== "lcars" && t !== "classic") t = "classic";
+          if (t !== "lcars" && t !== "classic") t = "lcars";
           document.documentElement.setAttribute("data-ui-theme", t);
         } catch (e) {
-          document.documentElement.setAttribute("data-ui-theme", "classic");
+          document.documentElement.setAttribute("data-ui-theme", "lcars");
         }
       })();
     </script>
@@ -41,7 +41,7 @@
               id="btn-theme-classic"
               class="theme-toggle-btn"
               data-theme="classic"
-              aria-pressed="true"
+              aria-pressed="false"
               title="Classic bridge look"
             >
               Classic
@@ -51,7 +51,7 @@
               id="btn-theme-lcars"
               class="theme-toggle-btn"
               data-theme="lcars"
-              aria-pressed="false"
+              aria-pressed="true"
               title="LCARS interface look"
             >
               LCARS
@@ -64,9 +64,9 @@
                 id="btn-voice"
                 class="lcars-btn secondary voice-toggle"
                 title="Toggle auto-play voice"
-                aria-pressed="false"
+                aria-pressed="true"
               >
-                Voice: Off
+                Voice: On
               </button>
               <button
                 type="button"

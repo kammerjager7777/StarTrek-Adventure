@@ -210,7 +210,7 @@ function syncLcarsSfxToggleUi() {
 }
 
 function initUiTheme() {
-  let saved = "classic";
+  let saved = "lcars";
   try {
     const t = localStorage.getItem(THEME_PREF_KEY);
     if (t === "lcars" || t === "classic") saved = t;
@@ -238,9 +238,21 @@ function loadVoiceSpeed() {
   return 1;
 }
 
+/** Auto-narration is on unless the player explicitly turned it off. */
+function loadSpeechPref() {
+  try {
+    const v = localStorage.getItem(VOICE_PREF_KEY);
+    if (v === "0") return false;
+    if (v === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
 /** Grok TTS auto-play queue + transport (volume always full) */
 let voice = {
-  enabled: localStorage.getItem(VOICE_PREF_KEY) === "1",
+  enabled: loadSpeechPref(),
   token: 0,
   audio: null,
   objectUrl: null,
@@ -723,11 +735,8 @@ function render(view, opts = {}) {
   const s = view.state;
   setActiveRun(s.runId);
 
-  // Prefer server setting when present
-  if (typeof s.settings?.speechOn === "boolean") {
-    voice.enabled = s.settings.speechOn;
-    localStorage.setItem(VOICE_PREF_KEY, voice.enabled ? "1" : "0");
-  }
+  // Keep the player's speech preference (default on). Older runs stored
+  // speechOn:false and must not flip narration off on load.
   updateVoiceToggleUi();
 
   // Phase badge: during debrief show clear success / failure
