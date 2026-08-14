@@ -384,43 +384,548 @@ export async function advanceSetup(
     }
 
     case "debrief":
+    case "starbase":
     case "post_mission": {
-      const choice = parseChoice(input, next.pendingChoices);
-      if (choice === 1 || /new mission/i.test(input)) {
-        next.mission = null;
-        next.turn = null;
-        next.debrief = null;
-        next.missionOffers = null;
-        next.status = "active";
-        if (next.ship) {
-          const maxShield =
-            next.ship.maxShieldIntegrity ?? next.ship.maxIntegrity;
-          next.ship = {
-            ...next.ship,
-            integrity: Math.min(
-              next.ship.maxIntegrity,
-              next.ship.integrity + 25
-            ),
-            maxShieldIntegrity: maxShield,
-            shieldIntegrity: Math.min(
-              maxShield,
-              (next.ship.shieldIntegrity ?? 0) + 30
-            ),
-            shieldGridOnline:
-              next.ship.systems.shields !== "destroyed"
-                ? true
-                : false,
-            shieldRechargeTurns: 0,
-          };
-        }
-        next = await goMissionType(next);
-      }
-      return logPlayerChoice(next, input, state.pendingChoices);
+      return handleStarbase(next, input, state);
     }
 
     default:
       return next;
   }
+}
+
+async function handleStarbase(
+  state: GameState,
+  input: string,
+  prev: GameState
+): Promise<GameState> {
+  let next = await ensureStarbaseSession(state);
+  const choice = parseChoice(input, next.pendingChoices);
+  const text = input.trim().toLowerCase();
+  const session = next.starbase!;
+  const labels = starbaseChoiceLabels(next);
+
+  // Resolve by choice id or keyword
+  const pickLabel =
+    choice && labels[choice - 1] ? labels[choice - 1].toLowerCase() : text;
+
+  // Begin next mission
+  if (
+    choice === labels.findIndex((l) => /begin another|next mission/i.test(l)) + 1 ||
+    /begin another|new mission|next mission|choose next/i.test(text)
+  ) {
+    return leaveStarbaseForMission(next, input, prev);
+  }
+
+  // Save & stand down
+  if (
+    /save and stand|stand down|save &|exit|quit/i.test(pickLabel) ||
+    /save|stand down|exit|quit/i.test(text)
+  ) {
+    try {
+      const { updateProfileFromRun } = await import("../store/profileStore.js");
+      await updateProfileFromRun(next, { clearActiveRun: true });
+    } catch {
+      /* ignore */
+    }
+    next = {
+      ...next,
+      status: "completed",
+      phase: "post_mission",
+      starbase: null,
+      pendingQuestion:
+        "Campaign saved, Captain. Your ship and crew wait at starbase. Use Continue on the home screen to resume.",
+      pendingChoices: numbered(["Acknowledged"]),
+    };
+    return logPlayerChoice(next, input, prev.pendingChoices);
+  }
+
+  // Deep structural refit (heavy damage)
+  if (
+    /deep (structural )?refit|structural deep|yard deep/i.test(pickLabel) ||
+    /deep (structural )?refit|structural deep/i.test(text)
+  ) {
+    const { deepStructuralRefit } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (!next.ship) return paintStarbase(next, "No ship docked.", prev, input);
+    const r = deepStructuralRefit(next.ship, session);
+    next = {
+      ...next,
+      ship: r.ship || next.ship,
+      starbase: r.session,
+    };
+    return paintStarbase(next, r.message, prev, input);
+  }
+
+  // Hull refit
+  if (/refit hull|hull refit|repair hull/i.test(pickLabel) || /refit hull|repair hull/i.test(text)) {
+    const { refitHull } = await import("../../../packages/game-core/src/index.js");
+    if (!next.ship) return paintStarbase(next, "No ship docked.", prev, input);
+    const r = refitHull(next.ship, session);
+    next = {
+      ...next,
+      ship: r.ship || next.ship,
+      starbase: r.session,
+    };
+    return paintStarbase(next, r.message, prev, input);
+  }
+
+  // Shield refit
+  if (
+    /refit shield|shield recharge|restore shield|recharge shield/i.test(pickLabel) ||
+    /refit shield|shield recharge|restore shield/i.test(text)
+  ) {
+    const { refitShields } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (!next.ship) return paintStarbase(next, "No ship docked.", prev, input);
+    const r = refitShields(next.ship, session);
+    next = {
+      ...next,
+      ship: r.ship || next.ship,
+      starbase: r.session,
+    };
+    return paintStarbase(next, r.message, prev, input);
+  }
+
+  // Repair system: "Repair: Shields" or choice text
+  const repairMatch =
+    pickLabel.match(/repair[:\s]+([a-z\s]+)/i) ||
+    text.match(/repair[:\s]+([a-z\s]+)/i);
+  if (repairMatch && next.ship) {
+    const raw = repairMatch[1].trim().toLowerCase().replace(/\s*\(.*/, "");
+    const keyMap: Record<string, keyof import("../../../packages/game-core/src/types.js").ShipSystems> = {
+      shields: "shields",
+      shield: "shields",
+      "shield array": "shields",
+      torpedoes: "torpedoes",
+      torpedo: "torpedoes",
+      warp: "warp",
+      nacelles: "warp",
+      communications: "communications",
+      comms: "communications",
+      sensors: "sensors",
+      "life support": "lifeSupport",
+      lifesupport: "lifeSupport",
+    };
+    const sysKey = keyMap[raw] || (raw as keyof import("../../../packages/game-core/src/types.js").ShipSystems);
+    const { repairSystemAtStarbase } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (next.ship.systems && sysKey in next.ship.systems) {
+      const r = repairSystemAtStarbase(next.ship, session, sysKey);
+      next = {
+        ...next,
+        ship: r.ship || next.ship,
+        starbase: r.session,
+      };
+      return paintStarbase(next, r.message, prev, input);
+    }
+  }
+
+  // Sickbay: "Heal: Name" / treat injured
+  const healMatch =
+    pickLabel.match(/(?:heal|treat|sickbay)[:\s]+(.+)/i) ||
+    text.match(/(?:heal|treat|sickbay)[:\s]+(.+)/i);
+  if (healMatch && next.ship) {
+    const who = healMatch[1].trim().toLowerCase().replace(/\s*\(.*/, "");
+    const patient = (next.ship.crew || []).find(
+      (c) =>
+        c.status === "injured" &&
+        (c.name.toLowerCase() === who ||
+          c.name.toLowerCase().includes(who) ||
+          c.id === who)
+    );
+    const { healCrewAtStarbase } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (patient) {
+      const r = healCrewAtStarbase(next.ship, session, patient.id);
+      next = {
+        ...next,
+        ship: r.ship || next.ship,
+        starbase: r.session,
+      };
+      return paintStarbase(next, r.message, prev, input);
+    }
+    return paintStarbase(
+      next,
+      `No injured officer matching "${healMatch[1].trim()}".`,
+      prev,
+      input
+    );
+  }
+
+  // Transfer: "Transfer: Name"
+  const transferMatch =
+    pickLabel.match(/transfer[:\s]+(.+)/i) ||
+    text.match(/transfer[:\s]+(.+)/i);
+  if (transferMatch && next.ship) {
+    const who = transferMatch[1].trim().toLowerCase().replace(/\s*\(.*/, "");
+    const officer = (next.ship.crew || []).find(
+      (c) =>
+        c.status !== "dead" &&
+        c.status !== "transferred" &&
+        (c.name.toLowerCase() === who ||
+          c.name.toLowerCase().includes(who) ||
+          c.id === who)
+    );
+    const { transferCrewMember } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (officer) {
+      const r = transferCrewMember(next.ship, session, officer.id);
+      next = {
+        ...next,
+        ship: r.ship || next.ship,
+        starbase: r.session,
+      };
+      return paintStarbase(next, r.message, prev, input);
+    }
+    return paintStarbase(
+      next,
+      `No transferable officer matching "${transferMatch[1].trim()}".`,
+      prev,
+      input
+    );
+  }
+
+  // Hire recruit by name or "Hire: Name"
+  const hireMatch =
+    pickLabel.match(/hire[:\s]+(.+)/i) || text.match(/hire[:\s]+(.+)/i);
+  if (hireMatch && next.ship) {
+    const who = hireMatch[1].trim().toLowerCase();
+    // Strip quality/role suffixes from choice labels
+    const whoCore = who.replace(/\s*[—–-].*/, "").replace(/\s*\(.*/, "").trim();
+    const offer = session.recruitOffers.find((c) => {
+      const n = c.name.toLowerCase();
+      return (
+        n === whoCore ||
+        whoCore.includes(n) ||
+        n.includes(whoCore) ||
+        c.id === whoCore ||
+        who.includes(n)
+      );
+    });
+    const { hireRecruit } = await import(
+      "../../../packages/game-core/src/index.js"
+    );
+    if (offer) {
+      const r = hireRecruit(next.ship, session, offer.id);
+      next = {
+        ...next,
+        ship: r.ship || next.ship,
+        starbase: r.session,
+      };
+      return paintStarbase(next, r.message, prev, input);
+    }
+    return paintStarbase(
+      next,
+      `No candidate matching "${hireMatch[1].trim()}" on the slate.`,
+      prev,
+      input
+    );
+  }
+
+  // Refresh slate / status
+  return paintStarbase(next, null, prev, input);
+}
+
+async function ensureStarbaseSession(state: GameState): Promise<GameState> {
+  const {
+    initStarbaseSession,
+    normalizeStarbaseSession,
+    computeShipSkills,
+    normalizeShip,
+  } = await import("../../../packages/game-core/src/index.js");
+
+  if (state.starbase?.ready) {
+    const starbase = normalizeStarbaseSession(state.starbase, state.universe);
+    return {
+      ...state,
+      phase: "starbase",
+      status: "active",
+      starbase: starbase || state.starbase,
+    };
+  }
+  let ship = state.ship ? normalizeShip(state.ship) : null;
+  if (ship) {
+    const skills = computeShipSkills(ship, ship.crew);
+    ship = { ...ship, skills };
+  }
+  const starbase = initStarbaseSession(ship, { universe: state.universe });
+  return {
+    ...state,
+    phase: "starbase",
+    status: "active",
+    ship,
+    starbase,
+  };
+}
+
+function starbaseChoiceLabels(state: GameState): string[] {
+  const session = state.starbase;
+  const ship = state.ship;
+  const labels: string[] = ["Review starbase status"];
+  const hullGain =
+    session?.stationClass === "fleet_yards"
+      ? 55
+      : session?.stationClass === "starbase"
+        ? 40
+        : 28;
+
+  if (ship && session) {
+    const ratio =
+      ship.maxIntegrity > 0 ? ship.integrity / ship.maxIntegrity : 1;
+    if (
+      !session.deepRefitUsed &&
+      !session.hullRefitUsed &&
+      ratio <= 0.55 &&
+      session.systemsRepaired.length < session.systemRepairBudget
+    ) {
+      labels.push("Deep structural refit (major hull restore)");
+    }
+    if (!session.hullRefitUsed && ship.integrity < ship.maxIntegrity) {
+      labels.push(`Refit hull plating (+up to ${hullGain})`);
+    }
+    if (!session.shieldRefitUsed && ship.systems?.shields !== "destroyed") {
+      labels.push("Recharge shield grid (full)");
+    }
+    const remaining =
+      session.systemRepairBudget - session.systemsRepaired.length;
+    if (remaining > 0) {
+      const fleet = session.stationClass === "fleet_yards";
+      for (const [k, v] of Object.entries(ship.systems || {})) {
+        if (v !== "ok" && !session.systemsRepaired.includes(k)) {
+          const name =
+            k === "lifeSupport"
+              ? "Life support"
+              : k.charAt(0).toUpperCase() + k.slice(1);
+          const to =
+            v === "destroyed" ? (fleet ? "ok" : "damaged") : "ok";
+          labels.push(`Repair: ${name} (${v}→${to})`);
+        }
+      }
+    }
+    // Sickbay
+    if (session.medicalUsed < session.medicalBudget) {
+      for (const c of ship.crew || []) {
+        if (c.status === "injured") {
+          labels.push(
+            `Heal: ${c.name} (injured${
+              c.injuryTurnsRemaining != null
+                ? `, ${c.injuryTurnsRemaining} turns left`
+                : ""
+            })`
+          );
+        }
+      }
+    }
+    // Transfers (list active/injured, not last active alone handled by rules)
+    if (session.transfersUsed < session.transferBudget) {
+      const living = (ship.crew || []).filter(
+        (c) =>
+          (c.status || "active") === "active" || c.status === "injured"
+      );
+      if (living.length > 1) {
+        for (const c of living.slice(0, 6)) {
+          labels.push(`Transfer: ${c.name} — ${c.role}`);
+        }
+      }
+    }
+    // Recruitment slate with quality + skill brief
+    if (session.recruitsHired < session.recruitBudget) {
+      for (const c of session.recruitOffers) {
+        const q = c.quality || "standard";
+        const rank = c.rank ? `${c.rank} ` : "";
+        const top = c.skills
+          ? Object.entries(c.skills)
+              .sort((a, b) => (b[1] as number) - (a[1] as number))
+              .slice(0, 2)
+              .map(([k, v]) => `${k.slice(0, 3)} ${v}`)
+              .join(" · ")
+          : "";
+        labels.push(
+          `Hire: ${rank}${c.name} — ${c.role} [${q}]${top ? ` (${top})` : ""}`
+        );
+      }
+    }
+  }
+  labels.push("Begin another mission");
+  labels.push("Save and stand down");
+  return labels;
+}
+
+async function paintStarbase(
+  state: GameState,
+  notice: string | null,
+  prev: GameState,
+  input: string
+): Promise<GameState> {
+  const next = await ensureStarbaseSession(state);
+  const labels = starbaseChoiceLabels(next);
+  const body = [
+    buildStarbaseSummary(next),
+    notice ? `\n› ${notice}` : "",
+    "",
+    "Orders:",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return logPlayerChoice(
+    {
+      ...next,
+      phase: "starbase",
+      status: "active",
+      pendingQuestion: body,
+      pendingChoices: numbered(labels),
+      turn: {
+        sceneId: randomUUID(),
+        narration: body,
+        crewDialogue: [],
+        options: numbered(labels),
+        viewscreenPrompt: "Federation starbase spacedock, ship in repair cradle",
+        sfx: ["power_up2"],
+      },
+    },
+    input,
+    prev.pendingChoices
+  );
+}
+
+async function leaveStarbaseForMission(
+  state: GameState,
+  input: string,
+  prev: GameState
+): Promise<GameState> {
+  let next: GameState = {
+    ...state,
+    mission: null,
+    turn: null,
+    debrief: null,
+    missionOffers: null,
+    starbase: null,
+    status: "active",
+    phase: "mission_type",
+  };
+  try {
+    const { updateProfileFromRun } = await import("../store/profileStore.js");
+    await updateProfileFromRun(next, { clearActiveRun: true });
+  } catch {
+    /* ignore */
+  }
+  next = await goMissionType(next);
+  return logPlayerChoice(next, input, prev.pendingChoices);
+}
+
+function buildStarbaseSummary(state: GameState): string {
+  const ship = state.ship;
+  const u = state.universe;
+  const session = state.starbase;
+  const skills = ship?.skills?.total;
+  const living = (ship?.crew || []).filter(
+    (c) => (c.status || "active") === "active"
+  );
+  const dead = (ship?.crew || []).filter((c) => c.status === "dead");
+  const injured = (ship?.crew || []).filter((c) => c.status === "injured");
+  const transferred = (ship?.crew || []).filter(
+    (c) => c.status === "transferred"
+  );
+  const skillLine = skills
+    ? Object.entries(skills)
+        .map(([k, v]) => `${k} ${v}`)
+        .join(" · ")
+    : "skills calibrating…";
+  const rep = u?.factionReputation
+    ? Object.entries(u.factionReputation)
+        .filter(([, v]) => Math.abs(v) >= 5)
+        .map(([k, v]) => `${k} ${v > 0 ? "+" : ""}${v}`)
+        .join(", ") || "neutral standing"
+    : "unknown";
+  const damaged = ship
+    ? Object.entries(ship.systems || {})
+        .filter(([, v]) => v !== "ok")
+        .map(([k, v]) => `${k}:${v}`)
+        .join(", ") || "all nominal"
+    : "—";
+  const stationLabel =
+    session?.stationClass === "fleet_yards"
+      ? "Fleet Yards (priority facilities)"
+      : session?.stationClass === "starbase"
+        ? "Starbase (standard yards)"
+        : session?.stationClass === "outpost"
+          ? "Outpost (limited yards)"
+          : "Docking facility";
+  const roster =
+    living.length || injured.length
+      ? [
+          ...living.map(
+            (c) =>
+              `  · ${c.rank ? c.rank + " " : ""}${c.name} — ${c.role} [active]`
+          ),
+          ...injured.map(
+            (c) =>
+              `  · ${c.name} — ${c.role} [INJURED${
+                c.injuryTurnsRemaining != null
+                  ? ` ${c.injuryTurnsRemaining}t`
+                  : ""
+              }]`
+          ),
+        ].join("\n")
+      : "  (empty roster)";
+  const recruits =
+    session?.recruitOffers
+      ?.map((c, i) => {
+        const q = c.quality || "standard";
+        const rank = c.rank ? `${c.rank} ` : "";
+        const sk = c.skills
+          ? Object.entries(c.skills)
+              .sort((a, b) => (b[1] as number) - (a[1] as number))
+              .slice(0, 3)
+              .map(([k, v]) => `${k.slice(0, 3)} ${v}`)
+              .join(" · ")
+          : "—";
+        return `  ${i + 1}. ${rank}${c.name} — ${c.role} (${c.species || "Unknown"}) [${q}]\n      ${sk}`;
+      })
+      .join("\n") || "  (none this visit)";
+  const budget = session
+    ? [
+        `Facility: ${stationLabel}`,
+        `Refit: hull ${session.hullRefitUsed ? "done" : "open"}${
+          session.deepRefitUsed ? " · deep-refit done" : ""
+        } · shields ${session.shieldRefitUsed ? "done" : "open"} · systems ${session.systemsRepaired.filter((x) => x !== "__deep_refit__").length}/${session.systemRepairBudget}`,
+        `Personnel: recruits ${session.recruitsHired}/${session.recruitBudget} · sickbay ${session.medicalUsed}/${session.medicalBudget} · transfers ${session.transfersUsed}/${session.transferBudget}`,
+      ].join("\n")
+    : "";
+
+  return [
+    "=== Starbase — Campaign Hub ===",
+    "",
+    ship
+      ? `${ship.name} ${ship.registryNumber || ""} — hull ${ship.integrity}/${ship.maxIntegrity} · shields ${ship.shieldIntegrity}/${ship.maxShieldIntegrity}${ship.shieldGridOnline ? "" : " (offline)"}`
+      : "No ship docked.",
+    `Stardate ${u?.stardate || ship?.stardate || "—"}.`,
+    `Crew active: ${living.length}` +
+      (injured.length ? ` · injured: ${injured.length}` : "") +
+      (dead.length ? ` · KIA: ${dead.map((c) => c.name).join(", ")}` : "") +
+      (transferred.length ? ` · transferred: ${transferred.length}` : ""),
+    `Systems: ${damaged}`,
+    `Ship skills: ${skillLine}`,
+    `Reputation: ${rep}`,
+    budget,
+    "",
+    "Bridge roster:",
+    roster,
+    "",
+    "Personnel slate (this visit):",
+    recruits,
+    "",
+    state.debrief ? "Last mission debrief is on file." : "",
+    "What are your orders?",
+  ]
+    .filter((line) => line !== undefined && line !== null)
+    .join("\n");
 }
 
 /** Normalize a stored mission offer into a full SetupMissionOffer. */
@@ -570,6 +1075,9 @@ async function startPlaying(state: GameState): Promise<GameState> {
     phase: "playing",
   };
 
+  // Ensure campaign profile + skills + universe for this captain
+  next = await ensureCampaignAttached(next);
+
   const scene = await requireScene(
     await generateOpeningScene(next),
     "mission opening"
@@ -586,9 +1094,79 @@ async function startPlaying(state: GameState): Promise<GameState> {
       crewDialogue: scene.crewDialogue,
       options: scene.options,
       viewscreenPrompt: scene.viewscreenPrompt,
+      sfx: Array.isArray(scene.sfx) ? scene.sfx : [],
     },
   };
   return next;
+}
+
+/** Attach or create CampaignProfile; normalize crew skills */
+async function ensureCampaignAttached(state: GameState): Promise<GameState> {
+  if (!state.ship) return state;
+  const {
+    computeShipSkills,
+    emptyUniverse,
+    normalizeCrewMember,
+    stardateForEra,
+  } = await import("../../../packages/game-core/src/index.js");
+  const { normalizeShip } = await import("../../../packages/game-core/src/index.js");
+  let ship = normalizeShip(state.ship);
+  const stardate = ship.stardate || stardateForEra(ship.era);
+  const crew = (ship.crew || []).map((c) => normalizeCrewMember(c, stardate));
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  ship = { ...ship, crew, skills, stardate };
+
+  let profileId = state.profileId;
+  let universe = state.universe;
+  const ownerEmail = state.ownerEmail || "";
+  try {
+    if (!ownerEmail) {
+      throw new Error("ownerEmail missing on game state");
+    }
+    const {
+      createProfileFromShip,
+      readProfile,
+      writeProfile,
+    } = await import("../store/profileStore.js");
+    if (profileId) {
+      const existing = await readProfile(profileId, ownerEmail);
+      if (existing) {
+        universe = existing.universe;
+        await writeProfile({
+          ...existing,
+          ownerEmail,
+          ship,
+          crew,
+          skills,
+          activeRunId: state.runId,
+          captainName: state.playerName || existing.captainName,
+        });
+      }
+    } else {
+      const profile = await createProfileFromShip(
+        state.playerName || "Captain",
+        ship,
+        ownerEmail
+      );
+      profileId = profile.id;
+      universe = profile.universe;
+      await writeProfile({
+        ...profile,
+        ownerEmail,
+        activeRunId: state.runId,
+      });
+    }
+  } catch (err) {
+    console.warn("[campaign] ensure profile failed:", err);
+    universe = universe || emptyUniverse(stardateForEra(ship.era));
+  }
+
+  return {
+    ...state,
+    ship,
+    profileId: profileId || null,
+    universe: universe || emptyUniverse(stardateForEra(ship.era)),
+  };
 }
 
 /**
@@ -812,6 +1390,7 @@ async function finalizePlayScene(
     crewDialogue: scene.crewDialogue,
     options: scene.options,
     viewscreenPrompt: scene.viewscreenPrompt,
+    sfx: Array.isArray(scene.sfx) ? scene.sfx : [],
     lastRoll: next.turn?.lastRoll,
   };
   next.pendingQuestion = scene.narration;
@@ -835,12 +1414,20 @@ async function applyMechanics(
     toolUpdateIntegrity,
     toolSetSystem,
     toolDivertPowerToShields,
+    toolApplyCrewDeath,
+    toolTickCrewService,
   } = await import("../tools/registry.js");
   const {
+    canCrewDie,
     classifyDamageKind,
+    computeShipSkills,
     evaluateSystemConstraints,
     normalizeShip,
+    skillModifierForAction,
     tickShieldRecharge,
+    tickUniverse,
+    emptyUniverse,
+    stardateForEra,
   } = await import("../../../packages/game-core/src/index.js");
 
   let next = state;
@@ -849,13 +1436,53 @@ async function applyMechanics(
   const notes: string[] = [];
   let rollData: MechanicalResults["roll"] = null;
 
+  // Ensure universe state exists when we have a ship
+  if (!next.universe && next.ship) {
+    next = {
+      ...next,
+      universe: emptyUniverse(
+        next.ship.stardate || stardateForEra(next.ship.era)
+      ),
+    };
+  }
+
   // Normalize ship + tick shield recharge at the start of every mechanical beat
   if (next.ship) {
     let ship = normalizeShip(next.ship);
     const tick = tickShieldRecharge(ship);
     ship = tick.ship;
+    // Recompute skills from living crew
+    const skills = computeShipSkills(ship, ship.crew);
+    ship = { ...ship, skills };
     next = { ...next, ship };
     if (tick.note) notes.push(tick.note);
+  }
+
+  // Advance crew service clocks (active officers)
+  {
+    const svc = toolTickCrewService(next);
+    if (svc.state) next = svc.state;
+  }
+
+  // Universe tick every ~5 play turns
+  if (next.universe && next.mission) {
+    const turns = next.mission.playTurnCount || 0;
+    const since = turns - (next.universe.lastTickTurn || 0);
+    if (since >= 5) {
+      next = {
+        ...next,
+        universe: tickUniverse(
+          next.universe,
+          since,
+          next.mission.flags || []
+        ),
+      };
+      if (next.universe) {
+        notes.push(
+          `Stardate advanced to ${next.universe.stardate} (galactic turn ${next.universe.globalTurn}).`
+        );
+      }
+    }
   }
 
   // Divert power to shields (explicit order)
@@ -893,6 +1520,23 @@ async function applyMechanics(
     if (risk === "low") effectiveRisk = "medium";
     else if (risk === "medium") effectiveRisk = "high";
     notes.push("Damaged systems raise the difficulty of this action.");
+  }
+
+  // Ship/crew skills adjust difficulty (negative = easier)
+  if (next.ship?.skills?.total) {
+    const skillMod = skillModifierForAction(
+      next.ship.skills,
+      playerAction,
+      effectiveRisk
+    );
+    if (skillMod !== 0) {
+      actionModifier += skillMod;
+      notes.push(
+        skillMod < 0
+          ? `Crew expertise assists this action (skill mod ${skillMod}).`
+          : `Limited expertise hinders this action (skill mod +${skillMod}).`
+      );
+    }
   }
 
   // Life support damaged: everything is harder
@@ -1024,6 +1668,61 @@ async function applyMechanics(
       };
       systemChanges.push(`${hit.key} → ${hit.to}`);
     }
+
+    // Crew injury / death risk after serious hits
+    const hullDmg = Number(dmg.data?.hullDamage || 0);
+    const boarding =
+      damageKind === "boarding" ||
+      /board|intruder/i.test(playerAction);
+    if (
+      next.ship &&
+      canCrewDie(
+        {
+          hullDamage: hullDmg,
+          shieldsCollapsed: Boolean(dmg.data?.shieldsCollapsed),
+          boarding,
+          lifeSupportDestroyed: next.ship.systems.lifeSupport === "destroyed",
+          lifeSupportDamaged: next.ship.systems.lifeSupport === "damaged",
+        },
+        Math.random
+      )
+    ) {
+      const living = (next.ship.crew || []).filter(
+        (c) => (c.status || "active") === "active"
+      );
+      if (living.length) {
+        const victim = living[Math.floor(Math.random() * living.length)];
+        const death = toolApplyCrewDeath(
+          next,
+          victim.id,
+          hullDmg >= 15
+            ? "structural collapse on their deck"
+            : boarding
+              ? "boarding action"
+              : "combat trauma"
+        );
+        if (death.state) {
+          next = death.state;
+          notes.push(death.message);
+          flagsAdded.push("crew_casualty");
+          systemChanges.push(`crew:${victim.name}→dead`);
+        }
+      }
+    } else if (next.ship && hullDmg >= 10 && Math.random() < 0.25) {
+      // Injury without death
+      const living = (next.ship.crew || []).filter(
+        (c) => (c.status || "active") === "active"
+      );
+      if (living.length) {
+        const victim = living[Math.floor(Math.random() * living.length)];
+        const { toolSetCrewStatus } = await import("../tools/registry.js");
+        const inj = toolSetCrewStatus(next, victim.id, "injured");
+        if (inj.state) {
+          next = inj.state;
+          notes.push(`${victim.name} injured — off duty briefly.`);
+        }
+      }
+    }
   }
 
   // Extra system stress if life support / warp already damaged and we took hull hits
@@ -1072,6 +1771,15 @@ async function applyMechanics(
     if (next.ship && !next.ship.shieldGridOnline) {
       notes.push("Hull took the hit with shields offline.");
     }
+  }
+
+  // Attach skill snapshot for the LLM
+  if (next.ship?.skills?.total) {
+    notes.push(
+      `Ship skills: ${Object.entries(next.ship.skills.total)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ")}`
+    );
   }
 
   return {
@@ -1136,7 +1844,7 @@ async function finishMission(
   mechanical?: MechanicalResults
 ): Promise<GameState> {
   requireLlm();
-  let next = { ...state, phase: "debrief" as const, status: "completed" as const };
+  let next: GameState = { ...state, phase: "debrief", status: "completed" };
   if (next.mission) {
     // Finalize objectives so the bridge never shows [active] after the mission ends
     const objectives = next.mission.objectives.map((o) => {
@@ -1180,26 +1888,45 @@ async function finishMission(
   ].join("\n");
 
   next.debrief = debrief;
-  next.pendingQuestion = debrief;
-  next.pendingChoices = numbered(["New mission", "Remain on debrief"]);
-  next.turn = {
-    sceneId: randomUUID(),
-    narration: debrief,
-    crewDialogue: [
-      {
-        speaker: next.ship?.crew[0]?.name || "First Officer",
-        line: success
-          ? "Mission archived, Captain. The crew awaits your next command."
-          : "We did what we could, Captain. The log will remember this day.",
-      },
-    ],
-    options: next.pendingChoices,
-    viewscreenPrompt: success
-      ? "Quiet stars from orbit after a hard-fought mission"
-      : "Damaged starship drifting, emergency lights, solemn mood",
-    lastRoll: next.turn?.lastRoll ?? mechanical?.roll ?? undefined,
+  next.phase = "starbase";
+  next.status = "active";
+  next.starbase = null; // force fresh visit session on first hub paint
+
+  // Persist campaign profile (skills, crew, universe, log)
+  try {
+    const { updateProfileFromRun } = await import("../store/profileStore.js");
+    const profile = await updateProfileFromRun(next, {
+      outcome: success ? "success" : "failed",
+      clearActiveRun: false,
+    });
+    if (profile) {
+      next = {
+        ...next,
+        profileId: profile.id,
+        universe: profile.universe,
+        ship: profile.ship,
+      };
+    }
+  } catch (err) {
+    console.warn("[campaign] profile update failed:", err);
+  }
+
+  next = await paintStarbase(
+    next,
+    success
+      ? "Mission complete. Starbase facilities are standing by for refit and recruitment."
+      : "Mission failed — but the yard can still patch your hull and fill empty billets.",
+    next,
+    "debrief"
+  );
+  // Keep debrief text at top of the hub message
+  next = {
+    ...next,
+    debrief,
+    pendingQuestion: `${debrief}\n\n${next.pendingQuestion}`,
+    log: pushLog(next, "debrief", debrief).log,
   };
-  return pushLog(next, "debrief", debrief);
+  return next;
 }
 
 function buildDebriefStats(state: GameState): string {

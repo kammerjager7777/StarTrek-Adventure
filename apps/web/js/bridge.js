@@ -6,10 +6,7 @@ import {
   isLcarsTheme,
   lcarsUiSound,
   playIncomingTransmission,
-  playTypeTick,
   setLcarsSfxEnabled,
-  startWaitingLoop,
-  stopWaitingLoop,
   unlockLcarsAudio,
 } from "./lcarsFx.js";
 import {
@@ -19,6 +16,71 @@ import {
   setBridgeAmbientEnabled,
   startBridgeAmbient,
 } from "./bridgeAmbient.js";
+import {
+  initTrekSfx,
+  playIncomingCommTrek,
+  playNarratorSfx,
+  playOrderCues,
+  playStateDeltaSfx,
+  playTrekSfx,
+  playTrekUi,
+  playTypeTick,
+  playViewscreenSfx,
+  setRedAlertDucked,
+  setRedAlertLoop,
+  setSceneBed,
+  startProcessingLoop,
+  stopProcessingLoop,
+  syncRedAlertFromState,
+  unlockTrekAudio,
+} from "./trekSfx.js";
+
+/** Duck bridge ambient + red-alert bed under narrator/crew speech */
+function setSpeechBedsDucked(on) {
+  setBridgeAmbientDucked(on);
+  setRedAlertDucked(on);
+}
+
+/**
+ * UI SFX: TrekCore computer sounds (both themes when SFX on).
+ * LCARS panel beeps still fire in LCARS theme for a layered console feel.
+ * @param {string} intent
+ */
+function uiSound(intent) {
+  playTrekUi(intent);
+  if (isLcarsTheme()) {
+    // Map trek intents onto existing LCARS catalog without double-denying
+    const map = {
+      primary: "primary",
+      engage: "primary",
+      secondary: "secondary",
+      soft: "secondary",
+      open: "open",
+      close: "close",
+      nav: "nav",
+      "theme-lcars": "nav",
+      "theme-classic": "close",
+      deny: "deny",
+      error: "deny",
+      failed: "deny",
+      ok: "primary",
+      "new-game": "primary",
+      "history-open": "open",
+      "history-close": "close",
+      "voice-toggle": "secondary",
+      "voice-menu": "open",
+      "voice-pause": "soft",
+      "voice-stop": "close",
+      "voice-speed": "soft",
+      "scar-open": "open",
+      "scar-close": "close",
+      replay: "soft",
+      chime: "open",
+    };
+    const lcars = map[intent];
+    if (lcars) lcarsUiSound(lcars);
+  }
+}
 
 const els = {
   log: document.getElementById("mission-log"),
@@ -57,6 +119,12 @@ const els = {
   btnCloseHistory: document.getElementById("btn-close-history"),
   historyModal: document.getElementById("history-modal"),
   historyList: document.getElementById("history-list"),
+  historyAccount: document.getElementById("history-account"),
+  historyAccountEmail: document.getElementById("history-account-email"),
+  historyAccountNote: document.getElementById("history-account-note"),
+  historyAccountLocal: document.getElementById("history-account-local"),
+  historyAccountInput: document.getElementById("history-account-input"),
+  btnSetAccount: document.getElementById("btn-set-account"),
   scarModal: document.getElementById("scar-modal"),
   scarModalTitle: document.getElementById("scar-modal-title"),
   scarModalIcon: document.getElementById("scar-modal-icon"),
@@ -126,7 +194,7 @@ function applyUiTheme(theme, { persist = true, silent = false } = {}) {
   }
   if (!silent && prev !== next) {
     unlockLcarsAudio();
-    lcarsUiSound(next === "lcars" ? "nav" : "close");
+    uiSound(next === "lcars" ? "theme-lcars" : "theme-classic");
   }
   syncLcarsSfxToggleUi();
 }
@@ -270,9 +338,57 @@ function networkErrorMessage(err) {
   return { message: raw || "Request failed", detail: "" };
 }
 
+/** localStorage key for local multi-user account email */
+const LOCAL_USER_EMAIL_KEY = "sta-user-email";
+
+/**
+ * Email used for local account scoping (browser-chosen).
+ * Sent as X-Dev-User-Email; ignored when IAP is present on the server.
+ * @returns {string}
+ */
+function getLocalUserEmail() {
+  try {
+    const v = String(localStorage.getItem(LOCAL_USER_EMAIL_KEY) || "")
+      .trim()
+      .toLowerCase();
+    if (v && v.includes("@")) return v;
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+/**
+ * Persist local account email. Returns normalized email or "".
+ * @param {string} email
+ */
+function setLocalUserEmail(email) {
+  const n = String(email || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^accounts\.google\.com:/i, "");
+  if (!n || !n.includes("@") || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(n)) {
+    return "";
+  }
+  try {
+    localStorage.setItem(LOCAL_USER_EMAIL_KEY, n);
+  } catch {
+    /* ignore */
+  }
+  return n;
+}
+
+/** Headers that identify the browser account for local/dev scoping */
+function authHeaders() {
+  const email = getLocalUserEmail();
+  if (email) return { "X-Dev-User-Email": email };
+  return {};
+}
+
 /**
  * Fetch with timeout so the bridge never waits forever.
  * Default 90s (play turns); pass longer for portraits / heavy setup.
+ * Always attaches local account identity when set.
  * @param {string} path
  * @param {RequestInit & { timeoutMs?: number }} [options]
  */
@@ -296,7 +412,11 @@ async function api(path, options = {}) {
   let res;
   try {
     res = await fetch(`/api${path}`, {
-      headers: { "Content-Type": "application/json", ...(headers || {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+        ...(headers || {}),
+      },
       signal: controller.signal,
       ...rest,
     });
@@ -352,7 +472,7 @@ function showSoftError(message, detail = "") {
   if (els.softErrorToast) els.softErrorToast.classList.remove("hidden");
   if (softErrorTimer) clearTimeout(softErrorTimer);
   softErrorTimer = setTimeout(() => hideSoftError(), 12_000);
-  lcarsUiSound("deny");
+  uiSound("deny");
 }
 
 function hideSoftError() {
@@ -527,8 +647,78 @@ function finishTypewriterExtras(entry, extras) {
   }
 }
 
+/** Snapshot for TrekCore combat/phase SFX diffs */
+let prevSfxState = null;
+/** Last turn sceneId that already played narrator sfx[] */
+let lastNarratorSfxSceneId = null;
+
 function render(view, opts = {}) {
   const { forceTypewriter = false } = opts;
+  const nextState = view.state;
+  // Combat / phase SFX before overwriting current (compare prior ship)
+  if (nextState) {
+    playStateDeltaSfx(prevSfxState, nextState);
+
+    // Narrator-authored SFX for this beat (once per sceneId)
+    const sceneId = nextState.turn?.sceneId;
+    const narratorCues = nextState.turn?.sfx;
+    if (
+      sceneId &&
+      sceneId !== lastNarratorSfxSceneId &&
+      Array.isArray(narratorCues) &&
+      narratorCues.length
+    ) {
+      lastNarratorSfxSceneId = sceneId;
+      // Slight delay so order-keyword SFX from Engage land first
+      setTimeout(() => playNarratorSfx(narratorCues), 320);
+    } else if (sceneId && sceneId !== lastNarratorSfxSceneId) {
+      lastNarratorSfxSceneId = sceneId;
+    }
+
+    prevSfxState = {
+      phase: nextState.phase,
+      status: nextState.status,
+      mission: nextState.mission
+        ? {
+            status: nextState.mission.status,
+            flags: Array.isArray(nextState.mission.flags)
+              ? [...nextState.mission.flags]
+              : [],
+            objectives: Array.isArray(nextState.mission.objectives)
+              ? nextState.mission.objectives.map((o) => ({
+                  id: o.id,
+                  status: o.status,
+                }))
+              : [],
+          }
+        : null,
+      turn: nextState.turn?.lastRoll
+        ? { lastRoll: { ...nextState.turn.lastRoll } }
+        : null,
+      ship: nextState.ship
+        ? {
+            integrity: nextState.ship.integrity,
+            maxIntegrity: nextState.ship.maxIntegrity,
+            shieldIntegrity: nextState.ship.shieldIntegrity,
+            systems: { ...(nextState.ship.systems || {}) },
+            scars: Array.isArray(nextState.ship.scars)
+              ? [...nextState.ship.scars]
+              : [],
+          }
+        : null,
+    };
+
+    // Scene beds from order/narration keywords (light flavor)
+    const blob = `${nextState.pendingQuestion || ""} ${
+      nextState.turn?.narration || ""
+    }`.toLowerCase();
+    if (/sickbay|medical|infirmary|hypo/.test(blob)) setSceneBed("sickbay");
+    else if (/engineering|warp core|jefferies|dilithium/.test(blob)) {
+      setSceneBed("engineering");
+    } else if (nextState.phase !== "playing") {
+      setSceneBed(null);
+    }
+  }
   current = view;
   const s = view.state;
   setActiveRun(s.runId);
@@ -652,7 +842,7 @@ function stopVoicePlayback() {
     }
     voice.objectUrl = null;
   }
-  setBridgeAmbientDucked(false);
+  setSpeechBedsDucked(false);
   updateVoiceToggleUi();
 }
 
@@ -769,7 +959,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
   const token = voice.token;
   voice.paused = false;
   voice.speaking = true;
-  setBridgeAmbientDucked(true);
+  setSpeechBedsDucked(true);
   clearSpeakableHighlight();
   if (highlightEl) highlightEl.classList.add("is-speaking-line");
   updateVoiceToggleUi();
@@ -820,7 +1010,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
     if (token === voice.token) {
       voice.speaking = false;
       voice.paused = false;
-      setBridgeAmbientDucked(false);
+      setSpeechBedsDucked(false);
       clearSpeakableHighlight();
       updateVoiceToggleUi();
     }
@@ -881,7 +1071,10 @@ async function fetchSpeechBlob(runId, body) {
   const t0 = performance.now();
   const res = await fetch(`/api/games/${runId}/voice/speak`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
     body: JSON.stringify(body),
   });
   const tHeaders = performance.now();
@@ -1053,7 +1246,7 @@ async function autoSpeakBeat(state) {
   }
 
   voice.speaking = true;
-  setBridgeAmbientDucked(true);
+  setSpeechBedsDucked(true);
   updateVoiceToggleUi();
 
   voiceLog("beat_start", {
@@ -1127,7 +1320,7 @@ async function autoSpeakBeat(state) {
     if (token === voice.token) {
       voice.speaking = false;
       voice.paused = false;
-      setBridgeAmbientDucked(false);
+      setSpeechBedsDucked(false);
       updateVoiceToggleUi();
     }
   }
@@ -1205,6 +1398,7 @@ function classifyScar(text) {
 }
 
 function openScarModal(scarText, index, total) {
+  uiSound("scar-open");
   const meta = classifyScar(scarText);
   if (els.scarModalIcon) els.scarModalIcon.textContent = meta.icon;
   if (els.scarModalType) els.scarModalType.textContent = meta.label;
@@ -1220,6 +1414,7 @@ function openScarModal(scarText, index, total) {
 }
 
 function closeScarModal() {
+  uiSound("scar-close");
   els.scarModal?.classList.add("hidden");
 }
 
@@ -1344,6 +1539,21 @@ function renderShip(ship) {
       <div class="systems-label">Systems</div>
       ${systems}
     </div>
+    ${
+      ship.skills?.total
+        ? `<div class="ship-skills-block">
+        <div class="systems-label">Ship skills</div>
+        <div class="skill-grid">${Object.entries(ship.skills.total)
+          .map(
+            ([k, v]) =>
+              `<div class="skill-row"><span class="skill-name">${escapeHtml(
+                k
+              )}</span><span class="skill-val">${v}</span></div>`
+          )
+          .join("")}</div>
+      </div>`
+        : ""
+    }
     ${scarGrid}
   `;
 
@@ -1455,6 +1665,12 @@ function renderCrew(ship) {
               c.species || "Unknown"
             )}</div>
             <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
+            <div><span class="crew-label">Status</span>${escapeHtml(
+              c.status || "active"
+            )}</div>
+            <div><span class="crew-label">Service</span>${
+              typeof c.serviceTurns === "number" ? c.serviceTurns : 0
+            } turns</div>
             <div class="crew-span"><span class="crew-label">Personality</span>${escapeHtml(
               c.personality || "—"
             )}</div>
@@ -1469,6 +1685,17 @@ function renderCrew(ship) {
             <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
               status
             )}</div>
+            ${
+              (c.status || "active") === "active"
+                ? `<div class="crew-span"><button type="button" class="lcars-btn secondary crew-advice-btn" data-advice-id="${escapeHtml(
+                    c.id
+                  )}">Ask for advice</button></div>`
+                : c.status === "dead"
+                  ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
+                      c.deathCause || "lost in the line of duty"
+                    )}</div>`
+                  : ""
+            }
           </div>
         </div>
       </article>`;
@@ -1476,9 +1703,47 @@ function renderCrew(ship) {
       .join("");
 
   bindCrewCardExpandHandlers(ship.crew);
+  bindCrewAdviceButtons(ship.crew);
   // Image crew once a ship is assigned (ship select init, mission boot, or playing)
   if (current?.state?.ship?.crew?.length) {
     maybeRequestPortraits();
+  }
+}
+
+function bindCrewAdviceButtons(crew) {
+  if (!els.crew) return;
+  els.crew.querySelectorAll(".crew-advice-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute("data-advice-id");
+      if (id) void askCrewAdvice(id);
+    });
+  });
+}
+
+async function askCrewAdvice(memberId) {
+  const runId = current?.state?.runId;
+  if (!runId || !aiReady) {
+    showSoftError("Cannot request advice while offline.");
+    return;
+  }
+  uiSound("soft");
+  try {
+    const out = await api(`/games/${runId}/crew/advice`, {
+      method: "POST",
+      body: JSON.stringify({ memberId }),
+    });
+    if (out.view) render(out.view, { forceTypewriter: false });
+    if (out.advice?.ok && out.advice.advice) {
+      // Soft toast via soft error slot would be wrong; log entry already added
+      playTrekSfx("comm_chirp");
+    } else if (out.advice?.error) {
+      showSoftError(out.advice.error);
+      uiSound("deny");
+    }
+  } catch (err) {
+    showSoftError(err?.message || "Advice request failed");
   }
 }
 
@@ -1528,7 +1793,8 @@ async function onCrewCardExpand(tab, crewList) {
 
   tab.classList.add("is-hailing");
   try {
-    // Incoming transmission cue (LCARS theme + SFX on)
+    // Incoming transmission cue (LCARS theme + SFX on) + TrekCore hail beep
+    playTrekSfx("hail_beep");
     await playIncomingTransmission();
     // Spoken greeting in that officer's locked voice
     const line = buildCrewGreeting(member);
@@ -1909,7 +2175,9 @@ function startMissionBoot(runId, statusLabel) {
   if (els.log) {
     els.log.innerHTML = `<div class="log-entry system"><div class="who">Channel</div><div class="text">Incoming communication from Starfleet Command. Stand by…</div></div>`;
   }
+  playViewscreenSfx("open");
   playIncomingTransmission();
+  playIncomingCommTrek();
 }
 
 /**
@@ -1970,7 +2238,7 @@ function finishMissionBoot() {
   setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, false, {
     persist: true,
   });
-  lcarsUiSound("close");
+  playViewscreenSfx("close");
 
   if (els.form) els.form.classList.remove("is-waiting");
   if (els.options) {
@@ -2146,7 +2414,7 @@ function renderMeta(commands, phase) {
     btn.type = "button";
     btn.textContent = cmd;
     btn.addEventListener("click", () => {
-      lcarsUiSound("secondary");
+      uiSound("secondary");
       stopVoicePlayback();
       sendAction(cmd);
     });
@@ -2368,7 +2636,12 @@ function renderOptions(options) {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      lcarsUiSound("primary");
+      const risk = String(opt.risk || "").toLowerCase();
+      if (risk === "trap" || risk === "high") {
+        playTrekSfx("console_warning");
+      } else {
+        uiSound("primary");
+      }
       // New order makes current narrator/cast speech irrelevant
       stopVoicePlayback();
       sendAction(`${opt.id}. ${opt.text}`);
@@ -2434,7 +2707,12 @@ function setPanelExpanded(panel, toggleBtn, expanded, { persist = true } = {}) {
 function togglePanel(panel, toggleBtn) {
   const next = !isPanelExpanded(panel);
   setPanelExpanded(panel, toggleBtn, next, { persist: true });
-  lcarsUiSound(next ? "open" : "close");
+  // Viewscreen uses TrekCore TNG on/off; other panels keep LCARS beeps
+  if (panel === els.viewscreenPanel) {
+    playViewscreenSfx(next ? "open" : "close");
+  } else {
+    uiSound(next ? "open" : "close");
+  }
 }
 
 function initCollapsiblePanels() {
@@ -2554,9 +2832,9 @@ function setActionBusy(busy, detail = "") {
   // Waiting cue only — do not auto-expand viewscreen on every option
   // (mission boot expands explicitly for Incoming Communication)
   if (busy) {
-    startWaitingLoop();
+    startProcessingLoop();
   } else {
-    stopWaitingLoop();
+    stopProcessingLoop();
     stopWaitingElapsed();
   }
 
@@ -2696,6 +2974,7 @@ function renderViewscreen(state) {
         latest.length,
         Boolean(current?.state?.viewscreen?.generating)
       );
+      playTrekUi("scroll");
     }, 7000);
   }
 
@@ -2773,6 +3052,19 @@ async function sendAction(text) {
   const tAction0 = performance.now();
   const startingMission = isMissionBeginAction(phaseBefore, text);
 
+  // TrekCore order cues (phaser/warp/hail/…) fire immediately on Engage
+  if (phaseBefore === "playing" || phaseBefore === "debrief") {
+    playOrderCues(text, {
+      ship: current.state.ship,
+      mission: current.state.mission,
+      state: current.state,
+    });
+  } else if (/begin|start|accept|engage/i.test(text)) {
+    playTrekSfx("engage");
+  } else {
+    playTrekSfx("input_ok");
+  }
+
   // Mission begin uses the viewscreen Incoming Communication poster
   if (startingMission) {
     startMissionBoot(runId, "Incoming communication — stand by");
@@ -2783,11 +3075,19 @@ async function sendAction(text) {
     if (startingMission) {
       paintMissionBootViewscreen("Opening mission channel…");
     }
-    // 90s client abort — prevents infinite "Waiting…" if the model stalls
+    // Client abort: ship generation is the slow path; still never wait forever
+    const heavySetup =
+      phaseBefore === "tutorial_offer" ||
+      phaseBefore === "tutorial" ||
+      phaseBefore === "ship_select" ||
+      phaseBefore === "ship_custom" ||
+      phaseBefore === "mission_offer" ||
+      phaseBefore === "mission_type" ||
+      phaseBefore === "difficulty";
     let view = await api(`/games/${runId}/action`, {
       method: "POST",
       body: JSON.stringify({ text }),
-      timeoutMs: 90_000,
+      timeoutMs: heavySetup ? 100_000 : 90_000,
     });
 
     // Ignore stale responses if a newer action started (shouldn't happen with busy lock)
@@ -2927,8 +3227,8 @@ function showInitOverlay(opts = {}) {
   setInitProgress(0, opts.steps?.[0]?.label || "Stand by…");
   els.initOverlay.classList.remove("hidden");
   document.body.classList.add("init-active");
-  lcarsUiSound("open");
-  startWaitingLoop();
+  uiSound("open");
+  startProcessingLoop();
 }
 
 function setInitProgress(pct, label) {
@@ -2963,7 +3263,7 @@ function markInitStep(key, state) {
 function hideInitOverlay() {
   initSession.active = false;
   initSession.token += 1;
-  stopWaitingLoop();
+  stopProcessingLoop();
   if (els.initOverlay) els.initOverlay.classList.add("hidden");
   document.body.classList.remove("init-active");
   setInitProgress(0, "Stand by…");
@@ -3114,8 +3414,14 @@ async function newGame() {
 
 async function resume(runId) {
   const view = await api(`/games/${runId}`);
+  if (!view?.state?.runId) {
+    throw new Error("Saved game not found for this account");
+  }
+  // Keep local active-run pointer in sync after refresh / History resume
+  setActiveRun(view.state.runId);
   render(view);
   closeHistory();
+  return view;
 }
 
 async function deleteGame(runId) {
@@ -3145,12 +3451,152 @@ async function deleteGame(runId) {
   }
 }
 
-async function openHistory() {
-  const data = await api("/games");
+/** Current signed-in account (IAP email / local browser account) */
+let currentUser = null;
+
+async function refreshCurrentUser() {
+  try {
+    currentUser = await api("/me");
+  } catch {
+    currentUser = null;
+  }
+  return currentUser;
+}
+
+/**
+ * Paint the history modal account banner with the active email.
+ * Local/dev: allow switching the browser account (scopes saves).
+ * IAP: email is fixed by Google sign-in.
+ */
+function renderHistoryAccountBanner() {
+  const emailEl = els.historyAccountEmail;
+  const noteEl = els.historyAccountNote;
+  const localEl = els.historyAccountLocal;
+  const inputEl = els.historyAccountInput;
+  if (!emailEl) return;
+
+  const email = currentUser?.email || getLocalUserEmail() || "unknown";
+  emailEl.textContent = email;
+
+  const isIap = currentUser?.source === "iap";
+  if (noteEl) {
+    noteEl.textContent = isIap
+      ? "Captains, missions, and saves are private to this Google account."
+      : "Local play is linked to this email. History and new games stay under this account only.";
+  }
+  if (localEl) {
+    if (isIap) {
+      localEl.classList.add("hidden");
+    } else {
+      localEl.classList.remove("hidden");
+      if (inputEl) inputEl.value = getLocalUserEmail() || email || "";
+    }
+  }
+}
+
+async function applyLocalAccountFromHistory() {
+  const raw = els.historyAccountInput?.value || "";
+  const email = setLocalUserEmail(raw);
+  if (!email) {
+    showSoftError("Enter a valid email address for this local account.");
+    return;
+  }
+  uiSound("ok");
+  // Clear in-browser active run — it may belong to the previous account
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  currentUser = null;
+  await refreshCurrentUser();
+  await openHistory({ skipSound: true });
+  showSoftError(
+    `Now playing as ${email}.`,
+    "History and new games for this browser session are linked only to this account."
+  );
+}
+
+async function openHistory(opts = {}) {
+  if (!opts.skipSound) uiSound("history-open");
   els.historyList.innerHTML = "";
-  if (!data.games?.length) {
-    els.historyList.textContent = "No saved games yet.";
-  } else {
+
+  // Always resolve + show the account this history belongs to
+  await refreshCurrentUser();
+  renderHistoryAccountBanner();
+
+  // Campaign profiles (durable captains / ships)
+  let profiles = [];
+  try {
+    const pdata = await api("/profiles");
+    profiles = pdata.profiles || [];
+  } catch {
+    profiles = [];
+  }
+
+  if (profiles.length) {
+    const head = document.createElement("div");
+    head.className = "history-section-label";
+    head.textContent = "Your Captains / Ships";
+    els.historyList.appendChild(head);
+    for (const p of profiles) {
+      const row = document.createElement("div");
+      row.className = "history-item";
+      row.innerHTML = `<div class="history-info">
+        <strong>${escapeHtml(p.captainName)}</strong><br>
+        <span class="muted">${escapeHtml(p.shipName)} ${escapeHtml(
+        p.registryNumber || ""
+      )} · SD ${escapeHtml(p.stardate || "—")}</span><br>
+        <span class="muted">${p.missions || 0} mission(s) · ${new Date(
+        p.updatedAt
+      ).toLocaleString()}</span>
+      </div>`;
+      const actions = document.createElement("div");
+      actions.className = "history-actions";
+      const cont = document.createElement("button");
+      cont.className = "lcars-btn secondary";
+      cont.type = "button";
+      cont.textContent = p.activeRunId ? "Continue" : "Next mission";
+      cont.addEventListener("click", () => {
+        uiSound("ok");
+        continueProfile(p.id);
+      });
+      const del = document.createElement("button");
+      del.className = "lcars-btn danger";
+      del.type = "button";
+      del.textContent = "Delete";
+      del.addEventListener("click", async () => {
+        uiSound("delete");
+        try {
+          await api(`/profiles/${p.id}`, { method: "DELETE" });
+          openHistory();
+        } catch (err) {
+          showSoftError(err?.message || "Failed to delete profile");
+        }
+      });
+      actions.appendChild(cont);
+      actions.appendChild(del);
+      row.appendChild(actions);
+      els.historyList.appendChild(row);
+    }
+  }
+
+  // Session run snapshots for this account
+  let data = { games: [] };
+  try {
+    data = await api("/games");
+  } catch (err) {
+    const warn = document.createElement("div");
+    warn.className = "muted";
+    warn.textContent =
+      err?.message || "Could not load session runs for this account.";
+    els.historyList.appendChild(warn);
+  }
+  if (data.games?.length) {
+    const head = document.createElement("div");
+    head.className = "history-section-label";
+    head.textContent = "Session runs (legacy)";
+    els.historyList.appendChild(head);
     for (const g of data.games) {
       const row = document.createElement("div");
       row.className = "history-item";
@@ -3159,7 +3605,9 @@ async function openHistory() {
         <span class="muted">${escapeHtml(g.shipName || "No ship")} — ${escapeHtml(
         g.missionTitle || g.phase
       )}</span><br>
-        <span class="muted">${new Date(g.updatedAt).toLocaleString()} · ${g.status}</span>
+        <span class="muted">${new Date(g.updatedAt).toLocaleString()} · ${escapeHtml(
+        g.status
+      )}</span>
       </div>`;
 
       const actions = document.createElement("div");
@@ -3169,13 +3617,19 @@ async function openHistory() {
       resumeBtn.className = "lcars-btn secondary";
       resumeBtn.type = "button";
       resumeBtn.textContent = "Resume";
-      resumeBtn.addEventListener("click", () => resume(g.runId));
+      resumeBtn.addEventListener("click", () => {
+        uiSound("ok");
+        resume(g.runId);
+      });
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "lcars-btn danger";
       deleteBtn.type = "button";
       deleteBtn.textContent = "Delete";
-      deleteBtn.addEventListener("click", () => deleteGame(g.runId));
+      deleteBtn.addEventListener("click", () => {
+        uiSound("delete");
+        deleteGame(g.runId);
+      });
 
       actions.appendChild(resumeBtn);
       actions.appendChild(deleteBtn);
@@ -3183,27 +3637,62 @@ async function openHistory() {
       els.historyList.appendChild(row);
     }
   }
+
+  if (!profiles.length && !data.games?.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent =
+      "No captains yet for this account. Start a New Game to begin your campaign.";
+    els.historyList.appendChild(empty);
+  }
   els.historyModal.classList.remove("hidden");
 }
 
+async function continueProfile(profileId) {
+  try {
+    setActionBusy(true, "Loading campaign…");
+    const view = await api(`/profiles/${profileId}/continue`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    closeHistory();
+    render(view, { forceTypewriter: true });
+  } catch (err) {
+    showSoftError(err?.message || "Failed to continue campaign");
+  } finally {
+    setActionBusy(false);
+  }
+}
+
 function closeHistory() {
+  uiSound("history-close");
   els.historyModal.classList.add("hidden");
 }
+
+els.btnSetAccount?.addEventListener("click", () => {
+  applyLocalAccountFromHistory();
+});
+els.historyAccountInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    applyLocalAccountFromHistory();
+  }
+});
 
 els.form.addEventListener("submit", (e) => {
   e.preventDefault();
   // If narration is still typing and input is empty, skip typewriter
   if (typewriter.running && !els.input.value.trim()) {
     typewriter.skip = true;
-    lcarsUiSound("soft");
+    uiSound("soft");
     return;
   }
   const text = els.input.value.trim();
   if (text) {
-    lcarsUiSound("primary");
+    uiSound("engage");
     sendAction(text);
   } else {
-    lcarsUiSound("deny");
+    uiSound("deny");
   }
 });
 
@@ -3217,21 +3706,22 @@ document.addEventListener("keydown", (e) => {
 });
 
 els.btnNew.addEventListener("click", () => {
-  lcarsUiSound("primary");
+  uiSound("new-game");
   newGame();
 });
 els.btnHistory.addEventListener("click", () => {
-  lcarsUiSound("secondary");
+  uiSound("secondary");
   openHistory();
 });
 els.btnCloseHistory.addEventListener("click", () => {
-  lcarsUiSound("close");
+  uiSound("close");
   closeHistory();
 });
 
 // Classic / LCARS visual theme + SFX (no game logic)
 initLcarsFx();
 initBridgeAmbient();
+initTrekSfx();
 initUiTheme();
 if (els.btnThemeClassic) {
   els.btnThemeClassic.addEventListener("click", () => applyUiTheme("classic"));
@@ -3243,7 +3733,16 @@ if (els.lcarsSfxToggle) {
   els.lcarsSfxToggle.checked = isLcarsSfxEnabled();
   els.lcarsSfxToggle.addEventListener("change", () => {
     setLcarsSfxEnabled(els.lcarsSfxToggle.checked);
-    if (els.lcarsSfxToggle.checked) lcarsUiSound("soft");
+    if (els.lcarsSfxToggle.checked) {
+      unlockLcarsAudio();
+      unlockTrekAudio();
+      uiSound("soft");
+      playTrekSfx("comm_chirp");
+      // Resume red-alert bed if still at crisis
+      if (current?.state) syncRedAlertFromState(current.state);
+    } else {
+      setRedAlertLoop(false);
+    }
   });
 }
 if (els.bridgeAmbientToggle) {
@@ -3252,6 +3751,7 @@ if (els.bridgeAmbientToggle) {
     setBridgeAmbientEnabled(els.bridgeAmbientToggle.checked);
     if (els.bridgeAmbientToggle.checked) {
       unlockLcarsAudio();
+      unlockTrekAudio();
       startBridgeAmbient();
     }
   });
@@ -3263,25 +3763,33 @@ initCollapsiblePanels();
 
 if (els.btnVoice) {
   els.btnVoice.addEventListener("click", () => {
-    lcarsUiSound("secondary");
+    uiSound("voice-toggle");
     toggleVoice();
   });
 }
 if (els.btnVoiceMenu) {
   els.btnVoiceMenu.addEventListener("click", (e) => {
     e.stopPropagation();
+    uiSound("voice-menu");
     toggleVoiceMenu();
   });
 }
 if (els.btnVoicePause) {
-  els.btnVoicePause.addEventListener("click", () => toggleVoicePause());
+  els.btnVoicePause.addEventListener("click", () => {
+    uiSound("voice-pause");
+    toggleVoicePause();
+  });
 }
 if (els.btnVoiceStop) {
-  els.btnVoiceStop.addEventListener("click", () => stopVoicePlayback());
+  els.btnVoiceStop.addEventListener("click", () => {
+    uiSound("voice-stop");
+    stopVoicePlayback();
+  });
 }
 if (els.voiceSpeed) {
   els.voiceSpeed.value = String(voice.speed);
   els.voiceSpeed.addEventListener("change", () => {
+    uiSound("voice-speed");
     setVoiceSpeed(els.voiceSpeed.value);
   });
 }
@@ -3298,7 +3806,10 @@ document.addEventListener("keydown", (e) => {
 });
 updateVoiceToggleUi();
 if (els.btnDismissSoftError) {
-  els.btnDismissSoftError.addEventListener("click", () => hideSoftError());
+  els.btnDismissSoftError.addEventListener("click", () => {
+    uiSound("dismiss");
+    hideSoftError();
+  });
 }
 
 // Click (or keyboard) a narration paragraph / crew line to replay its voice
@@ -3311,6 +3822,7 @@ function bindSpeakableContainer(root) {
     if (!target || !root.contains(target)) return;
     e.preventDefault();
     e.stopPropagation();
+    uiSound("replay");
     handleSpeakableActivate(target);
   });
   root.addEventListener("keydown", (e) => {
@@ -3319,6 +3831,7 @@ function bindSpeakableContainer(root) {
     const target = e.target.closest(".speakable");
     if (!target || !root.contains(target)) return;
     e.preventDefault();
+    uiSound("replay");
     handleSpeakableActivate(target);
   });
 }
@@ -3347,6 +3860,29 @@ if (els.btnRetryAi) {
 // Boot
 (async function init() {
   try {
+    // Local: ensure browser has an account email before any game/history I/O
+    // (IAP overrides this on Cloud Run).
+    if (!getLocalUserEmail()) {
+      // First local visit: seed from server default (DEV_USER_EMAIL) if any
+      try {
+        const probe = await api("/me");
+        if (probe?.email && probe.source !== "iap") {
+          setLocalUserEmail(probe.email);
+        }
+      } catch {
+        /* will retry below */
+      }
+    }
+    await refreshCurrentUser();
+    // If still no browser email and not IAP, force a stable local identity
+    if (
+      !getLocalUserEmail() &&
+      currentUser?.source !== "iap" &&
+      currentUser?.email
+    ) {
+      setLocalUserEmail(currentUser.email);
+    }
+
     const ready = await checkAiLink(true);
     if (!ready) return;
 
@@ -3355,8 +3891,17 @@ if (els.btnRetryAi) {
       try {
         await resume(existing);
         return;
-      } catch {
-        /* start fresh */
+      } catch (err) {
+        // Stale runId or different account — clear so refresh does not loop
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+        console.warn(
+          "[bridge] resume failed after refresh; starting fresh",
+          err?.message || err
+        );
       }
     }
     await newGame();

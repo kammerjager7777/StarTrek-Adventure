@@ -1347,7 +1347,8 @@ body.init-active .shell {
   margin-top: 4px;
 }
 
-/* ── Init / transmission overlay (new game & roster boot) ── */
+/* ── Init / transmission overlay (new game & roster boot) ──
+   Lives outside .shell so it is NOT dimmed by body.init-active .shell filter */
 .init-overlay {
   position: fixed;
   inset: 0;
@@ -1355,9 +1356,11 @@ body.init-active .shell {
   display: flex;
   align-items: stretch;
   justify-content: stretch;
-  /* Slightly lifted charcoal so logo glow reads clearly */
-  background: radial-gradient(ellipse 80% 70% at 50% 42%, #1a1520 0%, #121018 45%, #0c0b10 100%);
-  color: #fff8f0;
+  /* Match normal bridge page background */
+  background:
+    radial-gradient(ellipse at top, #15203a 0%, transparent 55%),
+    linear-gradient(180deg, #05060a, #080b14 60%, #05060a);
+  color: var(--text, #e8eef8);
 }
 
 .init-overlay.hidden {
@@ -1366,7 +1369,7 @@ body.init-active .shell {
 
 .init-screen {
   width: 100%;
-  max-width: none; /* full viewport width */
+  max-width: none;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1379,23 +1382,20 @@ body.init-active .shell {
 .init-rail-top,
 .init-rail-bottom {
   flex: 0 0 auto;
-  height: 26px;
+  height: 22px;
   width: 100%;
   background: linear-gradient(
     90deg,
-    #ffb020 0 20%,
-    #e0a0ff 20% 36%,
-    #5ec8ff 36% 52%,
-    #ffc878 52% 72%,
-    #ffd040 72% 100%
+    var(--lcars-orange, #ff9900) 0 28%,
+    var(--lcars-lilac, #cc99cc) 28% 42%,
+    var(--lcars-blue, #9999ff) 42% 58%,
+    var(--lcars-peach, #ffcc99) 58% 100%
   );
   border-radius: 0;
-  box-shadow: 0 0 24px rgba(255, 176, 32, 0.35);
 }
 
 .init-rail-bottom {
   margin-top: 12px;
-  box-shadow: 0 0 24px rgba(255, 176, 32, 0.25);
 }
 
 .init-body {
@@ -1406,19 +1406,17 @@ body.init-active .shell {
   justify-content: center;
   text-align: center;
   padding: 40px clamp(24px, 6vw, 80px) 28px;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
 }
 
 .federation-logo {
-  width: min(380px, 62vw);
+  width: min(360px, 58vw);
   opacity: 1;
-  margin-bottom: 0.5rem;
-  /* Soft glow without rectangular box — works with transparent PNG */
-  filter: drop-shadow(0 0 20px rgba(255, 200, 100, 0.45))
-    drop-shadow(0 0 48px rgba(80, 140, 255, 0.35));
+  margin-bottom: 0.35rem;
+  filter: drop-shadow(0 0 18px rgba(255, 153, 0, 0.35));
   background: transparent;
 }
 
@@ -1429,78 +1427,75 @@ body.init-active .shell {
   display: block;
   object-fit: contain;
   background: transparent;
-  /* Avoid any residual box */
   border: none;
   outline: none;
   box-shadow: none;
-  mix-blend-mode: normal;
+  /* Lift dark seal artwork to match bright LCARS chrome */
+  filter: brightness(1.35) contrast(1.08) saturate(1.15);
 }
 
 .init-network {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #9ae0ff;
-  text-shadow: 0 0 12px rgba(100, 200, 255, 0.4);
+  color: var(--lcars-blue, #7dd3fc);
 }
 
 .init-title {
-  margin: 0.35rem 0 0;
-  font-size: clamp(2rem, 5.5vw, 3.1rem);
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.85rem, 5vw, 2.75rem);
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #ffd9a0;
+  color: var(--lcars-peach, #ffcc99);
   line-height: 1.1;
-  text-shadow: 0 0 28px rgba(255, 180, 80, 0.45);
 }
 
 .init-subtitle {
   margin: 0;
   max-width: 36rem;
-  font-size: 1.1rem;
-  color: #b8d4ff;
+  font-size: 1.05rem;
+  color: var(--lcars-blue, #99ccff);
   line-height: 1.45;
 }
 
 .init-status {
-  margin: 1.35rem 0 0;
-  font-size: 0.92rem;
+  margin: 1.25rem 0 0;
+  font-size: 0.9rem;
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #ffcc44;
-  text-shadow: 0 0 16px rgba(255, 200, 60, 0.4);
-  animation: init-status-pulse 1.2s ease-in-out infinite;
+  color: var(--lcars-orange, #ff9900);
+  animation: init-status-pulse 1.4s ease-in-out infinite;
 }
 
 .init-checklist {
   list-style: none;
-  margin: 1.15rem 0 0;
+  margin: 1.1rem 0 0;
   padding: 0;
   width: min(480px, 100%);
   text-align: left;
-  font-size: 0.86rem;
-  letter-spacing: 0.07em;
+  font-size: 0.84rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #c8d0dc;
+  color: var(--muted, #a8b4c8);
 }
 
 .init-checklist li {
   display: flex;
   gap: 8px;
   padding: 5px 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  border-bottom: 1px solid rgba(255, 153, 0, 0.2);
 }
 
 .init-checklist li.is-done {
-  color: #6eef9a;
+  color: var(--ok, #99cc99);
 }
 
 .init-checklist li.is-active {
-  color: #ffe0a8;
+  color: var(--lcars-peach, #ffcc99);
 }
 
 .init-checklist li .mark {
@@ -1521,12 +1516,11 @@ body.init-active .shell {
 }
 
 .init-progress-track {
-  height: 18px;
-  background: #1a1820;
-  border: 2px solid #ffb020;
+  height: 16px;
+  background: #111;
+  border: 2px solid var(--lcars-orange, #ff9900);
   border-radius: 0 14px 0 0;
   overflow: hidden;
-  box-shadow: 0 0 16px rgba(255, 176, 32, 0.2);
 }
 
 .init-progress-fill {
@@ -1534,10 +1528,10 @@ body.init-active .shell {
   width: 0%;
   background: linear-gradient(
     90deg,
-    #ffb020,
-    #ffd080,
-    #e0a0ff,
-    #70d0ff
+    var(--lcars-orange, #ff9900),
+    var(--lcars-peach, #ffcc99),
+    var(--lcars-lilac, #cc99cc),
+    var(--lcars-blue, #9999ff)
   );
   transition: width 0.35s ease;
 }
@@ -1551,17 +1545,17 @@ body.init-active .shell {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #e8eef8;
+  color: var(--lcars-peach, #ffcc99);
 }
 
 #init-percent {
-  color: #ffd040;
+  color: var(--lcars-orange, #ff9900);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
 }
 
 #init-step-label {
-  color: #f0f4fa;
+  color: var(--text, #ffcc99);
 }
 
 @keyframes init-status-pulse {
@@ -1570,7 +1564,7 @@ body.init-active .shell {
     opacity: 1;
   }
   50% {
-    opacity: 0.45;
+    opacity: 0.7; /* was 0.45 — kept readable */
   }
 }
 
@@ -2413,6 +2407,71 @@ body.init-active .shell {
   font-size: 0.9rem;
 }
 
+.history-account {
+  flex: 0 0 auto;
+  margin: 4px 0 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #334155);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.history-account-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #94a3b8);
+  margin-bottom: 4px;
+}
+
+.history-account-email {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--text, #e2e8f0);
+  word-break: break-all;
+}
+
+.history-account-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.history-account-local {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, #334155);
+}
+
+.history-account-local.hidden {
+  display: none;
+}
+
+.history-account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #94a3b8);
+}
+
+.history-account-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #334155);
+  background: #0b1220;
+  color: var(--text, #e2e8f0);
+  font: inherit;
+}
+
 .history-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -2482,4 +2541,45 @@ body.init-active .shell {
   .panel.right {
     max-height: none;
   }
+}
+
+/* Campaign: ship skills + crew status */
+.ship-skills-block {
+  margin-top: 0.65rem;
+}
+.skill-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+.skill-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  opacity: 0.9;
+}
+.skill-name {
+  text-transform: capitalize;
+  opacity: 0.75;
+}
+.skill-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.crew-advice-btn {
+  margin-top: 0.35rem;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.crew-kia {
+  color: #c44;
+}
+.history-section-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin: 0.75rem 0 0.35rem;
+  padding: 0 0.15rem;
 }

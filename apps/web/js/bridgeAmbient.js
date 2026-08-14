@@ -1,28 +1,30 @@
 /**
- * Starship-bridge ambient: looping bed (hum, air, murmur, baked beeps)
- * plus live soft console chirps so the deck never feels static.
+ * Starship-bridge ambient — TNG bridge bed loop from TrekCore
+ * (https://www.trekcore.com/audio/background/tng_bridge_1.mp3).
+ * Optional sparse live panel chirps stay very quiet so the bed stays authentic.
  */
 
 const AMBIENT_PREF_KEY = "sta-bridge-ambient";
-const AMBIENT_URL = "/assets/sfx/bridge_ambient.ogg";
+/** Cache-bust when the loop file is replaced */
+const AMBIENT_URL = "/assets/sfx/bridge_ambient.ogg?v=trekcore-tng1";
 const SFX_BASE = "/assets/sfx";
 
-/** Quiet console one-shots layered on the bed (very low volume) */
+/** Optional extra chirps — keep rare/soft; the loop already has console life */
 const DECK_CHIRPS = [
-  { file: "panel_beep_03.ogg", volume: 0.045 },
-  { file: "panel_beep_07.ogg", volume: 0.035 },
-  { file: "panel_beep_08.ogg", volume: 0.04 },
-  { file: "panel_beep_13.ogg", volume: 0.038 },
-  { file: "panel_beep_14.ogg", volume: 0.032 },
+  { file: "panel_beep_03.ogg", volume: 0.015 },
+  { file: "panel_beep_07.ogg", volume: 0.012 },
+  { file: "panel_beep_08.ogg", volume: 0.012 },
+  { file: "panel_beep_13.ogg", volume: 0.012 },
+  { file: "panel_beep_14.ogg", volume: 0.01 },
 ];
 
-/** Base loop level — under speech, above silence */
-const BASE_VOLUME = 0.2;
+/** Base loop level — under speech, full TNG bed present */
+const BASE_VOLUME = 0.28;
 /** While narrator/cast TTS is playing */
-const DUCKED_VOLUME = 0.07;
+const DUCKED_VOLUME = 0.1;
 /** Chirps quieter still when speech is up */
-const CHIRP_DUCK = 0.45;
-const FADE_MS = 900;
+const CHIRP_DUCK = 0.3;
+const FADE_MS = 1400;
 
 /** @type {HTMLAudioElement | null} */
 let audio = null;
@@ -160,21 +162,14 @@ function playDeckChirp() {
   }
 }
 
-/** Schedule irregular soft console activity (3–11s gaps). */
+/** Optional rare chirps — bed loop carries most of the atmosphere */
 function scheduleNextChirp() {
   stopChirpSchedule();
   if (!enabled || !started || document.hidden) return;
-  // Mostly quiet; occasional denser cluster
-  const cluster = Math.random() < 0.18;
-  const delay = cluster
-    ? 400 + Math.random() * 900
-    : 2800 + Math.random() * 8000;
+  // Very long gaps; loop already contains authentic console activity
+  const delay = 18000 + Math.random() * 25000;
   chirpTimer = setTimeout(() => {
-    playDeckChirp();
-    // Small chance of a double-beep status confirm
-    if (Math.random() < 0.22) {
-      setTimeout(() => playDeckChirp(), 90 + Math.random() * 80);
-    }
+    if (Math.random() < 0.25) playDeckChirp();
     scheduleNextChirp();
   }, delay);
 }

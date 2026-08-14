@@ -5,18 +5,26 @@
 
 import {
   applyCombatDamage,
+  applyCrewDeath,
+  applyCrewInjury,
   applyIntegrityDamage,
+  applyReputation,
+  canCrewDie,
   classifyDamageKind,
+  computeShipSkills,
   divertPowerToShields,
   evaluateD20,
   hintsAllowed,
+  normalizeCrewMember,
   normalizeShip,
   rollD20,
   setSystem,
   shipStatusSummary,
   systemLabel,
+  tickCrewService,
   type DamageKind,
   type Difficulty,
+  type Faction,
   type GameState,
   type ShipSystems,
 } from "../../../packages/game-core/src/index.js";
@@ -285,6 +293,115 @@ export function toolSetFlag(state: GameState, flag: string): ToolResult {
         flags: [...state.mission.flags, flag],
       },
     },
+  };
+}
+
+export function toolApplyCrewDeath(
+  state: GameState,
+  memberId: string,
+  cause: string
+): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  const ship = normalizeShip(state.ship);
+  const { crew, dead } = applyCrewDeath(ship.crew || [], memberId, cause);
+  if (!dead) {
+    return { ok: false, message: "Crew member not found or already dead.", state };
+  }
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  const scar = `${dead.name} (${dead.role}) — KIA: ${cause}`;
+  const nextShip = {
+    ...ship,
+    crew,
+    skills,
+    scars: [...ship.scars, scar].slice(-12),
+  };
+  let mission = state.mission;
+  if (mission) {
+    const flag = `crew_loss_${String(dead.role || "officer")
+      .toLowerCase()
+      .replace(/\s+/g, "_")}`;
+    mission = {
+      ...mission,
+      flags: mission.flags.includes(flag)
+        ? mission.flags
+        : [...mission.flags, flag, "crew_casualty"],
+    };
+  }
+  return {
+    ok: true,
+    message: `${dead.name} has been killed in action (${cause}).`,
+    state: { ...state, ship: nextShip, mission },
+    data: { memberId, name: dead.name, role: dead.role, cause },
+  };
+}
+
+export function toolSetCrewStatus(
+  state: GameState,
+  memberId: string,
+  status: "active" | "injured" | "dead" | "transferred",
+  cause?: string
+): ToolResult {
+  if (!state.ship) return { ok: false, message: "No ship selected." };
+  if (status === "dead") {
+    return toolApplyCrewDeath(state, memberId, cause || "combat trauma");
+  }
+  let ship = normalizeShip(state.ship);
+  let crew = (ship.crew || []).map((c) => normalizeCrewMember(c, ship.stardate));
+  if (status === "injured") {
+    crew = applyCrewInjury(crew, memberId, 2);
+  } else {
+    crew = crew.map((c) =>
+      c.id === memberId
+        ? {
+            ...c,
+            status,
+            injuryTurnsRemaining: undefined,
+            deathCause: status === "transferred" ? c.deathCause : undefined,
+          }
+        : c
+    );
+  }
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  ship = { ...ship, crew, skills };
+  return {
+    ok: true,
+    message: `Crew ${memberId} → ${status}.`,
+    state: { ...state, ship },
+  };
+}
+
+export function toolUpdateReputation(
+  state: GameState,
+  deltas: Partial<Record<Faction, number>>
+): ToolResult {
+  if (!state.universe) {
+    return { ok: false, message: "No universe state on this run.", state };
+  }
+  // Clamp proposed deltas
+  const clamped: Partial<Record<Faction, number>> = {};
+  for (const [k, v] of Object.entries(deltas || {})) {
+    if (typeof v === "number") {
+      clamped[k as Faction] = Math.max(-15, Math.min(15, Math.round(v)));
+    }
+  }
+  const universe = applyReputation(state.universe, clamped);
+  return {
+    ok: true,
+    message: `Reputation updated: ${JSON.stringify(clamped)}`,
+    state: { ...state, universe },
+    data: { deltas: clamped, factionReputation: universe.factionReputation },
+  };
+}
+
+export function toolTickCrewService(state: GameState): ToolResult {
+  if (!state.ship) return { ok: true, message: "No ship.", state };
+  const ship = normalizeShip(state.ship);
+  const crew = tickCrewService(ship.crew || []);
+  const skills = computeShipSkills({ ...ship, crew }, crew);
+  return {
+    ok: true,
+    message: "Crew service clocks advanced.",
+    state: { ...state, ship: { ...ship, crew, skills } },
   };
 }
 

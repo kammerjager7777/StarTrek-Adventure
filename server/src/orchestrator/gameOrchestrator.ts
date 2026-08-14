@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { GameState, PublicGameView } from "../../../packages/game-core/src/index.js";
 import {
+  computeShipSkills,
+  emptyUniverse,
   emptyViewscreen,
   metaCommandList,
+  normalizeCrewMember,
   normalizeShip,
+  stardateForEra,
 } from "../../../packages/game-core/src/index.js";
 import {
   advanceSetup,
@@ -47,8 +51,14 @@ import {
   ensureCrewVoices,
 } from "../services/voice/voiceIdentity.js";
 import { deleteSave, listSaves, readSave, writeSave } from "../store/saveStore.js";
+import {
+  readProfile,
+  updateProfileFromRun,
+  writeProfile,
+} from "../store/profileStore.js";
+import { requestCrewAdvice } from "../agents/crewAdvice.js";
 
-function freshState(): GameState {
+function freshState(ownerEmail: string): GameState {
   const now = new Date().toISOString();
   return {
     runId: randomUUID(),
@@ -57,6 +67,7 @@ function freshState(): GameState {
     status: "active",
     phase: "boot",
     playerName: "",
+    ownerEmail,
     difficulty: null,
     missionType: null,
     ship: null,
@@ -204,14 +215,17 @@ async function finalizeAction(
   return next;
 }
 
-export async function startNewGame(): Promise<PublicGameView> {
+export async function startNewGame(
+  ownerEmail: string
+): Promise<PublicGameView> {
   // Hard gate: no game without a working xAI link
   const link = await assertXaiReady(true);
-  let state = freshState();
+  let state = freshState(ownerEmail);
   await initSessionDebugLog(state);
   await logSystemMessage(state.runId, "boot", "xAI link verified — starting session", {
     model: link.model,
     detail: link.detail,
+    ownerEmail,
   });
   const before = state;
   state = await advanceSetup(state, "");
@@ -224,8 +238,11 @@ export async function startNewGame(): Promise<PublicGameView> {
 
 export { AiUnavailableError, LlmNarratorError };
 
-export async function getGame(runId: string): Promise<PublicGameView | null> {
-  const state = await readSave(runId);
+export async function getGame(
+  runId: string,
+  ownerEmail: string
+): Promise<PublicGameView | null> {
+  const state = await readSave(runId, ownerEmail);
   if (!state) return null;
   const normalized = normalizeState(state);
   // Persist voice re-locks (profile upgrades / uniqueness) so they stick
@@ -242,25 +259,150 @@ export async function getGame(runId: string): Promise<PublicGameView | null> {
   return toView(normalized);
 }
 
-export async function listGames() {
-  return listSaves();
+export async function listGames(ownerEmail: string) {
+  return listSaves(ownerEmail);
 }
 
-export async function deleteGame(runId: string): Promise<boolean> {
-  const existed = await deleteSave(runId);
+/** Ask officer for advice — no play turn, no dice */
+export async function requestAdvice(
+  runId: string,
+  ownerEmail: string,
+  memberId: string,
+  question?: string
+) {
+  const state = await readSave(runId, ownerEmail);
+  if (!state) return null;
+  const { state: next, result } = await requestCrewAdvice(
+    normalizeState(state),
+    memberId,
+    question
+  );
+  if (result.ok) {
+    await writeSave(next);
+  }
+  return {
+    view: toView(next),
+    advice: result,
+  };
+}
+
+/**
+ * Continue a campaign profile: resume active run or open mission selection
+ * with ship/crew/universe restored.
+ */
+export async function continueProfile(
+  profileId: string,
+  ownerEmail: string
+): Promise<PublicGameView | null> {
+  await assertXaiReady(true);
+  const profile = await readProfile(profileId, ownerEmail);
+  if (!profile) return null;
+
+  // Resume mid-mission if present
+  if (profile.activeRunId) {
+    const existing = await readSave(profile.activeRunId, ownerEmail);
+    if (existing && existing.status === "active") {
+      return toView(normalizeState(existing));
+    }
+  }
+
+  // New run from profile state
+  const now = new Date().toISOString();
+  const stardate =
+    profile.universe?.stardate ||
+    profile.ship.stardate ||
+    stardateForEra(profile.ship.era);
+  const crew = (profile.crew || profile.ship.crew || []).map((c) =>
+    normalizeCrewMember(c, stardate)
+  );
+  const skills = computeShipSkills(profile.ship, crew);
+  const ship = {
+    ...normalizeShip(profile.ship),
+    crew,
+    skills,
+    stardate,
+  };
+
+  let state: GameState = {
+    ...freshState(ownerEmail),
+    runId: randomUUID(),
+    createdAt: now,
+    updatedAt: now,
+    playerName: profile.captainName,
+    ownerEmail,
+    ship,
+    profileId: profile.id,
+    universe: profile.universe || emptyUniverse(stardateForEra(ship.era)),
+    phase: "mission_type",
+  };
+
+  await initSessionDebugLog(state);
+  await writeProfile({
+    ...profile,
+    ownerEmail,
+    ship,
+    crew,
+    skills,
+    activeRunId: state.runId,
+    updatedAt: now,
+  });
+
+  const before = state;
+  const { generateMissionTypePrompt } = await import(
+    "../agents/setupContent.js"
+  );
+  const prompt = await generateMissionTypePrompt(state);
+  const defaults = [
+    "Science — technology and problem-solving",
+    "Exploration — discovery and diplomacy",
+    "Search & Rescue — find and save those in peril",
+    "Battle — starship combat and strategy",
+    "Expanded — complex multi-skill Hardcore scenario",
+  ];
+  const choiceTexts =
+    prompt.choices?.length >= 5 ? prompt.choices.slice(0, 5) : defaults;
+  state = {
+    ...state,
+    phase: "mission_type",
+    pendingQuestion:
+      prompt.narration ||
+      "Captain, what manner of mission shall we undertake?",
+    pendingChoices: choiceTexts.map((text, i) => ({
+      id: i + 1,
+      text,
+      risk:
+        i === choiceTexts.length - 1
+          ? ("trap" as const)
+          : i >= 3
+            ? ("high" as const)
+            : ("medium" as const),
+    })),
+  };
+
+  state = await finalizeAction(before, state);
+  return toView(state);
+}
+
+export async function deleteGame(
+  runId: string,
+  ownerEmail: string
+): Promise<boolean> {
+  const existed = await deleteSave(runId, ownerEmail);
+  if (!existed) return false;
   await deleteDebugLog(runId);
   await deletePortraitsForRun(runId);
   await deleteViewscreenForRun(runId);
   await deleteVoiceCacheForRun(runId);
-  return existed;
+  return true;
 }
 
 /** Toggle auto-voice (Grok TTS) for narrator + crew lines. */
 export async function setSpeechEnabled(
   runId: string,
+  ownerEmail: string,
   speechOn: boolean
 ): Promise<PublicGameView | null> {
-  const state = await readSave(runId);
+  const state = await readSave(runId, ownerEmail);
   if (!state) return null;
   const next: GameState = {
     ...normalizeState(state),
@@ -288,6 +430,7 @@ export type SpeakRequest = {
  */
 export async function resolveSpeakPayload(
   runId: string,
+  ownerEmail: string,
   body: SpeakRequest
 ): Promise<{
   state: GameState;
@@ -296,7 +439,7 @@ export async function resolveSpeakPayload(
   speakerLabel: string;
   emotion: string;
 } | null> {
-  const raw = await readSave(runId);
+  const raw = await readSave(runId, ownerEmail);
   if (!raw) return null;
   const state = normalizeState(raw);
   // Persist backfilled voices once
@@ -376,9 +519,10 @@ export async function resolveSpeakPayload(
 
 /** Generate missing crew portraits (Imagine) and return updated view */
 export async function generateCrewPortraits(
-  runId: string
+  runId: string,
+  ownerEmail: string
 ): Promise<PublicGameView | null> {
-  const state = await readSave(runId);
+  const state = await readSave(runId, ownerEmail);
   if (!state) return null;
   const next = await ensureCrewPortraits(state);
   return toView(next);
@@ -386,9 +530,10 @@ export async function generateCrewPortraits(
 
 export async function playerAction(
   runId: string,
+  ownerEmail: string,
   text: string
 ): Promise<PublicGameView | null> {
-  let state = await readSave(runId);
+  let state = await readSave(runId, ownerEmail);
   if (!state) return null;
 
   const before = structuredClone(state);

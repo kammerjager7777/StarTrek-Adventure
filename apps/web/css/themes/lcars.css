@@ -40,60 +40,66 @@ html[data-ui-theme="lcars"] body {
   letter-spacing: 0.02em;
 }
 
-/* Init / transmission screen — full-bleed, bright LCARS */
+/* Init / transmission screen — same palette as normal LCARS bridge */
 html[data-ui-theme="lcars"] .init-overlay {
-  background: radial-gradient(
-    ellipse 85% 75% at 50% 40%,
-    #1c1408 0%,
-    #120e0a 50%,
-    #0a0806 100%
-  );
+  background: #000;
+  color: var(--text);
 }
 
 html[data-ui-theme="lcars"] .federation-logo {
-  filter: drop-shadow(0 0 24px rgba(255, 170, 40, 0.5))
-    drop-shadow(0 0 52px rgba(255, 140, 0, 0.28));
+  filter: drop-shadow(0 0 20px rgba(255, 153, 0, 0.4));
   background: transparent;
 }
 
+html[data-ui-theme="lcars"] .federation-logo img {
+  filter: brightness(1.4) contrast(1.1) saturate(1.2);
+}
+
 html[data-ui-theme="lcars"] .init-title {
-  color: #ffe0b0;
+  color: var(--lcars-peach);
   letter-spacing: 0.14em;
 }
 
 html[data-ui-theme="lcars"] .init-subtitle {
-  color: #c0d8ff;
+  color: var(--lcars-blue);
 }
 
 html[data-ui-theme="lcars"] .init-network {
-  color: #b0e0ff;
+  color: var(--lcars-blue);
 }
 
 html[data-ui-theme="lcars"] .init-status {
-  color: #ffb84d;
+  color: var(--lcars-bar);
 }
 
 html[data-ui-theme="lcars"] .init-checklist {
-  color: #d0d8e8;
+  color: var(--muted);
+}
+
+html[data-ui-theme="lcars"] .init-checklist li.is-done {
+  color: var(--ok);
+}
+
+html[data-ui-theme="lcars"] .init-checklist li.is-active {
+  color: var(--lcars-peach);
 }
 
 html[data-ui-theme="lcars"] .init-rail-top,
 html[data-ui-theme="lcars"] .init-rail-bottom {
   background: linear-gradient(
     90deg,
-    var(--lcars-bar) 0 24%,
-    var(--lcars-bar-2) 24% 40%,
-    #99ccff 40% 58%,
-    var(--lcars-peach) 58% 80%,
-    var(--lcars-bar) 80% 100%
+    var(--lcars-bar) 0 28%,
+    var(--lcars-bar-2) 28% 42%,
+    var(--lcars-bar-3) 42% 58%,
+    var(--lcars-peach) 58% 100%
   );
-  box-shadow: 0 0 28px rgba(255, 153, 0, 0.35);
+  box-shadow: none;
 }
 
 html[data-ui-theme="lcars"] .init-progress-track {
   border-color: var(--lcars-bar);
   border-radius: 0 14px 0 0;
-  background: #1a1208;
+  background: #111;
 }
 
 html[data-ui-theme="lcars"] .init-progress-fill {
@@ -102,17 +108,17 @@ html[data-ui-theme="lcars"] .init-progress-fill {
     var(--lcars-bar),
     var(--lcars-peach),
     var(--lcars-bar-2),
-    #99ccff
+    var(--lcars-bar-3)
   );
 }
 
 html[data-ui-theme="lcars"] .init-progress-meta,
 html[data-ui-theme="lcars"] #init-step-label {
-  color: #f0e8dc;
+  color: var(--text);
 }
 
 html[data-ui-theme="lcars"] #init-percent {
-  color: #ffcc66;
+  color: var(--lcars-bar);
 }
 
 /* ─── LCARS motion (inspired by lcars-monitor) ───────────── */

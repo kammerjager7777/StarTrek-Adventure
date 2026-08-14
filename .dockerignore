@@ -1,0 +1,14 @@
+node_modules
+data
+.git
+.env
+.env.*
+!.env.example
+*.md
+docs
+scripts
+.DS_Store
+**/.DS_Store
+npm-debug.log*
+.grok
+**/*.log

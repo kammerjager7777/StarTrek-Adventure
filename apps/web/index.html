@@ -166,52 +166,6 @@
         <button type="button" id="btn-dismiss-soft-error" class="lcars-btn secondary">Dismiss</button>
       </div>
 
-      <!-- LCARS-style transmission / init screen (inspired by lcars-monitor /transmission) -->
-      <div
-        id="init-overlay"
-        class="init-overlay hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="init-title"
-        aria-live="polite"
-      >
-        <div class="init-screen">
-          <div class="init-rail init-rail-top" aria-hidden="true"></div>
-          <div class="init-body">
-            <!-- United Federation of Planets seal (raster emblem) -->
-            <div class="init-logo federation-logo" aria-hidden="true">
-              <img
-                src="/assets/ufp-logo.png?v=2"
-                alt=""
-                class="ufp-logo-img"
-                width="480"
-                height="380"
-                decoding="async"
-              />
-            </div>
-            <p class="init-network" id="init-network">Subspace Comm Net LCARS</p>
-            <h1 class="init-title" id="init-title">Incoming Transmission</h1>
-            <p class="init-subtitle" id="init-subtitle">
-              Starfleet Command · Authorized access only
-            </p>
-            <p class="init-status" id="init-status">INITIALIZING BRIDGE SYSTEMS…</p>
-            <ul class="init-checklist" id="init-checklist" aria-hidden="true"></ul>
-          </div>
-          <div class="init-footer">
-            <div class="init-progress" aria-label="Initialization progress">
-              <div class="init-progress-track">
-                <div class="init-progress-fill" id="init-progress-fill"></div>
-              </div>
-              <div class="init-progress-meta">
-                <span id="init-step-label">Stand by…</span>
-                <span id="init-percent">0%</span>
-              </div>
-            </div>
-            <div class="init-rail init-rail-bottom" aria-hidden="true"></div>
-          </div>
-        </div>
-      </div>
-
       <main class="bridge">
         <aside class="panel left">
           <section class="panel-section ship-section">
@@ -346,8 +300,29 @@
               Close
             </button>
           </div>
+          <div id="history-account" class="history-account" aria-live="polite">
+            <div class="history-account-label">Signed in as</div>
+            <div id="history-account-email" class="history-account-email">…</div>
+            <p id="history-account-note" class="history-account-note muted">
+              Captains, missions, and saves are private to this account.
+            </p>
+            <div id="history-account-local" class="history-account-local hidden">
+              <label class="history-account-field">
+                <span>Local account email</span>
+                <input
+                  type="email"
+                  id="history-account-input"
+                  placeholder="you@example.com"
+                  autocomplete="username"
+                />
+              </label>
+              <button type="button" id="btn-set-account" class="lcars-btn secondary">
+                Use this account
+              </button>
+            </div>
+          </div>
           <p class="hint">
-            Resume a voyage or delete saves you no longer need.
+            Resume a voyage or delete saves for the account above.
           </p>
           <div id="history-list" class="history-list"></div>
         </div>
@@ -373,6 +348,51 @@
             Scars are a lasting record of damage and hard choices this voyage —
             not a second hit-point bar.
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outside .shell so body.init-active shell dimming does not darken this screen -->
+    <div
+      id="init-overlay"
+      class="init-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="init-title"
+      aria-live="polite"
+    >
+      <div class="init-screen">
+        <div class="init-rail init-rail-top" aria-hidden="true"></div>
+        <div class="init-body">
+          <div class="init-logo federation-logo" aria-hidden="true">
+            <img
+              src="/assets/ufp-logo.png?v=3"
+              alt=""
+              class="ufp-logo-img"
+              width="480"
+              height="380"
+              decoding="async"
+            />
+          </div>
+          <p class="init-network" id="init-network">Subspace Comm Net LCARS</p>
+          <h1 class="init-title" id="init-title">Incoming Transmission</h1>
+          <p class="init-subtitle" id="init-subtitle">
+            Starfleet Command · Authorized access only
+          </p>
+          <p class="init-status" id="init-status">INITIALIZING BRIDGE SYSTEMS…</p>
+          <ul class="init-checklist" id="init-checklist" aria-hidden="true"></ul>
+        </div>
+        <div class="init-footer">
+          <div class="init-progress" aria-label="Initialization progress">
+            <div class="init-progress-track">
+              <div class="init-progress-fill" id="init-progress-fill"></div>
+            </div>
+            <div class="init-progress-meta">
+              <span id="init-step-label">Stand by…</span>
+              <span id="init-percent">0%</span>
+            </div>
+          </div>
+          <div class="init-rail init-rail-bottom" aria-hidden="true"></div>
         </div>
       </div>
     </div>

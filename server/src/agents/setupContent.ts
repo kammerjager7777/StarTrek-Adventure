@@ -62,14 +62,17 @@ export type SetupMissionOffer = {
   secondaries: string[];
 };
 
-function getClient() {
+/** Default setup timeout; heavy tasks override per-call */
+const SETUP_TIMEOUT_MS = Number(process.env.XAI_SETUP_TIMEOUT_MS || 90_000);
+
+function getClient(timeoutMs = SETUP_TIMEOUT_MS) {
   const key = process.env.XAI_API_KEY?.trim();
   if (!key) return null;
   return new OpenAI({
     apiKey: key,
     baseURL: process.env.XAI_BASE_URL || "https://api.x.ai/v1",
-    // Setup payloads (especially ship offers) can take well over a minute
-    timeout: 180_000,
+    timeout: timeoutMs,
+    maxRetries: 0, // we handle retries ourselves with clear logs
   });
 }
 
@@ -90,28 +93,48 @@ async function callSetupJson(
   phase: string,
   purpose: string,
   system: string,
-  user: Record<string, unknown>
+  user: Record<string, unknown>,
+  opts: { timeoutMs?: number; maxTokens?: number; maxAttempts?: number } = {}
 ): Promise<Record<string, unknown>> {
   if (!isLlmConfigured()) {
     throw new Error("LLM not configured for setup content");
   }
-  const client = getClient();
+
+  const timeoutMs =
+    opts.timeoutMs ??
+    (purpose === "setup_ships" || purpose === "setup_missions"
+      ? 90_000
+      : SETUP_TIMEOUT_MS);
+  const maxTokens =
+    opts.maxTokens ??
+    (purpose === "setup_ships"
+      ? 3500
+      : purpose === "setup_missions"
+        ? 2800
+        : 1200);
+  const client = getClient(timeoutMs);
   if (!client) throw new Error("No xAI client");
 
   const model = process.env.XAI_MODEL || "grok-4.5";
-  const maxAttempts = purpose === "setup_ships" || purpose === "setup_missions" ? 2 : 1;
+  const maxAttempts =
+    opts.maxAttempts ??
+    (purpose === "setup_ships" || purpose === "setup_missions" ? 2 : 1);
   let lastErr: Error | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const t0 = Date.now();
     await logLlm(runId, phase, `LLM request: ${purpose}`, {
       model,
       purpose,
       attempt,
+      timeoutMs,
+      maxTokens,
     });
     try {
       const response = await client.chat.completions.create({
         model,
-        temperature: 0.95,
+        temperature: purpose === "setup_ships" ? 0.85 : 0.95,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: system },
           { role: "user", content: JSON.stringify(user) },
@@ -124,6 +147,7 @@ async function callSetupJson(
         chars: content.length,
         preview: content.slice(0, 280),
         attempt,
+        durationMs: Date.now() - t0,
       });
 
       const parsed = extractJson(content);
@@ -135,6 +159,7 @@ async function callSetupJson(
       lastErr = err instanceof Error ? err : new Error(String(err));
       await logError(runId, phase, `setup LLM attempt failed: ${purpose}`, {
         attempt,
+        durationMs: Date.now() - t0,
         error: lastErr.message,
       });
       if (attempt < maxAttempts) {
@@ -242,6 +267,8 @@ export async function generateTutorialBeat(
 export async function generateShipOffers(
   state: GameState
 ): Promise<{ narration: string; ships: SetupShipOffer[] }> {
+  // Keep this payload SMALL — full crew visual bibles made setup_ships hang (90s+).
+  // Portraits synthesize imagePrompt server-side from name/role/species.
   const obj = await callSetupJson(
     state.runId,
     state.phase,
@@ -249,19 +276,30 @@ export async function generateShipOffers(
     SETUP_SYSTEM,
     {
       task: "ship_offers",
-      instruction: `Generate 4 Starfleet command ships from DIFFERENT eras (mix 22nd–24th century).
-Return {
-  narration: string (brief intro asking which vessel to command; mention option 5 can be custom),
-  ships: [{
-    name, registryNumber, className, era, stardate, description, capabilities: string[3-6],
-    shipVisualPrompt: string (exterior lock for image gen),
-    crew: [{ name, role, species, sex, height, skinTone, hair, eyes, build, clothing, scarsMarks, personality, bio, imagePrompt }]
+      instruction: `Generate exactly 4 Starfleet command ships from DIFFERENT eras (22nd–24th century mix).
+Return compact JSON only:
+{
+  "narration": "2-3 sentences inviting ship choice; mention option 5 custom",
+  "ships": [{
+    "name": "USS …",
+    "registryNumber": "NCC-##### or NX-##",
+    "className": "… class",
+    "era": "…",
+    "stardate": "…",
+    "description": "1-2 sentences",
+    "capabilities": ["…","…","…"],
+    "shipVisualPrompt": "short exterior image lock, no text",
+    "crew": [
+      {"name":"…","role":"Captain or XO","species":"…","personality":"short"},
+      {"name":"…","role":"…","species":"…","personality":"short"},
+      {"name":"…","role":"…","species":"…","personality":"short"},
+      {"name":"…","role":"…","species":"…","personality":"short"}
+    ]
   }]
 }
-Exactly 4 ships. Crew 4-6 each. imagePrompt must be detailed portrait locks for consistency.
-registryNumber is required: Starfleet hull number like "NCC-1701", "NCC-74656", "NX-01" (era-appropriate; unique per ship).
-Include recognizable Trek-era flavor (NX era, Constitution era, Galaxy era, Intrepid era, etc.) with original or classic ship identities as appropriate.`,
-    }
+Rules: exactly 4 ships; exactly 4 crew each; unique registryNumbers; no imagePrompt/bio/height fields; keep JSON under ~6k characters.`,
+    },
+    { timeoutMs: 90_000, maxTokens: 3500, maxAttempts: 2 }
   );
 
   const narration = String(obj.narration || "").trim();
@@ -269,53 +307,71 @@ Include recognizable Trek-era flavor (NX era, Constitution era, Galaxy era, Intr
   const ships: SetupShipOffer[] = rawShips.slice(0, 4).map((s, i) => {
     const sh = s as Record<string, unknown>;
     const crewRaw = Array.isArray(sh.crew) ? sh.crew : [];
-    const name = String(sh.name || `USS Vessel ${i + 1}`);
+    const shipName = String(sh.name || `USS Vessel ${i + 1}`);
+    const className = String(sh.className || "Starfleet class");
     const registryNumber = normalizeRegistryNumber(
       String(sh.registryNumber || sh.registry || sh.ncc || ""),
-      name.length * 97 + i * 1301
+      shipName.length * 97 + i * 1301
     );
     return {
       id: String(sh.id || `gen-ship-${i + 1}-${randomUUID().slice(0, 8)}`),
-      name,
+      name: shipName,
       registryNumber,
-      className: String(sh.className || "Starfleet class"),
+      className,
       era: String(sh.era || "24th century"),
       stardate: String(sh.stardate || "47600.1"),
       description: String(sh.description || "A Starfleet vessel."),
       capabilities: Array.isArray(sh.capabilities)
-        ? sh.capabilities.map((c) => String(c)).slice(0, 8)
+        ? sh.capabilities.map((c) => String(c)).slice(0, 6)
         : ["Warp drive", "Phasers", "Shields"],
       shipVisualPrompt: String(
         sh.shipVisualPrompt ||
-          `Federation starship ${name} ${registryNumber}, ${sh.className}, cinematic exterior, no text`
+          `Federation starship ${shipName} ${registryNumber}, ${className}, cinematic exterior, no text`
       ),
-      crew: crewRaw.slice(0, 6).map((c) => {
+      crew: crewRaw.slice(0, 4).map((c) => {
         const m = c as Record<string, unknown>;
         const name = String(m.name || "Officer");
         const role = String(m.role || "Bridge Officer");
         const species = String(m.species || "Human");
+        const personality = m.personality
+          ? String(m.personality)
+          : "Dedicated Starfleet officer";
         return {
           name,
           role,
           species,
           sex: m.sex ? String(m.sex) : undefined,
-          height: m.height ? String(m.height) : undefined,
-          skinTone: m.skinTone ? String(m.skinTone) : undefined,
-          hair: m.hair ? String(m.hair) : undefined,
-          eyes: m.eyes ? String(m.eyes) : undefined,
-          build: m.build ? String(m.build) : undefined,
-          clothing: m.clothing ? String(m.clothing) : undefined,
-          scarsMarks: m.scarsMarks ? String(m.scarsMarks) : undefined,
-          personality: m.personality ? String(m.personality) : undefined,
-          bio: m.bio ? String(m.bio) : undefined,
+          personality,
+          bio: m.bio
+            ? String(m.bio)
+            : `${name} serves as ${role} aboard ${shipName}.`,
+          // Server-side portrait lock — do not require LLM to invent long prompts
           imagePrompt: String(
             m.imagePrompt ||
-              `Photorealistic portrait of ${name}, ${species} ${role}, Starfleet uniform, head-and-shoulders, no text`
+              `Photorealistic portrait of ${name}, ${species} ${role}, Starfleet uniform, head-and-shoulders, neutral lighting, no text, no watermark`
           ),
         };
       }),
     };
   });
+
+  // Ensure at least 4 crew with placeholders if model under-delivered
+  for (const ship of ships) {
+    const roles = ["First Officer", "Chief Engineer", "Science Officer", "Tactical"];
+    while (ship.crew.length < 4) {
+      const n = ship.crew.length;
+      const role = roles[n] || "Bridge Officer";
+      const name = `Officer ${n + 1}`;
+      ship.crew.push({
+        name,
+        role,
+        species: "Human",
+        personality: "Dedicated Starfleet officer",
+        bio: `${name} serves as ${role}.`,
+        imagePrompt: `Photorealistic portrait of ${name}, Human ${role}, Starfleet uniform, head-and-shoulders, no text`,
+      });
+    }
+  }
 
   if (ships.length < 4) throw new Error("Need 4 generated ships");
   if (!narration) throw new Error("Empty ship narration");

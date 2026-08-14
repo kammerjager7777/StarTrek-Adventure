@@ -22,7 +22,9 @@ export type Phase =
   | "mission_brief"
   | "playing"
   | "debrief"
-  | "post_mission";
+  | "post_mission"
+  /** Campaign hub after debrief — refit / recruit / next mission */
+  | "starbase";
 
 export type SystemStatus = "ok" | "damaged" | "destroyed";
 
@@ -78,6 +80,20 @@ export type VoiceEmotion =
   | "wonder"
   | "formal";
 
+/** Multi-dimensional skill axes (0–100) */
+export type SkillDimension =
+  | "tactical"
+  | "science"
+  | "diplomacy"
+  | "piloting"
+  | "engineering"
+  | "medical"
+  | "command";
+
+export type SkillVector = Record<SkillDimension, number>;
+
+export type CrewStatus = "active" | "injured" | "dead" | "transferred";
+
 export type CrewMember = {
   id: string;
   name: string;
@@ -104,6 +120,83 @@ export type CrewMember = {
   portraitStatus?: "pending" | "ready" | "failed" | "none";
   /** Loyalty / attachment 0–100 */
   loyalty?: number;
+  /** Role/experience skills (partial OK on older saves) */
+  skills?: Partial<SkillVector>;
+  /** Mechanical play turns served while active */
+  serviceTurns?: number;
+  /** Completed missions while alive */
+  missionsServed?: number;
+  status?: CrewStatus;
+  deathCause?: string;
+  joinedStardate?: string;
+  /** Turns remaining before injured → active */
+  injuryTurnsRemaining?: number;
+  /** Recruitment quality tier (starbase hires) */
+  quality?: RecruitQuality;
+  /** Display rank, e.g. "Lt.", "Lt. Cmdr." */
+  rank?: string;
+};
+
+/** Starbase recruit quality — scales starting skills */
+export type RecruitQuality = "green" | "standard" | "veteran" | "elite";
+
+export type ShipSkills = {
+  /** From class / era baselines */
+  base: SkillVector;
+  /** Sum of living active crew contributions */
+  fromCrew: SkillVector;
+  /** base + fromCrew, clamped 0–100 */
+  total: SkillVector;
+};
+
+export type Faction =
+  | "federation"
+  | "klingon"
+  | "romulan"
+  | "cardassian"
+  | "borg"
+  | "independent"
+  | "other";
+
+export type UniverseState = {
+  stardate: string;
+  globalTurn: number;
+  factionReputation: Record<Faction, number>;
+  knownLocations: string[];
+  galacticFlags: string[];
+  lastTickTurn: number;
+  activeCrises: string[];
+};
+
+export type CampaignLogEntry = {
+  missionId: string;
+  title: string;
+  stardate: string;
+  outcome: "success" | "failed" | "abandoned";
+  keyFlags: string[];
+  casualties: string[];
+  skillGains: Partial<SkillVector>;
+  reputationDeltas: Partial<Record<Faction, number>>;
+};
+
+/** Durable captain/ship campaign (profile-centric save) */
+export type CampaignProfile = {
+  id: string;
+  captainName: string;
+  createdAt: string;
+  updatedAt: string;
+  ship: Ship;
+  crew: CrewMember[];
+  skills: ShipSkills;
+  universe: UniverseState;
+  campaignLog: CampaignLogEntry[];
+  /** Optional mid-mission resume */
+  activeRunId?: string | null;
+  /**
+   * Account that owns this campaign (normalized email).
+   * All profile list/load/continue is scoped by this field + user data dir.
+   */
+  ownerEmail?: string | null;
 };
 
 export type Ship = {
@@ -140,6 +233,8 @@ export type Ship = {
   visual?: VisualIdentity;
   /** Optional exterior hero image */
   exteriorImageUrl?: string | null;
+  /** Cached ship skill totals (recomputed on crew change) */
+  skills?: ShipSkills;
 };
 
 /** How incoming damage interacts with shields vs hull */
@@ -199,6 +294,12 @@ export type Turn = {
   options: TurnOption[];
   /** Beat summary for the Viewscreen / Imagine agent */
   viewscreenPrompt?: string;
+  /**
+   * Bridge SFX cues requested by the Narrator for this beat
+   * (catalog keys or aliases, e.g. "phaser", "shield_hit", "red_alert").
+   * Client plays when the turn lands; max ~4.
+   */
+  sfx?: string[];
   /** Pending dice context (server/debug; not shown in UI) */
   lastRoll?: {
     die: number;
@@ -262,6 +363,11 @@ export type GameState = {
   status: "active" | "completed" | "abandoned";
   phase: Phase;
   playerName: string;
+  /**
+   * Account that owns this run (normalized email).
+   * Saves live under data/users/{slug}/saves — never shared across accounts.
+   */
+  ownerEmail?: string | null;
   difficulty: Difficulty | null;
   missionType: MissionType | null;
   ship: Ship | null;
@@ -277,6 +383,12 @@ export type GameState = {
   pendingQuestion: string | null;
   pendingChoices: TurnOption[] | null;
   setupNotes: string[];
+  /** Link to durable CampaignProfile (source of truth across missions) */
+  profileId?: string | null;
+  /** Living galaxy state for this captain (mirrors profile.universe) */
+  universe?: UniverseState | null;
+  /** Soft advice cooldowns: crewId → last playTurnCount when advised */
+  adviceCooldowns?: Record<string, number> | null;
   /** AI-generated ship offers during ship_select */
   setupShips?: Array<{
     id: string;
@@ -301,6 +413,45 @@ export type GameState = {
     secondaries?: string[];
   }> | null;
   debrief: string | null;
+  /**
+   * Temporary starbase session state (recruitment slate + refit counters).
+   * Cleared when leaving hub for a new mission.
+   */
+  starbase?: StarbaseSession | null;
+};
+
+/** Yard class derived from Federation reputation */
+export type StationClass = "outpost" | "starbase" | "fleet_yards";
+
+/** One visit to the campaign hub between missions */
+export type StarbaseSession = {
+  /** Free hull restoration used this visit */
+  hullRefitUsed: boolean;
+  /** Free shield restoration used this visit */
+  shieldRefitUsed: boolean;
+  /** System keys repaired this visit */
+  systemsRepaired: string[];
+  /** Max system repairs allowed this visit (usually 1–3) */
+  systemRepairBudget: number;
+  /** Officers offered for recruitment (not yet hired) */
+  recruitOffers: CrewMember[];
+  /** How many hires allowed this visit */
+  recruitBudget: number;
+  recruitsHired: number;
+  /** Sickbay treatments used this visit */
+  medicalUsed: number;
+  /** Max injured officers treatable this visit */
+  medicalBudget: number;
+  /** Crew transfers (off roster) used this visit */
+  transfersUsed: number;
+  /** Max transfers this visit */
+  transferBudget: number;
+  /** Structural deep-refit (big hull restore) used */
+  deepRefitUsed: boolean;
+  /** Facility tier — drives budgets and recruit quality */
+  stationClass: StationClass;
+  /** Visit initialized */
+  ready: boolean;
 };
 
 export type PublicGameView = {
