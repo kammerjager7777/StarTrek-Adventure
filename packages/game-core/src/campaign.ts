@@ -27,6 +27,7 @@ import type {
   UniverseState,
 } from "./types.js";
 import { normalizeShip, systemLabel } from "./rules.js";
+import { interpretCaptainName } from "./names.js";
 
 export const SKILL_DIMENSIONS: SkillDimension[] = [
   "tactical",
@@ -534,7 +535,7 @@ export function createCampaignProfile(input: {
   const skills = computeShipSkills(withCrew, crew);
   return {
     id: input.id || newProfileId(),
-    captainName: input.captainName.trim() || "Captain",
+    captainName: interpretCaptainName(input.captainName),
     createdAt: now,
     updatedAt: now,
     ship: { ...withCrew, skills },

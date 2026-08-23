@@ -21,6 +21,7 @@ import {
   computeShipSkills,
   createCampaignProfile,
   emptyUniverse,
+  interpretCaptainName,
   normalizeCrewMember,
   reputationDeltaFromFlags,
   stardateForEra,
@@ -47,6 +48,7 @@ export async function writeProfile(profile: CampaignProfile): Promise<void> {
   const next: CampaignProfile = {
     ...profile,
     ownerEmail: email,
+    captainName: interpretCaptainName(profile.captainName),
     updatedAt: new Date().toISOString(),
   };
   await fs.writeFile(
@@ -67,7 +69,11 @@ export async function readProfile(
     const raw = await fs.readFile(profilePath(email, id), "utf8");
     const p = JSON.parse(raw) as CampaignProfile;
     if (p.ownerEmail && !emailsMatch(p.ownerEmail, email)) return null;
-    return { ...p, ownerEmail: email };
+    return {
+      ...p,
+      ownerEmail: email,
+      captainName: interpretCaptainName(p.captainName),
+    };
   } catch {
     return null;
   }
@@ -107,7 +113,7 @@ export async function listProfiles(ownerEmail: string): Promise<
       if (p.ownerEmail && !emailsMatch(p.ownerEmail, email)) continue;
       out.push({
         id: p.id,
-        captainName: p.captainName,
+        captainName: interpretCaptainName(p.captainName),
         shipName: p.ship?.name || "Unknown vessel",
         registryNumber: p.ship?.registryNumber || "",
         stardate: p.universe?.stardate || p.ship?.stardate || "",

@@ -8,6 +8,7 @@ import type {
 import {
   computeShipSkills,
   emptyUniverse,
+  interpretCaptainName,
   emptyViewscreen,
   metaCommandList,
   normalizeCrewMember,
@@ -354,7 +355,15 @@ export async function continueProfile(
   if (profile.activeRunId) {
     const existing = await readSave(profile.activeRunId, ownerEmail);
     if (existing && existing.status === "active") {
-      return toView(normalizeState(existing));
+      const named = interpretCaptainName(
+        existing.playerName || profile.captainName
+      );
+      return toView(
+        normalizeState({
+          ...existing,
+          playerName: named,
+        })
+      );
     }
   }
 
@@ -380,7 +389,7 @@ export async function continueProfile(
     runId: randomUUID(),
     createdAt: now,
     updatedAt: now,
-    playerName: profile.captainName,
+    playerName: interpretCaptainName(profile.captainName),
     ownerEmail,
     ship,
     profileId: profile.id,

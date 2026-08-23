@@ -10,6 +10,7 @@ import {
   emptyUniverse,
   normalizeCrewMember,
 } from "../packages/game-core/src/campaign.ts";
+import { interpretCaptainName } from "../packages/game-core/src/names.ts";
 import type { CrewMember, Ship } from "../packages/game-core/src/types.ts";
 
 let failed = 0;
@@ -164,6 +165,29 @@ assert(
   "createCampaignProfile crew is normalized"
 );
 assert(profile.activeRunId == null, "createCampaignProfile activeRunId is empty");
+
+assert(
+  interpretCaptainName("Michael Stephens, But Call Me Stephens") === "Stephens",
+  "interpretCaptainName uses call-me nickname"
+);
+assert(
+  interpretCaptainName("my name is jean-luc picard") === "Jean-Luc Picard",
+  "interpretCaptainName strips my-name-is"
+);
+assert(
+  interpretCaptainName("Captain Kirk") === "Kirk",
+  "interpretCaptainName strips Captain rank"
+);
+assert(
+  interpretCaptainName("you can call me Bones") === "Bones",
+  "interpretCaptainName handles you-can-call-me"
+);
+
+const nick = createCampaignProfile({
+  captainName: "Michael Stephens, but call me Stephens",
+  ship,
+});
+assert(nick.captainName === "Stephens", "createCampaignProfile interprets call-me name");
 
 if (failed) {
   console.error(`\n${failed} assertion(s) failed`);

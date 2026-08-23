@@ -13,6 +13,10 @@ import type {
   OptionRisk,
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
+import {
+  capitalizeName,
+  interpretCaptainName,
+} from "../../../packages/game-core/src/index.js";
 import { tracedTool } from "../debug/sessionDebugLog.js";
 import {
   generateDebriefNarration,
@@ -56,39 +60,6 @@ function pushLog(state: GameState, kind: GameState["log"][0]["kind"], text: stri
       { at: new Date().toISOString(), phase: state.phase, kind, text },
     ],
   };
-}
-
-/** Title-case names: "picard" → "Picard", "jean-luc picard" → "Jean-Luc Picard" */
-function capitalizeName(raw: string): string {
-  return raw
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) =>
-      word
-        .split("-")
-        .map((part) => {
-          if (!part) return part;
-          // Preserve all-caps short tokens (II, III) if already uppercase multi-letter roman-ish
-          if (/^[IVXLCDM]+$/i.test(part) && part.length <= 5 && part === part.toUpperCase()) {
-            return part.toUpperCase();
-          }
-          // O'brien / o'brien → O'Brien
-          if (part.includes("'")) {
-            return part
-              .split("'")
-              .map((p, i) =>
-                p
-                  ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()
-                  : p
-              )
-              .join("'");
-          }
-          return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-        })
-        .join("-")
-    )
-    .join(" ");
 }
 
 /** Ensure custom Starfleet vessels use the USS registry prefix. */
@@ -159,7 +130,7 @@ export async function advanceSetup(
           "I must know how to address you. What is your name, Captain?";
         return next;
       }
-      const captainName = capitalizeName(input);
+      const captainName = interpretCaptainName(input);
       next.playerName = captainName;
       const welcome = await setupCall("welcome", () =>
         generateWelcomeAndTutorialOffer(next, captainName)
