@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch server/src/index.ts",
     "start": "tsx server/src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:campaign": "tsx scripts/smoke-campaign-types.mts"
   },
   "engines": {
     "node": ">=20"

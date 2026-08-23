@@ -1,4 +1,4 @@
-/** Shared game types — Phase 1 core + viewscreen visual journey */
+/** Shared game types — play loop, viewscreen, and Phase 0 campaign contract. */
 
 export type Difficulty = "easy" | "medium" | "hard" | "hardcore";
 
@@ -80,7 +80,7 @@ export type VoiceEmotion =
   | "wonder"
   | "formal";
 
-/** Multi-dimensional skill axes (0–100) */
+/** Multi-dimensional skill axes (0–100). Canonical Phase 0 campaign contract. */
 export type SkillDimension =
   | "tactical"
   | "science"
@@ -90,6 +90,10 @@ export type SkillDimension =
   | "medical"
   | "command";
 
+/**
+ * Per-axis scores. Range is 0–100 at runtime (`clampSkill` in campaign.ts);
+ * the type itself does not enforce bounds. Old saves may omit keys.
+ */
 export type SkillVector = Record<SkillDimension, number>;
 
 export type CrewStatus = "active" | "injured" | "dead" | "transferred";
@@ -383,7 +387,10 @@ export type GameState = {
   pendingQuestion: string | null;
   pendingChoices: TurnOption[] | null;
   setupNotes: string[];
-  /** Link to durable CampaignProfile (source of truth across missions) */
+  /**
+   * Link to durable CampaignProfile. The active run still carries full
+   * ship/crew; the profile is the source of truth on load / continue.
+   */
   profileId?: string | null;
   /** Living galaxy state for this captain (mirrors profile.universe) */
   universe?: UniverseState | null;

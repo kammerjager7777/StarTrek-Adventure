@@ -718,3 +718,17 @@ export function metaCommandList(difficulty: Difficulty | null): string[] {
   if (hintsAllowed(difficulty)) base.splice(1, 0, "hint");
   return base;
 }
+
+/**
+ * Phase 0.2 campaign helpers live in `campaign.ts` so this file’s combat,
+ * dice, shields, and system logic stay untouched. Do not add stubs here —
+ * `index.ts` already re-exports both modules and duplicate names would clash.
+ *
+ *   computeShipSkills(ship, crew) → ShipSkills
+ *   applySkillXp(skills, gains, amount) → SkillVector
+ *   skillModifierForAction(skills, actionText, risk) → number
+ *   canCrewDie(event, rng) → boolean
+ *   applyCrewDeath(crew, memberId, cause) → { crew, skillDelta, dead }
+ *   tickUniverse(universe, playTurnsSinceLast, flags, rng) → UniverseState
+ *   reputationDeltaFromFlags(flags, outcome) → Partial<Record<Faction, number>>
+ */

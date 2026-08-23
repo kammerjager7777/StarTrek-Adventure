@@ -1,6 +1,10 @@
 /**
  * Campaign layer pure rules — skills, crew lifecycle, universe ticks.
  * No I/O. Code is the referee; LLM never invents these numbers.
+ *
+ * Phase 0 factories (types live in types.ts):
+ *   emptySkillVector, emptyUniverse, normalizeCrewMember,
+ *   computeShipSkills, createCampaignProfile
  */
 
 import type {

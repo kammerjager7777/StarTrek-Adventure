@@ -472,6 +472,8 @@ Expanded mission type is designed as always-hardcore style content in the design
 
 ## 16. Campaign layer (skills, crew, universe, profiles)
 
+Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`SkillVector`, `CrewMember` campaign fields, `ShipSkills`, `UniverseState`, `CampaignProfile`). Old JSON saves may omit campaign fields; runtime fills them via `normalizeCrewMember` / `emptyUniverse` in `campaign.ts`.
+
 ### 16.1 Skills
 - Seven dimensions: tactical, science, diplomacy, piloting, engineering, medical, command (0–100).
 - **Ship total** = class/era baseline + contribution from **active** crew.
