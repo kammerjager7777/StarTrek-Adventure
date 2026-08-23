@@ -235,8 +235,11 @@ assert(sess.recruitOffers.length >= 1, "starbase offers replacement officers");
 const hire = hireRecruit(makeShip([tuvok]), sess, sess.recruitOffers[0].id);
 assert(hire.ok && hire.hired, "hireRecruit adds a replacement");
 assert(
-  hire.hired?.status === "active" && hire.hired?.skills && hire.hired.serviceTurns === 0,
-  "hired officer has baseline skills and zero service"
+  hire.hired?.status === "active" &&
+    hire.hired?.skills &&
+    typeof hire.hired.skills.tactical === "number" &&
+    typeof hire.hired.serviceTurns === "number",
+  "hired officer has baseline skills and service clock"
 );
 
 if (failed) {

@@ -209,7 +209,8 @@ export async function updateProfileFromRun(
       runState.mission,
       outcome,
       runState.mission.playTurnCount || 0,
-      flags
+      flags,
+      runState.mission.objectives
     );
     const repDeltas = reputationDeltaFromFlags(flags, outcome);
     universe = applyReputation(universe, repDeltas);

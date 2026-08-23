@@ -31,6 +31,10 @@ export type MechanicalResults = {
   systemChanges: string[];
   flagsAdded: string[];
   notes: string[];
+  /** Absolute ship skill totals (0–100). LLM must not invent these. */
+  skillTotals?: Record<string, number>;
+  /** Dice modifier from skills (negative = easier). */
+  skillModifier?: number;
 };
 
 export type LlmScene = {
@@ -556,6 +560,7 @@ export async function generatePlayScene(
         "Only set endMission to failed if the main objective is truly lost or the ship is effectively finished.",
         "Partial progress = keep playing (endMission null).",
         "Do not mention raw d20 numbers in narration.",
+        "mechanicalResults.skillTotals and skillModifier are absolute. Do not invent skill numbers. Negative skillModifier means crew expertise made this order easier.",
         `Current playTurnCount=${state.mission?.playTurnCount ?? 0}.`,
         `Hull ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}; Shields ${state.ship?.shieldIntegrity ?? "?"}/${state.ship?.maxShieldIntegrity ?? "?"} (${state.ship?.shieldGridOnline ? "online" : `offline, recharge ${state.ship?.shieldRechargeTurns ?? "?"}`}).`,
         `Systems: ${state.ship ? Object.entries(state.ship.systems).map(([k, v]) => `${k}=${v}`).join(", ") : "n/a"}.`,

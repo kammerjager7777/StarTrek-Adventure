@@ -1567,12 +1567,17 @@ function renderShip(ship) {
         ? `<div class="ship-skills-block">
         <div class="systems-label">Ship skills</div>
         <div class="skill-grid">${Object.entries(ship.skills.total)
-          .map(
-            ([k, v]) =>
-              `<div class="skill-row"><span class="skill-name">${escapeHtml(
-                k
-              )}</span><span class="skill-val">${v}</span></div>`
-          )
+          .map(([k, v]) => {
+            const n = Number(v) || 0;
+            const band = Math.min(10, Math.floor(n / 10));
+            return `<div class="skill-row" title="${escapeHtml(
+              k
+            )} ${n}/100">
+              <span class="skill-name">${escapeHtml(k)}</span>
+              <span class="skill-bar" aria-hidden="true"><span class="skill-bar-fill" style="width:${n}%"></span></span>
+              <span class="skill-val">${n}<span class="skill-band">b${band}</span></span>
+            </div>`;
+          })
           .join("")}</div>
       </div>`
         : ""

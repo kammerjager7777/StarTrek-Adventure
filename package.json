@@ -11,7 +11,8 @@
     "test:campaign": "tsx scripts/smoke-campaign-types.mts",
     "test:profiles": "tsx scripts/smoke-profile-persist.mts",
     "test:crew": "tsx scripts/smoke-crew-lifecycle.mts",
-    "test:shields": "tsx scripts/smoke-shield-leak.mts"
+    "test:shields": "tsx scripts/smoke-shield-leak.mts",
+    "test:skills": "tsx scripts/smoke-skills.mts"
   },
   "engines": {
     "node": ">=20"

@@ -1495,8 +1495,9 @@ async function applyMechanics(
   }
 
   // Ship/crew skills adjust difficulty (negative = easier)
+  let skillMod = 0;
   if (next.ship?.skills?.total) {
-    const skillMod = skillModifierForAction(
+    skillMod = skillModifierForAction(
       next.ship.skills,
       playerAction,
       effectiveRisk
@@ -1529,16 +1530,25 @@ async function applyMechanics(
       "Measured approach: sensors improve the picture; low immediate risk."
     );
     if (next.mission && next.ship?.systems.sensors !== "destroyed") {
+      const science = next.ship?.skills?.total?.science ?? 40;
+      const damagedArrays = next.ship?.systems.sensors === "damaged";
+      let intel = "Detailed sensor map acquired";
+      if (damagedArrays) {
+        intel =
+          science >= 70
+            ? "Partial sensor map compensated by science expertise"
+            : "Partial sensor map (arrays damaged)";
+      } else if (science >= 65) {
+        intel = "High-resolution sensor map acquired";
+      } else if (science < 40) {
+        intel = "Partial sensor map (limited science suite)";
+      }
+      notes.push(`Science ${science}: ${intel}.`);
       next = {
         ...next,
         mission: {
           ...next.mission,
-          knownIntel: [
-            ...next.mission.knownIntel,
-            next.ship?.systems.sensors === "damaged"
-              ? "Partial sensor map (arrays damaged)"
-              : "Detailed sensor map acquired",
-          ],
+          knownIntel: [...next.mission.knownIntel, intel],
         },
       };
     } else if (next.ship?.systems.sensors === "destroyed") {
@@ -1765,6 +1775,10 @@ async function applyMechanics(
       systemChanges,
       flagsAdded,
       notes,
+      skillTotals: next.ship?.skills?.total
+        ? { ...next.ship.skills.total }
+        : undefined,
+      skillModifier: skillMod,
     },
   };
 }

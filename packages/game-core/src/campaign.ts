@@ -480,7 +480,8 @@ export function calculateSkillGains(
   mission: Mission | null | undefined,
   outcome: "success" | "failed" | "abandoned",
   playTurnCount: number,
-  flags: string[]
+  flags: string[],
+  objectives?: { kind?: string; status?: string }[]
 ): Partial<SkillVector> {
   const gains: Partial<SkillVector> = {};
   const bump = (k: SkillDimension, n: number) => {
@@ -505,12 +506,26 @@ export function calculateSkillGains(
     bump("science", 1);
   }
 
+  const objs = objectives || mission?.objectives || [];
+  const mainDone = objs.some(
+    (o) => o.kind === "main" && o.status === "completed"
+  );
+  const secondariesDone = objs.filter(
+    (o) => o.kind === "secondary" && o.status === "completed"
+  ).length;
+  if (mainDone) {
+    if (type === "battle") bump("tactical", 2);
+    else if (type === "science" || type === "exploration") bump("science", 2);
+    else if (type === "search_rescue") bump("medical", 1);
+    else bump("command", 1);
+  }
+  if (secondariesDone) bump("command", 1);
+
   const blob = flags.join(" ").toLowerCase();
   if (/repair|engineering|warp_core|shield/.test(blob)) bump("engineering", 2);
   if (/negotiat|diplomacy|treaty/.test(blob)) bump("diplomacy", 2);
   if (/boarding|combat|phaser|torpedo/.test(blob)) bump("tactical", 1);
   if (outcome === "failed") {
-    // Still learn something
     bump("command", 1);
   }
   return gains;

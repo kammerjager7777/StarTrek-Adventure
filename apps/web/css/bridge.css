@@ -2554,18 +2554,39 @@ body.init-active .shell {
   font-size: 0.78rem;
 }
 .skill-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: 4.6rem 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
   opacity: 0.9;
 }
 .skill-name {
   text-transform: capitalize;
   opacity: 0.75;
 }
+.skill-bar {
+  height: 5px;
+  background: rgba(125, 211, 252, 0.15);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: #7dd3fc;
+  border-radius: 99px;
+}
 .skill-val {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  min-width: 2.6rem;
+  text-align: right;
+}
+.skill-band {
+  margin-left: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  opacity: 0.55;
 }
 .crew-advice-btn {
   margin-top: 0.35rem;

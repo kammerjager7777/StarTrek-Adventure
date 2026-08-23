@@ -475,9 +475,12 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 
 ### 16.1 Skills
 - Seven dimensions: tactical, science, diplomacy, piloting, engineering, medical, command (0–100).
-- **Ship total** = class/era baseline + contribution from **active** crew.
-- On each order, `skillModifierForAction` adjusts the d20 actionModifier (clamped ±4). Destroyed systems still hard-block.
-- Mission end applies XP via `calculateSkillGains` into the durable profile.
+- **Ship total** = class/era baseline (`baselineShipSkills`) + contribution from **active** crew (`baselineSkillsForRole` then XP). Dead/injured do not contribute.
+- On each order, `skillModifierForAction` adjusts the d20 `actionModifier` (clamped ±4; negative = easier). Score 50 is neutral. Destroyed systems still hard-block regardless of skill.
+- Low-risk scans: science ≥ 65 yields a high-resolution map; science < 40 yields a partial map even with healthy sensors.
+- Mission end applies XP via `calculateSkillGains` to **participating crew**, then `computeShipSkills` refreshes `profile.skills`. Extra XP if the main objective completed; command tick if any secondary completed.
+- Mechanical snapshot sent to the LLM includes `skillTotals` and `skillModifier` — the model must not invent numbers.
+- UI shows skill bars plus a 10-point band (`b0`–`b10`) for later badge work.
 
 ### 16.2 Crew lifecycle
 - Status: `active` | `injured` | `dead` | `transferred`.
