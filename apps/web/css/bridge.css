@@ -2173,7 +2173,24 @@ body.init-active .shell {
   border-radius: 8px 8px 0 0;
   border-bottom-color: transparent;
 }
+.scar-section .collapsible-body {
+  overflow: hidden;
+}
+.scar-section.is-collapsed > .collapsible-body {
+  grid-template-rows: 0fr;
+  max-height: 0;
+  opacity: 0;
+}
+.scar-section.is-expanded > .collapsible-body {
+  max-height: 480px;
+  opacity: 1;
+}
 .scar-collapse-inner {
+  padding: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+.scar-section.is-expanded .scar-collapse-inner {
   padding: 0 2px 6px;
 }
 
