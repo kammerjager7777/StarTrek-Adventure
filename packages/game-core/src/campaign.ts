@@ -359,11 +359,15 @@ export function stardateForEra(era: string): string {
   return "47457.1";
 }
 
-export function advanceStardate(stardate: string, steps = 1): string {
+export function advanceStardate(
+  stardate: string,
+  steps = 1,
+  rng: () => number = Math.random
+): string {
   const n = Number.parseFloat(String(stardate).replace(/[^\d.]/g, ""));
   if (!Number.isFinite(n)) return stardate;
   // Classic TNG-style fractional advance
-  const next = n + steps * (0.1 + Math.random() * 0.4);
+  const next = n + steps * (0.1 + rng() * 0.4);
   return next.toFixed(1);
 }
 
@@ -380,7 +384,7 @@ export function tickUniverse(
     knownLocations: [...u.knownLocations],
     galacticFlags: [...u.galacticFlags],
     activeCrises: [...u.activeCrises],
-    stardate: advanceStardate(u.stardate, playTurnsSinceLast),
+    stardate: advanceStardate(u.stardate, playTurnsSinceLast, rng),
     globalTurn: u.globalTurn + playTurnsSinceLast,
     lastTickTurn: u.lastTickTurn + playTurnsSinceLast,
   };
@@ -413,13 +417,18 @@ export function tickUniverse(
     }
   }
 
-  // Low Klingon rep → more hostility flag
-  if (
-    (next.factionReputation.klingon || 0) <= -40 &&
-    !next.galacticFlags.includes("klingon_hostility")
-  ) {
-    next.galacticFlags = [...next.galacticFlags, "klingon_hostility"];
-  }
+  const markHostile = (faction: Faction, flag: string, threshold = -40) => {
+    if (
+      (next.factionReputation[faction] || 0) <= threshold &&
+      !next.galacticFlags.includes(flag)
+    ) {
+      next.galacticFlags = [...next.galacticFlags, flag];
+    }
+  };
+  markHostile("klingon", "klingon_hostility");
+  markHostile("romulan", "romulan_hostility");
+  markHostile("cardassian", "cardassian_hostility");
+  markHostile("borg", "borg_hostility", -20);
 
   return next;
 }

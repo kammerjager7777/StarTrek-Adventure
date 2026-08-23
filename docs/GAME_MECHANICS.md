@@ -492,8 +492,11 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - Replacement officers are hired at starbase (`hireRecruit`) with role baseline skills.
 
 ### 16.3 Universe
-- `UniverseState`: stardate, faction reputation (−100…100), galactic flags, crises.
-- Ticks every ~5 play turns and on debrief; reputation also from flags / optional LLM `reputationDeltas` (clamped).
+- New profiles get `emptyUniverse(stardateForEra(ship.era))` — Federation standing starts at **+5**, others **0**.
+- `tickUniverse` every **5** mission play turns and on debrief: advance stardate, mild reputation drift toward 0, chance of a galactic crisis, hostility flags at low standing (Klingon/Romulan/Cardassian ≤ −40, Borg ≤ −20).
+- `lastTickTurn` is **per mission** (reset to 0 when play starts) so a new assignment still ticks.
+- LLM may send `reputationDeltas`; host clamps ±15 via `applyReputation`. Debrief also applies `reputationDeltaFromFlags`.
+- Mission offers receive current standing, flags, and crises so antagonists/ports reflect the campaign.
 
 ### 16.4 Profiles & account isolation
 - All durable data is **scoped by signed-in email** (IAP `X-Goog-Authenticated-User-Email`, or local browser account).

@@ -2599,6 +2599,12 @@ body.init-active .shell {
 }
 
 /* Campaign: ship skills + crew status */
+.universe-standing {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
 .ship-skills-block {
   margin-top: 0.65rem;
 }

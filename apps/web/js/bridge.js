@@ -1453,6 +1453,25 @@ function systemDisplayName(key) {
   return names[key] || key;
 }
 
+function universeStandingHtml(universe) {
+  if (!universe?.factionReputation) return "";
+  const bits = Object.entries(universe.factionReputation)
+    .filter(([, v]) => Math.abs(Number(v)) >= 5)
+    .map(
+      ([k, v]) =>
+        `${k} ${Number(v) > 0 ? "+" : ""}${v}`
+    );
+  const flags = Array.isArray(universe.galacticFlags)
+    ? universe.galacticFlags.slice(0, 3)
+    : [];
+  if (!bits.length && !flags.length) return "";
+  return `<div class="ship-meta universe-standing" title="${escapeHtml(
+    flags.join(", ") || "standing"
+  )}">${escapeHtml(bits.join(" · ") || "neutral")}${
+    flags.length ? ` · ${escapeHtml(flags.join(", "))}` : ""
+  }</div>`;
+}
+
 function renderIntegrityBar(label, value, max, tone, statusText) {
   const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((value / max) * 100))) : 0;
   const low = pct <= 25 ? " is-critical" : pct <= 50 ? " is-low" : "";
@@ -1572,7 +1591,10 @@ function renderShip(ship) {
           : ""
       }
       <div class="ship-meta">${escapeHtml(ship.className)}</div>
-      <div class="ship-meta">Stardate ${escapeHtml(ship.stardate)}</div>
+      <div class="ship-meta">Stardate ${escapeHtml(
+        current?.state?.universe?.stardate || ship.stardate
+      )}</div>
+      ${universeStandingHtml(current?.state?.universe)}
     </div>
     <div class="integrity-bars">
       ${renderIntegrityBar("Hull", hull, maxHull, "hull", "")}

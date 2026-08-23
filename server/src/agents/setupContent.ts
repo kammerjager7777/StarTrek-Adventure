@@ -605,12 +605,31 @@ export async function generateDifficultyPrompt(
   return { narration, choices: choices.slice(0, 4) };
 }
 
+function universeBriefing(state: GameState): string {
+  const u = state.universe;
+  if (!u) return "No prior galactic standing (new campaign).";
+  const standing = Object.entries(u.factionReputation || {})
+    .filter(([, v]) => Math.abs(Number(v)) >= 5)
+    .map(([k, v]) => `${k} ${Number(v) > 0 ? "+" : ""}${v}`)
+    .join(", ");
+  const flags = (u.galacticFlags || []).join(", ") || "none";
+  const crises = (u.activeCrises || []).join(", ") || "none";
+  return [
+    `Stardate ${u.stardate}.`,
+    `Faction standing: ${standing || "neutral / unremarkable"}.`,
+    `Galactic flags: ${flags}.`,
+    `Active crises: ${crises}.`,
+    "Shape missions from this standing: high negative Klingon/Romulan/Cardassian → more hostile encounters and fewer friendly ports; high Federation → more diplomatic/support assignments; borg_threat/borg_hostility → assimilation or cube stakes when type allows.",
+  ].join(" ");
+}
+
 export async function generateMissionOffers(
   state: GameState,
   reshuffle = false
 ): Promise<{ narration: string; offers: SetupMissionOffer[] }> {
   const type = state.missionType || "exploration";
   const difficulty = state.difficulty || "medium";
+  const briefing = universeBriefing(state);
   const obj = await callSetupJson(
     state.runId,
     state.phase,
@@ -621,6 +640,14 @@ export async function generateMissionOffers(
       missionType: type,
       difficulty,
       reshuffle,
+      universe: state.universe
+        ? {
+            stardate: state.universe.stardate,
+            factionReputation: state.universe.factionReputation,
+            galacticFlags: state.universe.galacticFlags,
+            activeCrises: state.universe.activeCrises,
+          }
+        : null,
       ship: state.ship
         ? {
             name: state.ship.name,
@@ -630,6 +657,7 @@ export async function generateMissionOffers(
           }
         : null,
       instruction: `Invent 3 original Star Trek–style missions for type=${type}, difficulty=${difficulty}.
+${briefing}
 ${reshuffle ? "Provide different missions than a prior batch." : ""}
 Return {
   narration: string (present the 3 options; mention typing "more" for alternatives),
@@ -639,7 +667,8 @@ Return {
     secondaries: string[1-3]
   }]
 }
-Exactly 3 missions. Stakes scale with difficulty. Expanded type should be multi-faceted crises.`,
+Exactly 3 missions. Stakes scale with difficulty. Expanded type should be multi-faceted crises.
+Honor current faction standing and galactic flags in locations and antagonists.`,
     }
   );
 

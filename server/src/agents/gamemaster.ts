@@ -14,6 +14,7 @@ import type {
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
 import {
+  applyReputation,
   capitalizeName,
   interpretCaptainName,
 } from "../../../packages/game-core/src/index.js";
@@ -1049,6 +1050,21 @@ async function startPlaying(state: GameState): Promise<GameState> {
   // Ensure campaign profile + skills + universe for this captain
   next = await ensureCampaignAttached(next);
 
+  // New mission: tick clock is relative to this mission's playTurnCount
+  if (next.universe) {
+    const loc = next.mission?.location?.trim();
+    const known = next.universe.knownLocations || [];
+    next = {
+      ...next,
+      universe: {
+        ...next.universe,
+        lastTickTurn: 0,
+        knownLocations:
+          loc && !known.includes(loc) ? [...known, loc] : known,
+      },
+    };
+  }
+
   const scene = await requireScene(
     await generateOpeningScene(next),
     "mission opening"
@@ -1820,6 +1836,18 @@ function applySceneSideEffects(state: GameState, scene: LlmScene): GameState {
       objectives,
     },
   };
+
+  if (scene.reputationDeltas && next.universe) {
+    const universe = applyReputation(next.universe, scene.reputationDeltas);
+    tracedTool(
+      next.runId,
+      next.phase,
+      "update_reputation",
+      { deltas: scene.reputationDeltas, source: "llm" },
+      { ok: true, message: "Reputation deltas applied (clamped)." }
+    );
+    next = { ...next, universe };
+  }
   return next;
 }
 

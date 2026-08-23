@@ -6,11 +6,13 @@
 import OpenAI from "openai";
 import type {
   CrewLine,
+  Faction,
   GameState,
   ObjectiveStatus,
   OptionRisk,
   TurnOption,
 } from "../../../packages/game-core/src/index.js";
+import { FACTIONS } from "../../../packages/game-core/src/index.js";
 import { loadSkillPacksCompact } from "../content/loader.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { stateSnapshot } from "../debug/sessionDebugLog.js";
@@ -51,6 +53,8 @@ export type LlmScene = {
    * Empty array = no narrator-driven SFX (client still has keyword/state SFX).
    */
   sfx: string[];
+  /** Optional standing changes — host clamps and applies. */
+  reputationDeltas?: Partial<Record<Faction, number>>;
   /** Always true for successful LLM scenes; false only if parse produced empty filler */
   usedLlm: boolean;
 };
@@ -381,6 +385,19 @@ function normalizeScene(raw: unknown, fallbackNotes: string[]): LlmScene {
     obj.sfx ?? obj.sounds ?? obj.audioCues ?? obj.soundEffects
   );
 
+  let reputationDeltas: LlmScene["reputationDeltas"];
+  if (obj.reputationDeltas && typeof obj.reputationDeltas === "object") {
+    const raw = obj.reputationDeltas as Record<string, unknown>;
+    const deltas: Partial<Record<Faction, number>> = {};
+    for (const f of FACTIONS) {
+      const v = raw[f];
+      if (typeof v === "number" && Number.isFinite(v)) {
+        deltas[f] = Math.max(-15, Math.min(15, Math.round(v)));
+      }
+    }
+    if (Object.keys(deltas).length) reputationDeltas = deltas;
+  }
+
   return {
     narration,
     crewDialogue,
@@ -391,6 +408,7 @@ function normalizeScene(raw: unknown, fallbackNotes: string[]): LlmScene {
     objectiveUpdates,
     endMission,
     sfx,
+    reputationDeltas,
     // Only count as a real LLM scene if we got narration text
     usedLlm: Boolean(narration),
   };
@@ -429,7 +447,7 @@ async function callXaiJson(
             "You are the live Gamemaster for the PLAYING phase.",
             "The host already resolved dice and integrity. Treat mechanicalResults as absolute truth.",
             "Return ONE JSON object only (no markdown fences) with keys:",
-            "narration, crewDialogue[{speaker,line}], options[{id,text,risk}], viewscreenPrompt, newIntel[], setFlags[], objectiveUpdates[{id,status}], endMission, sfx[].",
+            "narration, crewDialogue[{speaker,line}], options[{id,text,risk}], viewscreenPrompt, newIntel[], setFlags[], objectiveUpdates[{id,status}], endMission, sfx[], reputationDeltas{faction:number}.",
             "Narration: 1–3 short paragraphs max (TTS-friendly). crewDialogue: 0–2 short lines.",
             "options: exactly 3–4, risk one of low|medium|high|trap. endMission: null unless mission truly ends.",
             "sfx: optional string array (0–4) of bridge sound cues that match THIS beat's fiction — played on the client as the scene lands.",
@@ -563,6 +581,13 @@ export async function generatePlayScene(
         "mechanicalResults.skillTotals and skillModifier are absolute. Do not invent skill numbers. Negative skillModifier means crew expertise made this order easier.",
         `Current playTurnCount=${state.mission?.playTurnCount ?? 0}.`,
         `Hull ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}; Shields ${state.ship?.shieldIntegrity ?? "?"}/${state.ship?.maxShieldIntegrity ?? "?"} (${state.ship?.shieldGridOnline ? "online" : `offline, recharge ${state.ship?.shieldRechargeTurns ?? "?"}`}).`,
+        state.universe
+          ? `Stardate ${state.universe.stardate}. Standing: ${Object.entries(
+              state.universe.factionReputation || {}
+            )
+              .map(([k, v]) => `${k}=${v}`)
+              .join(", ")}. Flags: ${(state.universe.galacticFlags || []).join(", ") || "none"}.`
+          : "No universe state.",
         `Systems: ${state.ship ? Object.entries(state.ship.systems).map(([k, v]) => `${k}=${v}`).join(", ") : "n/a"}.`,
       ].join(" "),
       fallbackNarration: mechanical.notes.join(" "),
