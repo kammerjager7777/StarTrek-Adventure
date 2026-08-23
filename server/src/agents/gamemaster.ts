@@ -1415,6 +1415,7 @@ async function applyMechanics(
     toolSetSystem,
     toolDivertPowerToShields,
     toolApplyCrewDeath,
+    toolSetCrewStatus,
     toolTickCrewService,
   } = await import("../tools/registry.js");
   const {
@@ -1715,7 +1716,6 @@ async function applyMechanics(
       );
       if (living.length) {
         const victim = living[Math.floor(Math.random() * living.length)];
-        const { toolSetCrewStatus } = await import("../tools/registry.js");
         const inj = toolSetCrewStatus(next, victim.id, "injured");
         if (inj.state) {
           next = inj.state;

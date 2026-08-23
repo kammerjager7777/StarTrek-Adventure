@@ -303,7 +303,42 @@ export function toolApplyCrewDeath(
 ): ToolResult {
   if (!state.ship) return { ok: false, message: "No ship selected." };
   const ship = normalizeShip(state.ship);
-  const { crew, dead } = applyCrewDeath(ship.crew || [], memberId, cause);
+  const roster = ship.crew || [];
+  const target = roster.find((c) => c.id === memberId);
+  if (!target) {
+    return { ok: false, message: "Crew member not found.", state };
+  }
+  if (target.status === "dead") {
+    return { ok: false, message: "Crew member not found or already dead.", state };
+  }
+
+  const living = roster.filter(
+    (c) => c.status !== "dead" && c.status !== "transferred"
+  );
+  const isLastLiving = living.length <= 1;
+  if (isLastLiving) {
+    if ((target.status || "active") === "active") {
+      const inj = toolSetCrewStatus(
+        state,
+        memberId,
+        "injured",
+        cause || "combat trauma"
+      );
+      return {
+        ...inj,
+        ok: true,
+        message: `${target.name} is critically injured — the last officer on the roster cannot be lost.`,
+        data: { ...(inj.data || {}), lastOfficerProtected: true, memberId },
+      };
+    }
+    return {
+      ok: false,
+      message: "Cannot lose the last remaining officer.",
+      state,
+    };
+  }
+
+  const { crew, dead, skillDelta } = applyCrewDeath(roster, memberId, cause);
   if (!dead) {
     return { ok: false, message: "Crew member not found or already dead.", state };
   }
@@ -331,7 +366,13 @@ export function toolApplyCrewDeath(
     ok: true,
     message: `${dead.name} has been killed in action (${cause}).`,
     state: { ...state, ship: nextShip, mission },
-    data: { memberId, name: dead.name, role: dead.role, cause },
+    data: {
+      memberId,
+      name: dead.name,
+      role: dead.role,
+      cause,
+      skillDelta,
+    },
   };
 }
 

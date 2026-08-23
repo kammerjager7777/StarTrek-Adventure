@@ -482,8 +482,12 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 
 ### 16.2 Crew lifecycle
 - Status: `active` | `injured` | `dead` | `transferred`.
-- Mechanical play turns advance `serviceTurns` for living crew; injuries tick down to active.
-- Serious hull/boarding/life-support events may injure or kill (RNG). Death removes skill contribution, adds scar + flags.
+- Mechanical play turns (numbered options and free-text **orders**, not questions) call `tickCrewService`: `serviceTurns += 1` for **active** crew; injured officers count down `injuryTurnsRemaining` then return to active.
+- After significant hull damage or boarding/internal hits, the referee rolls `canCrewDie` (higher chance if life support is damaged/destroyed). A miss may still **injure**.
+- Death is applied by `toolApplyCrewDeath`: recomputes `computeShipSkills` (dead/injured do not contribute), adds a scar, and sets `crew_loss_<role>` + `crew_casualty`.
+- The **last living officer cannot be killed** — the tool converts that hit to injury instead.
+- On debrief, living crew gain `missionsServed` and a small loyalty bump on success (`updateProfileFromRun`).
+- Replacement officers are hired at starbase (`hireRecruit`) with role baseline skills.
 
 ### 16.3 Universe
 - `UniverseState`: stardate, faction reputation (−100…100), galactic flags, crises.

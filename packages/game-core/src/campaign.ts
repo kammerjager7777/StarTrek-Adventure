@@ -1296,7 +1296,10 @@ export function hireRecruit(
       session,
     };
   }
-  const hired = { ...offer, status: "active" as const };
+  const hired = normalizeCrewMember(
+    { ...offer, status: "active" },
+    s.stardate
+  );
   const crew = [...(s.crew || []), hired];
   const beforeSkills = computeShipSkills(s, s.crew);
   const skills = computeShipSkills({ ...s, crew }, crew);

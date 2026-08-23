@@ -96,6 +96,9 @@ Player action (UI)
 | `get_mission_status` | Status text for meta |
 | `give_hint` | Blocked on hardcore |
 | `change_difficulty` / `restart_mission` / `new_mission` | Meta flow |
+| `toolApplyCrewDeath` | KIA: skills, scar, `crew_loss_<role>` flag; last living officer → injury |
+| `toolSetCrewStatus` | `active` / `injured` / `dead` / `transferred` |
+| `toolTickCrewService` | Service clocks + injury recovery each mechanical beat |
 
 Pure rules live in `packages/game-core/src/rules.ts` (dice, combat, recharge, constraints).
 

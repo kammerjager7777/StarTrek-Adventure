@@ -9,7 +9,8 @@
     "start": "tsx server/src/index.ts",
     "typecheck": "tsc --noEmit",
     "test:campaign": "tsx scripts/smoke-campaign-types.mts",
-    "test:profiles": "tsx scripts/smoke-profile-persist.mts"
+    "test:profiles": "tsx scripts/smoke-profile-persist.mts",
+    "test:crew": "tsx scripts/smoke-crew-lifecycle.mts"
   },
   "engines": {
     "node": ">=20"
