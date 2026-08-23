@@ -1513,10 +1513,12 @@ function renderShip(ship) {
     .join("");
 
   const scars = Array.isArray(ship.scars) ? ship.scars : [];
-  const scarGrid = scars.length
-    ? `<div class="scar-section">
-        <div class="scar-section-label">Scars <span class="scar-count">${scars.length}</span></div>
-        <div class="scar-grid" role="list">
+  const scarsOpen = loadPanelExpandedPrefs().scars === true;
+  const scarSummary = scars.length
+    ? `${scars.length} on record`
+    : "No lasting damage";
+  const scarChips = scars.length
+    ? `<div class="scar-grid" role="list">
           ${scars
             .map((scar, i) => {
               const meta = classifyScar(scar);
@@ -1529,11 +1531,29 @@ function renderShip(ship) {
               </button>`;
             })
             .join("")}
+        </div>`
+    : `<div class="scar-empty-text">No lasting damage recorded</div>`;
+  const scarGrid = `<div class="scar-section collapsible-panel ${
+    scarsOpen ? "is-expanded" : "is-collapsed"
+  }${scars.length ? "" : " scar-empty"}">
+        <button type="button" class="scar-collapse-toggle" id="scar-collapse-toggle"
+          aria-expanded="${scarsOpen ? "true" : "false"}"
+          aria-controls="scar-collapse-body"
+          title="Show or hide ship scars">
+          <span class="collapse-chevron" aria-hidden="true">${scarsOpen ? "▾" : "▸"}</span>
+          <span class="collapse-label">Scars</span>
+          ${
+            scars.length
+              ? `<span class="scar-count">${scars.length}</span>`
+              : ""
+          }
+          <span class="collapse-summary">${escapeHtml(scarSummary)}</span>
+        </button>
+        <div class="collapsible-body" id="scar-collapse-body">
+          <div class="collapsible-body-inner scar-collapse-inner">
+            ${scarChips}
+          </div>
         </div>
-      </div>`
-    : `<div class="scar-section scar-empty">
-        <div class="scar-section-label">Scars</div>
-        <div class="scar-empty-text">No lasting damage recorded</div>
       </div>`;
 
   const registry =
@@ -1593,6 +1613,13 @@ function renderShip(ship) {
       }
     });
   });
+  const scarPanel = els.ship.querySelector(".scar-section");
+  const scarToggle = els.ship.querySelector(".scar-collapse-toggle");
+  if (scarPanel && scarToggle) {
+    scarToggle.addEventListener("click", () => {
+      togglePanel(scarPanel, scarToggle);
+    });
+  }
 }
 
 let portraitRequestFor = null;
@@ -2846,16 +2873,17 @@ function loadPanelExpandedPrefs() {
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
     // Default: viewscreen collapsed until mission-start Incoming Communication
-    if (!raw) return { viewscreen: false, history: false };
+    if (!raw) return { viewscreen: false, history: false, scars: false };
     const parsed = JSON.parse(raw);
     return {
       // Only open if the user explicitly expanded it
       viewscreen: parsed.viewscreen === true,
       // History is always collapsed unless the user explicitly expanded it
       history: parsed.history === true,
+      scars: parsed.scars === true,
     };
   } catch {
-    return { viewscreen: false, history: false };
+    return { viewscreen: false, history: false, scars: false };
   }
 }
 
@@ -2866,6 +2894,7 @@ function savePanelExpandedPrefs() {
       JSON.stringify({
         viewscreen: isPanelExpanded(els.viewscreenPanel),
         history: isPanelExpanded(els.logHistoryPanel),
+        scars: isPanelExpanded(els.ship?.querySelector(".scar-section")),
       })
     );
   } catch {

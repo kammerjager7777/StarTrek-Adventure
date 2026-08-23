@@ -2139,6 +2139,44 @@ body.init-active .shell {
   opacity: 0.75;
 }
 
+.scar-section {
+  margin-top: 0.55rem;
+}
+.scar-collapse-toggle {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  font: inherit;
+}
+.scar-collapse-toggle:hover {
+  border-color: var(--lcars-peach);
+  background: rgba(247, 178, 103, 0.08);
+}
+.scar-collapse-toggle .collapse-label {
+  color: var(--lcars-peach);
+  font-size: 0.7rem;
+}
+.scar-collapse-toggle .collapse-summary {
+  font-size: 0.7rem;
+}
+.scar-section.is-expanded > .scar-collapse-toggle {
+  border-radius: 8px 8px 0 0;
+  border-bottom-color: transparent;
+}
+.scar-collapse-inner {
+  padding: 0 2px 6px;
+}
+
 .scar-section-label {
   font-size: 0.7rem;
   letter-spacing: 0.1em;
