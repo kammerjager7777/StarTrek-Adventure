@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   AiUnavailableError,
   continueProfile,
+  createProfile,
   deleteGame,
   generateCrewPortraits,
   getGame,
@@ -25,6 +26,7 @@ import {
   listProfiles,
   readProfile,
 } from "../store/profileStore.js";
+import type { Ship } from "../../../packages/game-core/src/types.js";
 import { requireUser, resolveAuthUser } from "../auth/identity.js";
 import { maybeMigrateLegacyForUser } from "../auth/userData.js";
 import {
@@ -410,6 +412,28 @@ apiRouter.get("/profiles", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to list profiles" });
+  }
+});
+
+/** Create a campaign profile (captain + ship, or snapshot an existing run). */
+apiRouter.post("/profiles", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const profile = await createProfile(req.user!.email, {
+      captainName: body.captainName ? String(body.captainName) : undefined,
+      ship: body.ship as Ship | undefined,
+      runId: body.runId ? String(body.runId) : undefined,
+    });
+    if (!profile) {
+      res.status(400).json({
+        error: "Provide captainName + ship, or runId of a save you own.",
+      });
+      return;
+    }
+    res.status(201).json({ profile });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create profile" });
   }
 });
 

@@ -65,6 +65,7 @@ export async function listSaves(ownerEmail: string): Promise<
     updatedAt: string;
     createdAt: string;
     ownerEmail: string;
+    profileId: string | null;
   }>
 > {
   const email = normalizeEmail(ownerEmail);
@@ -95,6 +96,7 @@ export async function listSaves(ownerEmail: string): Promise<
         updatedAt: state.updatedAt,
         createdAt: state.createdAt,
         ownerEmail: email,
+        profileId: state.profileId || null,
       });
     } catch {
       /* skip corrupt */

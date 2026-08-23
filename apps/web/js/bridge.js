@@ -3568,7 +3568,7 @@ async function openHistory(opts = {}) {
       const cont = document.createElement("button");
       cont.className = "lcars-btn secondary";
       cont.type = "button";
-      cont.textContent = p.activeRunId ? "Continue" : "Next mission";
+      cont.textContent = "Continue your story";
       cont.addEventListener("click", () => {
         uiSound("ok");
         continueProfile(p.id);
@@ -3604,12 +3604,16 @@ async function openHistory(opts = {}) {
       err?.message || "Could not load session runs for this account.";
     els.historyList.appendChild(warn);
   }
-  if (data.games?.length) {
+  const profileIds = new Set(profiles.map((p) => p.id));
+  const legacyGames = (data.games || []).filter(
+    (g) => !g.profileId || !profileIds.has(g.profileId)
+  );
+  if (legacyGames.length) {
     const head = document.createElement("div");
     head.className = "history-section-label";
     head.textContent = "Session runs (legacy)";
     els.historyList.appendChild(head);
-    for (const g of data.games) {
+    for (const g of legacyGames) {
       const row = document.createElement("div");
       row.className = "history-item";
       row.innerHTML = `<div class="history-info">
@@ -3650,7 +3654,7 @@ async function openHistory(opts = {}) {
     }
   }
 
-  if (!profiles.length && !data.games?.length) {
+  if (!profiles.length && !legacyGames.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
     empty.textContent =

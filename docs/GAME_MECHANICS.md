@@ -494,7 +494,7 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - **Local play:** the bridge stores `sta-user-email` in `localStorage` and sends `X-Dev-User-Email` on every API call. Opening **History** always shows **Signed in as** that email (and can switch local accounts).
 - Paths: `data/users/{emailSlug}/profiles/{id}.json`, `data/users/{emailSlug}/saves/{runId}.json`.
 - `GameState.ownerEmail` and `CampaignProfile.ownerEmail` stamp ownership; list/get/delete/continue refuse cross-account access.
-- API: `GET /api/me`, `GET/DELETE /api/profiles`, `POST /api/profiles/:id/continue` (all require auth after health probes).
+- API: `GET /api/me`, `GET/POST /api/profiles`, `GET/DELETE /api/profiles/:id`, `POST /api/profiles/:id/continue` (all require auth after health probes).
 - History UI shows only that account’s captains/ships with **Continue**.
 - Optional one-time legacy import: set `LEGACY_OWNER_EMAIL` to the account that should claim pre-multiuser flat `data/saves` + `data/profiles`.
 

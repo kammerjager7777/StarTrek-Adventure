@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { GameState, PublicGameView } from "../../../packages/game-core/src/index.js";
+import type {
+  CampaignProfile,
+  GameState,
+  PublicGameView,
+  Ship,
+} from "../../../packages/game-core/src/index.js";
 import {
   computeShipSkills,
   emptyUniverse,
@@ -52,6 +57,7 @@ import {
 } from "../services/voice/voiceIdentity.js";
 import { deleteSave, listSaves, readSave, writeSave } from "../store/saveStore.js";
 import {
+  createProfileFromShip,
   readProfile,
   updateProfileFromRun,
   writeProfile,
@@ -284,6 +290,52 @@ export async function requestAdvice(
     view: toView(next),
     advice: result,
   };
+}
+
+/**
+ * Create a durable campaign profile for this account.
+ * Body: { captainName, ship } and/or { runId } to snapshot an existing save.
+ */
+export async function createProfile(
+  ownerEmail: string,
+  input: { captainName?: string; ship?: Ship; runId?: string }
+): Promise<CampaignProfile | null> {
+  let ship = input.ship;
+  let captain = String(input.captainName || "").trim();
+  let run: GameState | null = null;
+
+  if (input.runId) {
+    run = await readSave(input.runId, ownerEmail);
+    if (!run?.ship) return null;
+    ship = run.ship;
+    captain = captain || run.playerName || "Captain";
+  }
+  if (!ship || !String(ship.name || "").trim()) return null;
+
+  let profile = await createProfileFromShip(
+    captain || "Captain",
+    ship,
+    ownerEmail
+  );
+
+  if (run) {
+    const active = run.status === "active" ? run.runId : null;
+    profile = {
+      ...profile,
+      universe: run.universe || profile.universe,
+      skills: run.ship?.skills || profile.skills,
+      crew: run.ship?.crew || profile.crew,
+      activeRunId: active,
+    };
+    await writeSave({
+      ...run,
+      profileId: profile.id,
+      universe: profile.universe,
+    });
+    await writeProfile(profile);
+  }
+
+  return profile;
 }
 
 /**

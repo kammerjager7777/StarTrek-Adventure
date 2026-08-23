@@ -122,5 +122,15 @@ LLM scenes may include `sfx: string[]` (0â€“4 cues). Server normalizes aliases â
 
 ## Persistence
 
-Every run has `runId`, timestamps, full `GameState` in `data/saves/`.  
-History UI lists runs for resume/delete. Debug JSONL per run under `data/debug/`.
+Durable campaigns are **profile-centric** (Phase 1), scoped per account:
+
+| What | Path | API |
+|------|------|-----|
+| Campaign profile | `data/users/{slug}/profiles/{id}.json` | `GET/POST /api/profiles`, `GET/DELETE /api/profiles/:id`, `POST /api/profiles/:id/continue` |
+| Mid-mission run | `data/users/{slug}/saves/{runId}.json` | `GET /api/games`, `POST /api/games/:id/action` |
+
+`updateProfileFromRun` merges ship, living crew, skills, and universe into the profile on debrief (and appends `campaignLog`). Continue resumes `activeRunId` if present; otherwise starts the next mission from the profile.
+
+The Campaign modal lists captains/ships first; session runs without a `profileId` are marked legacy.
+
+Debug JSONL lives under `data/users/{slug}/debug/` (legacy flat `data/debug/` may be migrated).

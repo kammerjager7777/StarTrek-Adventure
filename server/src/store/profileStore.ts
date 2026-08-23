@@ -290,3 +290,7 @@ export async function updateProfileFromRun(
 function baselineFromCrew(c: { role: string }) {
   return baselineSkillsForRole(c.role);
 }
+
+/** Spec names for Phase 1 persistence. */
+export const saveProfile = writeProfile;
+export const loadProfile = readProfile;
