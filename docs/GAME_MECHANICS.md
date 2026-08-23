@@ -176,26 +176,25 @@ Inferred from order/scene text via `classifyDamageKind`:
 
 | Kind | How classified | Shield behavior |
 |------|----------------|-----------------|
-| `phaser` / `laser` | phaser, beam, disruptor, … | High grid stress (`shieldMult` 1.4), moderate bleed when weak |
-| `torpedo` | torpedo, photon, quantum, … | Lower grid drain (0.75), low bleed |
-| `collision` | ram, asteroid, crash, … | Lower grid, some bleed |
+| `phaser` / `laser` | phaser, beam, disruptor, … | High grid stress; leak rises as % falls |
+| `torpedo` | torpedo, photon, quantum, … | Lower grid drain; still leaks when weak |
+| `collision` | ram, asteroid, crash, … | Lower grid, substantial leak when weak |
 | `boarding` / `internal` | boarding, intruder, sabotage, internal explosion | **Bypass shields entirely** |
 | `general` | generic combat/attack language | Default external profile |
 
 ### 5.2 When shields are up
 
-External damage hits the **shield grid first**:
+External damage hits the **shield grid first**. Shields **reduce** hull damage; they do not stop it once the grid is worn:
 
-1. Compute **bleed ratio** from current shield % (≈0 at full shields; up to `maxBleed` when empty).
-2. Apply most of the hit to **shieldIntegrity** (scaled by `shieldMult`).
-3. Optional **bleed-through** to hull while shields still hold.
-4. If shields hit **0** this strike:
+1. Compute **bleed ratio** from current shield % of **effective max** (linear: ~4–8% at full, ~25–30% at 75%, ~50% at half, most of the hit near empty).
+2. That fraction of incoming hits the **hull**; the rest hits **shieldIntegrity** (scaled by `shieldMult`).
+3. If shields hit **0** this strike:
    - Grid goes **offline**
    - **Overflow** of unabsorbed energy may hit hull
-   - `shieldRechargeTurns` set to **2** (sometimes **3**)
-5. Hull reduced by bleed + overflow.
+   - `shieldRechargeTurns` set to **2–3** (healthy) or **4–5** if the shield *system* is damaged
+4. Hull reduced by bleed + overflow.
 
-**Full shields nearly eliminate free hull damage** from energy fire; players should feel shields matter.
+**Damaged shield emitters** also lower **effective max capacity** to **65%** of `maxShieldIntegrity` until repaired.
 
 ### 5.3 When shields are offline or bypassed
 
@@ -245,9 +244,9 @@ Runs at the beginning of every mechanical play beat:
 | Grid state | Effect |
 |------------|--------|
 | Shields system **destroyed** | Charge 0, offline offline, no recharge |
-| **Online** | Slow passive fill: **+2**/turn (or **+1** if damaged), up to max |
-| **Offline**, turns left > 0 | Countdown `shieldRechargeTurns` by 1 |
-| Countdown hits 0 | Grid online with **30** charge (or **18** if damaged) |
+| **Online** | Slow passive fill: **+2**/turn (or **+1** if damaged), up to **effective max** (65% cap if emitters damaged) |
+| **Offline**, turns left > 0 | Countdown `shieldRechargeTurns` by 1 (longer if emitters damaged) |
+| Countdown hits 0 | Grid online at ~30% of **effective max** |
 
 ### 6.2 Divert power to shields
 

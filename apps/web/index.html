@@ -45,6 +45,7 @@
           <span class="pip"></span>
           <h1>Star Trek Adventure</h1>
           <span class="sub">Narrator // Phase 1 Bridge</span>
+          <span id="red-alert-badge" class="red-alert-badge hidden" role="status">RED ALERT</span>
           <!-- Debug-only model badge kept in DOM but hidden; model also in Run panel -->
           <span id="narrator-badge" class="badge narrator-badge sr-only" aria-hidden="true">narrator: …</span>
         </div>
@@ -369,6 +370,41 @@
             not a second hit-point bar.
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- Starbase / campaign hub — not the in-mission bridge -->
+    <div
+      id="starbase-overlay"
+      class="starbase-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="starbase-title"
+    >
+      <div class="starbase-screen">
+        <header class="starbase-head">
+          <div class="starbase-kicker">Federation dockyard</div>
+          <h1 id="starbase-title" class="starbase-title">Starbase operations</h1>
+          <p id="starbase-meta" class="starbase-meta"></p>
+        </header>
+        <p id="starbase-notice" class="starbase-notice hidden" role="status"></p>
+        <div class="starbase-grid">
+          <section class="starbase-card" id="starbase-ship-card">
+            <h2>Vessel</h2>
+            <div id="starbase-ship" class="starbase-card-body"></div>
+          </section>
+          <section class="starbase-card" id="starbase-yard-card">
+            <h2>Yard</h2>
+            <div id="starbase-yard" class="starbase-actions"></div>
+          </section>
+          <section class="starbase-card" id="starbase-people-card">
+            <h2>Personnel</h2>
+            <div id="starbase-people" class="starbase-actions"></div>
+          </section>
+        </div>
+        <footer class="starbase-foot">
+          <div id="starbase-primary" class="starbase-primary"></div>
+        </footer>
       </div>
     </div>
 

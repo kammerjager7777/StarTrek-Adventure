@@ -26,6 +26,7 @@ import {
   playTrekUi,
   playTypeTick,
   playViewscreenSfx,
+  isRedAlertState,
   setRedAlertDucked,
   setRedAlertLoop,
   setSceneBed,
@@ -132,6 +133,14 @@ const els = {
   scarModalIndex: document.getElementById("scar-modal-index"),
   scarModalBody: document.getElementById("scar-modal-body"),
   btnCloseScar: document.getElementById("btn-close-scar"),
+  redAlertBadge: document.getElementById("red-alert-badge"),
+  starbaseOverlay: document.getElementById("starbase-overlay"),
+  starbaseMeta: document.getElementById("starbase-meta"),
+  starbaseNotice: document.getElementById("starbase-notice"),
+  starbaseShip: document.getElementById("starbase-ship"),
+  starbaseYard: document.getElementById("starbase-yard"),
+  starbasePeople: document.getElementById("starbase-people"),
+  starbasePrimary: document.getElementById("starbase-primary"),
   btnVoice: document.getElementById("btn-voice"),
   btnVoiceMenu: document.getElementById("btn-voice-menu"),
   voiceMenu: document.getElementById("voice-menu"),
@@ -744,6 +753,8 @@ function render(view, opts = {}) {
 
   // Phase badge: during debrief show clear success / failure
   updatePhaseBadge(s);
+  updateRedAlertUi(s);
+  renderStarbaseScreen(s);
   // Model badge is header-hidden (debug); keep Run panel as the debug surface
   if (els.narratorBadge) {
     const mode = view.narrator || "unknown";
@@ -1469,7 +1480,7 @@ function renderShip(ship) {
 
   const maxHull = ship.maxIntegrity ?? 100;
   const hull = typeof ship.integrity === "number" ? ship.integrity : maxHull;
-  const maxShield = ship.maxShieldIntegrity ?? maxHull;
+  const maxShield = shieldDisplayCap(ship);
   const shield =
     typeof ship.shieldIntegrity === "number" ? ship.shieldIntegrity : maxShield;
   const gridOnline =
@@ -2366,6 +2377,162 @@ function updatePhaseBadge(state) {
   els.phase.textContent = phase;
 }
 
+function updateRedAlertUi(state) {
+  const on =
+    Boolean(state) &&
+    state.phase === "playing" &&
+    isRedAlertState(state);
+  document.body.classList.toggle("red-alert", on);
+  if (els.redAlertBadge) {
+    els.redAlertBadge.classList.toggle("hidden", !on);
+  }
+}
+
+function shieldDisplayCap(ship) {
+  const max =
+    typeof ship.maxShieldIntegrity === "number" && ship.maxShieldIntegrity > 0
+      ? ship.maxShieldIntegrity
+      : 100;
+  if (ship.systems?.shields === "destroyed") return 0;
+  if (ship.systems?.shields === "damaged") {
+    return Math.max(1, Math.round(max * 0.65));
+  }
+  return max;
+}
+
+function starbaseButton(label, extraClass = "") {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `lcars-btn${extraClass ? ` ${extraClass}` : ""}`;
+  btn.textContent = label;
+  btn.addEventListener("click", () => {
+    uiSound("primary");
+    sendAction(label);
+  });
+  return btn;
+}
+
+function renderStarbaseScreen(state) {
+  const overlay = els.starbaseOverlay;
+  if (!overlay) return;
+  const docked = state?.phase === "starbase";
+  document.body.classList.toggle("starbase-active", docked);
+  overlay.classList.toggle("hidden", !docked);
+  if (!docked) {
+    document.body.classList.remove("starbase-waiting");
+    return;
+  }
+
+  const ship = state.ship;
+  const session = state.starbase;
+  const u = state.universe;
+  const facility =
+    session?.stationClass === "fleet_yards"
+      ? "Fleet Yards"
+      : session?.stationClass === "starbase"
+        ? "Starbase"
+        : session?.stationClass === "outpost"
+          ? "Outpost"
+          : "Docking facility";
+  if (els.starbaseMeta) {
+    els.starbaseMeta.textContent = [
+      ship ? `${ship.name} ${ship.registryNumber || ""}`.trim() : "No ship",
+      facility,
+      `Stardate ${u?.stardate || ship?.stardate || "—"}`,
+    ].join(" · ");
+  }
+
+  const noticeLine = String(state.pendingQuestion || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.startsWith("› "));
+  if (els.starbaseNotice) {
+    if (noticeLine) {
+      els.starbaseNotice.textContent = noticeLine.replace(/^›\s*/, "");
+      els.starbaseNotice.classList.remove("hidden");
+    } else {
+      els.starbaseNotice.classList.add("hidden");
+    }
+  }
+
+  if (els.starbaseShip) {
+    const cap = ship ? shieldDisplayCap(ship) : 0;
+    const living = (ship?.crew || []).filter(
+      (c) => (c.status || "active") === "active"
+    ).length;
+    const injured = (ship?.crew || []).filter((c) => c.status === "injured")
+      .length;
+    const dead = (ship?.crew || []).filter((c) => c.status === "dead");
+    const damaged = ship
+      ? Object.entries(ship.systems || {})
+          .filter(([, v]) => v !== "ok")
+          .map(([k, v]) => `${k}:${v}`)
+          .join(", ") || "all nominal"
+      : "—";
+    const skills = ship?.skills?.total
+      ? Object.entries(ship.skills.total)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(" · ")
+      : "—";
+    els.starbaseShip.textContent = [
+      ship
+        ? `Hull ${ship.integrity}/${ship.maxIntegrity}`
+        : "No vessel docked.",
+      ship
+        ? `Shields ${ship.shieldIntegrity}/${cap}${
+            ship.shieldGridOnline ? "" : " (offline)"
+          }${ship.systems?.shields === "damaged" ? " · emitters damaged" : ""}`
+        : "",
+      `Crew ${living} active` +
+        (injured ? ` · ${injured} injured` : "") +
+        (dead.length ? ` · KIA ${dead.map((c) => c.name).join(", ")}` : ""),
+      `Systems: ${damaged}`,
+      `Skills: ${skills}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  const choices = Array.isArray(state.pendingChoices)
+    ? state.pendingChoices.map((c) => c.text)
+    : [];
+  const yard = [];
+  const people = [];
+  const primary = [];
+  for (const label of choices) {
+    if (/^review starbase/i.test(label)) continue;
+    if (/^begin another mission/i.test(label) || /^save and stand down/i.test(label)) {
+      primary.push(label);
+    } else if (/^(heal|hire|transfer):/i.test(label)) {
+      people.push(label);
+    } else {
+      yard.push(label);
+    }
+  }
+
+  const fill = (host, labels, emptyText) => {
+    if (!host) return;
+    host.innerHTML = "";
+    if (!labels.length) {
+      const p = document.createElement("p");
+      p.className = "starbase-empty";
+      p.textContent = emptyText;
+      host.appendChild(p);
+      return;
+    }
+    for (const label of labels) host.appendChild(starbaseButton(label));
+  };
+  fill(els.starbaseYard, yard, "No yard work remaining this visit.");
+  fill(els.starbasePeople, people, "No personnel actions this visit.");
+  if (els.starbasePrimary) {
+    els.starbasePrimary.innerHTML = "";
+    for (const label of primary) {
+      const extra = /^save/i.test(label) ? "secondary" : "";
+      els.starbasePrimary.appendChild(starbaseButton(label, extra));
+    }
+  }
+}
+
 function renderObjectiveList(objectives) {
   return objectives
     .map(
@@ -2513,6 +2680,7 @@ function renderLogStaticCurrent(state, options) {
 }
 
 function renderLog(state, opts = {}) {
+  if (state?.phase === "starbase") return;
   const { forceTypewriter = false } = opts;
   const options = state.pendingChoices || state.turn?.options || [];
   const key = narrationKey(state);
@@ -2809,6 +2977,10 @@ function startWaitingElapsed(baseDetail = "") {
 
 function setActionBusy(busy, detail = "") {
   actionInFlight = busy;
+  document.body.classList.toggle(
+    "starbase-waiting",
+    Boolean(busy) && document.body.classList.contains("starbase-active")
+  );
   const lockInput = busy || !aiReady || missionBoot.active;
   if (els.input) els.input.disabled = lockInput;
   if (els.engageBtn) {

@@ -2583,3 +2583,195 @@ body.init-active .shell {
   margin: 0.75rem 0 0.35rem;
   padding: 0 0.15rem;
 }
+
+/* ── Red alert (in-mission) ───────────────────────────────── */
+.red-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  background: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid #ef4444;
+  animation: red-alert-badge-pulse 1.05s ease-in-out infinite;
+}
+.red-alert-badge.hidden {
+  display: none;
+}
+
+body.red-alert {
+  background:
+    radial-gradient(ellipse at top, #3b1018 0%, transparent 52%),
+    linear-gradient(180deg, #140508, #080b14 60%, #05060a);
+}
+body.red-alert .shell {
+  box-shadow: inset 0 0 0 3px rgba(220, 38, 38, 0.55);
+}
+body.red-alert .top-bar {
+  background: linear-gradient(90deg, #dc2626 0 28px, transparent 28px), #1a080c;
+  border-color: #ef4444;
+  animation: red-alert-bar 1.2s ease-in-out infinite;
+}
+body.red-alert .brand .pip {
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+  animation: red-alert-pip 0.7s steps(2, end) infinite;
+}
+body.red-alert .log-panel {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+body.red-alert .integrity-bar.is-critical .integrity-bar-fill,
+body.red-alert .integrity-shield .integrity-bar-fill {
+  filter: saturate(1.4);
+}
+
+@keyframes red-alert-badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes red-alert-bar {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.0); }
+  50% { box-shadow: 0 0 18px 0 rgba(220, 38, 38, 0.45); }
+}
+@keyframes red-alert-pip {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+
+/* ── Starbase operations (out of mission) ─────────────────── */
+body.starbase-active {
+  overflow: hidden;
+}
+body.starbase-active .shell {
+  display: none;
+}
+
+.starbase-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background:
+    radial-gradient(ellipse at 20% 0%, #12324a 0%, transparent 50%),
+    linear-gradient(180deg, #071018, #05080e);
+  color: var(--text);
+  overflow: auto;
+  padding: 18px 22px 28px;
+}
+.starbase-overlay.hidden {
+  display: none;
+}
+
+.starbase-screen {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.starbase-head {
+  padding: 14px 18px 12px 22px;
+  border-radius: 18px 8px 8px 18px;
+  background: linear-gradient(90deg, #38bdf8 0 18px, #0c1924 18px);
+  border: 1px solid #1e3a4c;
+}
+.starbase-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+.starbase-title {
+  margin: 4px 0 2px;
+  font-size: 1.55rem;
+  letter-spacing: 0.04em;
+}
+.starbase-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.starbase-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #e0f2fe;
+}
+.starbase-notice.hidden {
+  display: none;
+}
+
+.starbase-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 14px;
+  flex: 1;
+}
+@media (max-width: 960px) {
+  .starbase-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.starbase-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  min-height: 0;
+}
+.starbase-card h2 {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+.starbase-card-body {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.starbase-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.starbase-actions .lcars-btn,
+.starbase-primary .lcars-btn {
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+}
+.starbase-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.starbase-foot {
+  padding-top: 4px;
+}
+.starbase-primary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.starbase-primary .lcars-btn {
+  flex: 1;
+  min-width: 200px;
+  text-align: center;
+  justify-content: center;
+}
+
+body.starbase-waiting .starbase-overlay {
+  pointer-events: none;
+  opacity: 0.72;
+}

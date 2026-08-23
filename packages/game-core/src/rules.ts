@@ -93,11 +93,17 @@ export function normalizeShip(ship: Ship): Ship {
     typeof ship.maxShieldIntegrity === "number" && ship.maxShieldIntegrity > 0
       ? ship.maxShieldIntegrity
       : maxHull;
-  let shield =
-    typeof ship.shieldIntegrity === "number" ? ship.shieldIntegrity : maxShield;
-  shield = clampIntegrity(shield, maxShield);
-
   const systems = { ...ship.systems };
+  const usableMax =
+    systems.shields === "destroyed"
+      ? 0
+      : systems.shields === "damaged"
+        ? Math.max(1, Math.round(maxShield * DAMAGED_SHIELD_MAX_FACTOR))
+        : maxShield;
+  let shield =
+    typeof ship.shieldIntegrity === "number" ? ship.shieldIntegrity : usableMax;
+  shield = clampIntegrity(shield, usableMax || maxShield);
+
   // If shield hardware destroyed, grid cannot hold charge
   if (systems.shields === "destroyed") {
     shield = 0;
@@ -169,10 +175,9 @@ export function classifyDamageKind(text: string): DamageKind {
 type DamageProfile = {
   /** Multiplier applied to damage taken by the shield grid */
   shieldMult: number;
-  /**
-   * Max hull bleed-through fraction when shields are nearly gone.
-   * Full shields ≈ almost no hull damage; empty shields ≈ this value as overflow risk.
-   */
+  /** Hull leak fraction at full shields */
+  minBleed: number;
+  /** Hull leak fraction as shields approach empty (still online) */
   maxBleed: number;
   /** Bypass shields entirely */
   bypassShields: boolean;
@@ -182,19 +187,43 @@ function damageProfile(kind: DamageKind): DamageProfile {
   switch (kind) {
     case "phaser":
     case "laser":
-      // Energy weapons hammer the grid; little hull until shields fail
-      return { shieldMult: 1.4, maxBleed: 0.25, bypassShields: false };
+      return { shieldMult: 1.35, minBleed: 0.08, maxBleed: 0.9, bypassShields: false };
     case "torpedo":
-      // Shields are good vs warheads — less grid drain, low bleed
-      return { shieldMult: 0.75, maxBleed: 0.12, bypassShields: false };
+      return { shieldMult: 0.8, minBleed: 0.06, maxBleed: 0.75, bypassShields: false };
     case "collision":
-      return { shieldMult: 0.7, maxBleed: 0.18, bypassShields: false };
+      return { shieldMult: 0.75, minBleed: 0.1, maxBleed: 0.82, bypassShields: false };
     case "boarding":
     case "internal":
-      return { shieldMult: 0, maxBleed: 1, bypassShields: true };
+      return { shieldMult: 0, minBleed: 1, maxBleed: 1, bypassShields: true };
     default:
-      return { shieldMult: 1.1, maxBleed: 0.2, bypassShields: false };
+      return { shieldMult: 1.1, minBleed: 0.08, maxBleed: 0.85, bypassShields: false };
   }
+}
+
+/** Damaged emitters cannot hold a full grid. */
+export const DAMAGED_SHIELD_MAX_FACTOR = 0.65;
+
+/** Current usable shield cap (damaged hardware lowers max; destroyed → 0). */
+export function effectiveShieldMax(ship: Ship): number {
+  const cap =
+    typeof ship.maxShieldIntegrity === "number" && ship.maxShieldIntegrity > 0
+      ? ship.maxShieldIntegrity
+      : 100;
+  if (ship.systems?.shields === "destroyed") return 0;
+  if (ship.systems?.shields === "damaged") {
+    return Math.max(1, Math.round(cap * DAMAGED_SHIELD_MAX_FACTOR));
+  }
+  return cap;
+}
+
+/** Hull leak-through grows as shield % falls. Linear, not quadratic. */
+export function hullBleedRatio(shieldPct: number, profile: DamageProfile): number {
+  const pct = Math.max(0, Math.min(1, shieldPct));
+  if (pct >= 0.995) return profile.minBleed * 0.5;
+  return Math.min(
+    0.95,
+    profile.minBleed + (1 - pct) * (profile.maxBleed - profile.minBleed)
+  );
 }
 
 export type CombatDamageResult = {
@@ -249,41 +278,32 @@ export function applyCombatDamage(
 
   if (shieldsWereUp) {
     // --- Shields first ---
-    // Almost all external damage hits the grid. Hull only takes:
-    //   1) small bleed-through that grows as shields weaken, and
-    //   2) overflow when this hit collapses the grid.
-    const shieldPct = ship.shieldIntegrity / Math.max(1, ship.maxShieldIntegrity);
-    // Full shields: ~0–5% bleed. At 0%: up to maxBleed. No free hull damage at 100%.
-    const bleedRatio =
-      shieldPct >= 0.99
-        ? 0
-        : Math.min(profile.maxBleed, profile.maxBleed * (1 - shieldPct) * (1 - shieldPct));
+    // Leak to hull grows as the grid weakens (linear). Overflow on collapse.
+    const cap = Math.max(1, effectiveShieldMax(ship));
+    const shieldPct = ship.shieldIntegrity / cap;
+    const bleedRatio = hullBleedRatio(shieldPct, profile);
 
     const rawToShields = Math.max(
       1,
-      Math.round(incoming * profile.shieldMult * (1 - bleedRatio * 0.5))
+      Math.round(incoming * profile.shieldMult * (1 - bleedRatio))
     );
-    const newShield = clampIntegrity(
-      ship.shieldIntegrity - rawToShields,
-      ship.maxShieldIntegrity
-    );
+    const newShield = clampIntegrity(ship.shieldIntegrity - rawToShields, cap);
     shieldDamage = ship.shieldIntegrity - newShield;
     ship = { ...ship, shieldIntegrity: newShield };
 
     let bleed = Math.round(incoming * bleedRatio);
     let overflow = 0;
     if (newShield <= 0) {
-      // Anything the grid couldn't absorb spills to hull
       overflow = Math.max(0, rawToShields - shieldBefore);
       shieldsCollapsed = true;
+      const damagedEmitters = ship.systems.shields === "damaged";
+      const recharge =
+        (damagedEmitters ? 4 : 2) + (rng() < (damagedEmitters ? 0.55 : 0.4) ? 1 : 0);
       ship = {
         ...ship,
         shieldIntegrity: 0,
         shieldGridOnline: false,
-        shieldRechargeTurns: Math.max(
-          ship.shieldRechargeTurns,
-          2 + (rng() < 0.4 ? 1 : 0)
-        ),
+        shieldRechargeTurns: Math.max(ship.shieldRechargeTurns, recharge),
       };
       events.push(
         `Shield grid collapsed — recharging (${ship.shieldRechargeTurns} turns).`
@@ -292,7 +312,9 @@ export function applyCombatDamage(
 
     hullDamage = bleed + overflow;
     if (shieldDamage > 0) {
-      events.push(`Shields −${shieldDamage} → ${ship.shieldIntegrity}/${ship.maxShieldIntegrity}.`);
+      events.push(
+        `Shields −${shieldDamage} → ${ship.shieldIntegrity}/${cap}.`
+      );
     }
     if (hullDamage > 0 && !shieldsCollapsed) {
       events.push(`Bleed-through to hull −${hullDamage}.`);
@@ -319,10 +341,10 @@ export function applyCombatDamage(
 
   // System damage roll — worse when hull takes a hard hit and shields are weak/down
   let systemHit: CombatDamageResult["systemHit"] = null;
-  const shieldFrac =
-    ship.maxShieldIntegrity > 0
-      ? ship.shieldIntegrity / ship.maxShieldIntegrity
-      : 0;
+  const shieldFrac = (() => {
+    const cap = effectiveShieldMax(ship);
+    return cap > 0 ? ship.shieldIntegrity / cap : 0;
+  })();
   const systemChance =
     0.08 +
     hullDamage * 0.028 +
@@ -377,7 +399,7 @@ export function applyCombatDamage(
       ...ship,
       shieldIntegrity: clampIntegrity(
         ship.shieldIntegrity - drip,
-        ship.maxShieldIntegrity
+        effectiveShieldMax(ship)
       ),
     };
     if (ship.shieldIntegrity <= 0) {
@@ -454,16 +476,14 @@ export function tickShieldRecharge(rawShip: Ship): {
       note: null,
     };
   }
+  const cap = effectiveShieldMax(ship);
   if (ship.shieldGridOnline) {
     // Very slow passive recharge while online — must not erase combat drain
-    if (ship.shieldIntegrity < ship.maxShieldIntegrity) {
+    if (ship.shieldIntegrity < cap) {
       const rate = ship.systems.shields === "damaged" ? 1 : 2;
       ship = {
         ...ship,
-        shieldIntegrity: clampIntegrity(
-          ship.shieldIntegrity + rate,
-          ship.maxShieldIntegrity
-        ),
+        shieldIntegrity: clampIntegrity(ship.shieldIntegrity + rate, cap),
       };
     }
     return { ship, restored: false, note: null };
@@ -473,12 +493,15 @@ export function tickShieldRecharge(rawShip: Ship): {
   if (ship.shieldRechargeTurns > 0) {
     const left = ship.shieldRechargeTurns - 1;
     if (left <= 0) {
-      const restore = ship.systems.shields === "damaged" ? 18 : 30;
+      const restore =
+        ship.systems.shields === "damaged"
+          ? Math.round(cap * 0.28)
+          : Math.round(cap * 0.3);
       ship = {
         ...ship,
         shieldRechargeTurns: 0,
         shieldGridOnline: true,
-        shieldIntegrity: clampIntegrity(restore, ship.maxShieldIntegrity),
+        shieldIntegrity: clampIntegrity(restore, cap),
       };
       return {
         ship,
@@ -495,13 +518,16 @@ export function tickShieldRecharge(rawShip: Ship): {
   }
 
   // Offline with 0 turns but still empty — restore
-  const restore = ship.systems.shields === "damaged" ? 18 : 30;
+  const restoreEmpty =
+    ship.systems.shields === "damaged"
+      ? Math.round(cap * 0.28)
+      : Math.round(cap * 0.3);
   ship = {
     ...ship,
     shieldGridOnline: true,
     shieldIntegrity: clampIntegrity(
-      Math.max(ship.shieldIntegrity, restore),
-      ship.maxShieldIntegrity
+      Math.max(ship.shieldIntegrity, restoreEmpty),
+      cap
     ),
   };
   return {
@@ -529,12 +555,16 @@ export function divertPowerToShields(rawShip: Ship): {
     // Speed up recharge by one turn and add a little juice when it comes up
     const left = Math.max(0, ship.shieldRechargeTurns - 1);
     if (left <= 0) {
-      const restore = ship.systems.shields === "damaged" ? 22 : 35;
+      const cap = effectiveShieldMax(ship);
+      const restore =
+        ship.systems.shields === "damaged"
+          ? Math.round(cap * 0.34)
+          : Math.round(cap * 0.35);
       ship = {
         ...ship,
         shieldRechargeTurns: 0,
         shieldGridOnline: true,
-        shieldIntegrity: clampIntegrity(restore, ship.maxShieldIntegrity),
+        shieldIntegrity: clampIntegrity(restore, cap),
       };
       return {
         ship,
@@ -549,14 +579,12 @@ export function divertPowerToShields(rawShip: Ship): {
       message: `Power diverted to shield restart — ${left} turn${left === 1 ? "" : "s"} until grid online.`,
     };
   }
+  const cap = effectiveShieldMax(ship);
   const boost = ship.systems.shields === "damaged" ? 12 : 20;
   const before = ship.shieldIntegrity;
   ship = {
     ...ship,
-    shieldIntegrity: clampIntegrity(
-      ship.shieldIntegrity + boost,
-      ship.maxShieldIntegrity
-    ),
+    shieldIntegrity: clampIntegrity(ship.shieldIntegrity + boost, cap),
   };
   const gained = ship.shieldIntegrity - before;
   return {
@@ -564,7 +592,7 @@ export function divertPowerToShields(rawShip: Ship): {
     ok: true,
     message:
       gained > 0
-        ? `Power diverted to shields (+${gained} to ${ship.shieldIntegrity}/${ship.maxShieldIntegrity}).`
+        ? `Power diverted to shields (+${gained} to ${ship.shieldIntegrity}/${cap}).`
         : "Shields already at maximum capacity.",
   };
 }

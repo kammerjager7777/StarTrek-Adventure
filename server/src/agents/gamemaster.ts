@@ -757,7 +757,7 @@ async function paintStarbase(
         crewDialogue: [],
         options: numbered(labels),
         viewscreenPrompt: "Federation starbase spacedock, ship in repair cradle",
-        sfx: ["power_up2"],
+        sfx: notice ? ["power_up2"] : [],
       },
     },
     input,

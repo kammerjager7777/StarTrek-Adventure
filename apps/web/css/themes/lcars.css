@@ -1030,3 +1030,35 @@ html[data-ui-theme="lcars"] .history-actions .lcars-btn {
 html[data-ui-theme="lcars"] .scar-modal-card {
   border-color: var(--lcars-bar);
 }
+
+html[data-ui-theme="lcars"] body.red-alert {
+  background: #120000;
+}
+html[data-ui-theme="lcars"] body.red-alert .top-bar {
+  background: linear-gradient(90deg, #cc0000 0 36px, #1a0000 36px);
+  border-color: #ff3333;
+}
+html[data-ui-theme="lcars"] .red-alert-badge {
+  border-radius: 0 12px 0 12px;
+  background: #cc0000;
+  color: #ffcc99;
+  border-color: #ff6666;
+}
+
+html[data-ui-theme="lcars"] .starbase-overlay {
+  background: #000;
+}
+html[data-ui-theme="lcars"] .starbase-head {
+  border-radius: 0 24px 0 0;
+  background: linear-gradient(90deg, #99cccc 0 22px, #000 22px);
+  border: 2px solid #99cccc;
+}
+html[data-ui-theme="lcars"] .starbase-kicker,
+html[data-ui-theme="lcars"] .starbase-card h2 {
+  color: #99cccc;
+}
+html[data-ui-theme="lcars"] .starbase-card {
+  border: 2px solid #336666;
+  border-radius: 0 18px 0 0;
+  background: #050505;
+}

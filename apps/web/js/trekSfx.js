@@ -752,7 +752,11 @@ export function playOrderCues(text, ctx = {}) {
  * @param {object | null} prev
  * @param {object | null} next
  */
+/** Catalog keys already played from a state-diff this render (skip in narrator SFX). */
+let lastStateDeltaSfx = new Set();
+
 export function playStateDeltaSfx(prev, next) {
+  lastStateDeltaSfx = new Set();
   if (!next) {
     setRedAlertLoop(false);
     return;
@@ -767,7 +771,10 @@ export function playStateDeltaSfx(prev, next) {
   const cues = [];
   const push = (name, delayMs = 0) => {
     if (name === "red_alert" || name === "red_alert2") return;
-    if (name) cues.push({ name, delayMs });
+    if (name) {
+      lastStateDeltaSfx.add(name);
+      cues.push({ name, delayMs });
+    }
   };
 
   const prevPhase = prev?.phase;
@@ -1017,6 +1024,14 @@ export function playNarratorSfx(cues, opts = {}) {
     if (name === "red_alert" || name === "red_alert2") {
       redAlertLatched = true;
       setRedAlertLoop(true);
+      continue;
+    }
+    // Don't replay combat one-shots the state-diff already fired (e.g. shields fail).
+    if (lastStateDeltaSfx.has(name)) continue;
+    if (
+      lastStateDeltaSfx.has("voice_shields_failing") &&
+      (name === "shield_sizzle" || name === "shield_sizzle2")
+    ) {
       continue;
     }
     playTrekSfx(name, {
