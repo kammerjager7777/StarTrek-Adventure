@@ -19,7 +19,8 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 
 - [x] Classic + LCARS themes  
 - [x] Mission log typewriter, options bar, Engage, soft errors  
-- [x] Ship panel (hull, shields, systems, scars)  
+- [x] Ship panel (hull, shields, systems)  
+- [x] Starbase vessel card (scars / lasting damage log)  
 - [x] Captain’s Ready Room (skill bars + reputation)  
 - [x] Crew cards + expand hail (Injured / KIA badges, service time)  
 - [x] Objectives panel with success/failure presentation  

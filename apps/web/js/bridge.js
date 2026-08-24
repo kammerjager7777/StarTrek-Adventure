@@ -1403,7 +1403,7 @@ async function toggleVoice() {
   }
 }
 
-/** Classify a scar string into an icon + label for the ship panel grid */
+/** Classify a scar string into an icon + label for the starbase record */
 function classifyScar(text) {
   const t = String(text || "").toLowerCase();
   if (/shield/.test(t)) {
@@ -1452,6 +1452,38 @@ function openScarModal(scarText, index, total) {
 function closeScarModal() {
   uiSound("scar-close");
   els.scarModal?.classList.add("hidden");
+}
+
+function scarChipsHtml(scars) {
+  const list = Array.isArray(scars) ? scars : [];
+  if (!list.length) {
+    return `<div class="scar-empty-text">No lasting damage recorded</div>`;
+  }
+  return `<div class="scar-grid" role="list">${list
+    .map((scar, i) => {
+      const meta = classifyScar(scar);
+      const title = scar.length > 48 ? `${scar.slice(0, 48)}…` : scar;
+      return `<button type="button" class="scar-chip tone-${meta.tone}" role="listitem"
+                data-scar-index="${i}" title="${escapeHtml(title)}"
+                aria-label="${escapeHtml(meta.label)} scar: ${escapeHtml(title)}">
+                <span class="scar-chip-icon" aria-hidden="true">${meta.icon}</span>
+                <span class="scar-chip-label">${escapeHtml(meta.label)}</span>
+              </button>`;
+    })
+    .join("")}</div>`;
+}
+
+function bindScarChips(root, scars) {
+  if (!root) return;
+  const list = Array.isArray(scars) ? scars : [];
+  root.querySelectorAll(".scar-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.getAttribute("data-scar-index"));
+      if (!Number.isNaN(idx) && list[idx]) {
+        openScarModal(list[idx], idx, list.length);
+      }
+    });
+  });
 }
 
 function systemDisplayName(key) {
@@ -1572,50 +1604,6 @@ function renderShip(ship) {
     })
     .join("");
 
-  const scars = Array.isArray(ship.scars) ? ship.scars : [];
-  const scarsOpen = loadPanelExpandedPrefs().scars === true;
-  const scarSummary = scars.length
-    ? `${scars.length} on record`
-    : "No lasting damage";
-  const scarChips = scars.length
-    ? `<div class="scar-grid" role="list">
-          ${scars
-            .map((scar, i) => {
-              const meta = classifyScar(scar);
-              const title = scar.length > 48 ? `${scar.slice(0, 48)}…` : scar;
-              return `<button type="button" class="scar-chip tone-${meta.tone}" role="listitem"
-                data-scar-index="${i}" title="${escapeHtml(title)}"
-                aria-label="${escapeHtml(meta.label)} scar: ${escapeHtml(title)}">
-                <span class="scar-chip-icon" aria-hidden="true">${meta.icon}</span>
-                <span class="scar-chip-label">${escapeHtml(meta.label)}</span>
-              </button>`;
-            })
-            .join("")}
-        </div>`
-    : `<div class="scar-empty-text">No lasting damage recorded</div>`;
-  const scarGrid = `<div class="scar-section collapsible-panel ${
-    scarsOpen ? "is-expanded" : "is-collapsed"
-  }${scars.length ? "" : " scar-empty"}">
-        <button type="button" class="scar-collapse-toggle" id="scar-collapse-toggle"
-          aria-expanded="${scarsOpen ? "true" : "false"}"
-          aria-controls="scar-collapse-body"
-          title="Show or hide ship scars">
-          <span class="collapse-chevron" aria-hidden="true">${scarsOpen ? "▾" : "▸"}</span>
-          <span class="collapse-label">Scars</span>
-          ${
-            scars.length
-              ? `<span class="scar-count">${scars.length}</span>`
-              : ""
-          }
-          <span class="collapse-summary">${escapeHtml(scarSummary)}</span>
-        </button>
-        <div class="collapsible-body" id="scar-collapse-body">
-          <div class="collapsible-body-inner scar-collapse-inner">
-            ${scarChips}
-          </div>
-        </div>
-      </div>`;
-
   const registry =
     ship.registryNumber ||
     (String(ship.name || "").match(/\b((?:NCC|NX)[-\s]?\d[\w-]*)\b/i) ||
@@ -1644,26 +1632,9 @@ function renderShip(ship) {
       <div class="systems-label">Systems</div>
       ${systems}
     </div>
-    ${scarGrid}
   `;
 
   renderReadyRoom(ship, current?.state?.universe);
-
-  els.ship.querySelectorAll(".scar-chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.getAttribute("data-scar-index"));
-      if (!Number.isNaN(idx) && scars[idx]) {
-        openScarModal(scars[idx], idx, scars.length);
-      }
-    });
-  });
-  const scarPanel = els.ship.querySelector(".scar-section");
-  const scarToggle = els.ship.querySelector(".scar-collapse-toggle");
-  if (scarPanel && scarToggle) {
-    scarToggle.addEventListener("click", () => {
-      togglePanel(scarPanel, scarToggle);
-    });
-  }
 }
 
 let portraitRequestFor = null;
@@ -2570,6 +2541,7 @@ function renderStarbaseScreen(state) {
   overlay.classList.toggle("hidden", !docked);
   if (!docked) {
     document.body.classList.remove("starbase-waiting");
+    els.scarModal?.classList.add("hidden");
     return;
   }
 
@@ -2662,8 +2634,17 @@ function renderStarbaseScreen(state) {
          }</span></div>
          <div>Systems: ${escapeHtml(damaged)}</div>
          <div class="starbase-skills">Skills: ${escapeHtml(skills)}</div>
+         <div class="starbase-scars">
+           <div class="systems-label">Scars${
+             Array.isArray(ship.scars) && ship.scars.length
+               ? ` <span class="scar-count">${ship.scars.length}</span>`
+               : ""
+           }</div>
+           ${scarChipsHtml(ship.scars)}
+         </div>
          ${roster}`
       : `<p class="starbase-empty">No vessel docked.</p>`;
+    bindScarChips(els.starbaseShip, ship?.scars || []);
   }
 
   if (els.starbaseStanding) {
@@ -3426,17 +3407,16 @@ function loadPanelExpandedPrefs() {
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
     // Default: viewscreen collapsed until mission-start Incoming Communication
-    if (!raw) return { viewscreen: false, history: false, scars: false };
+    if (!raw) return { viewscreen: false, history: false };
     const parsed = JSON.parse(raw);
     return {
       // Only open if the user explicitly expanded it
       viewscreen: parsed.viewscreen === true,
       // History is always collapsed unless the user explicitly expanded it
       history: parsed.history === true,
-      scars: parsed.scars === true,
     };
   } catch {
-    return { viewscreen: false, history: false, scars: false };
+    return { viewscreen: false, history: false };
   }
 }
 
@@ -3447,7 +3427,6 @@ function savePanelExpandedPrefs() {
       JSON.stringify({
         viewscreen: isPanelExpanded(els.viewscreenPanel),
         history: isPanelExpanded(els.logHistoryPanel),
-        scars: isPanelExpanded(els.ship?.querySelector(".scar-section")),
       })
     );
   } catch {

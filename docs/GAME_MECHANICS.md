@@ -523,7 +523,7 @@ Out-of-band consult (Phase 5). Code is the referee; the LLM only writes the frag
 ### 16.6 Starbase (campaign hub)
 Phase 6. After debrief the run stays `active` and phase becomes `starbase`. Dedicated overlay (not the mission bridge) shows:
 
-- **Vessel** — hull, shields, systems, **skill totals**, roster with status badges (active / injured / KIA) and service time
+- **Vessel** — hull, shields, systems, **skill totals**, **scars** (lasting damage log), roster with status badges (active / injured / KIA) and service time
 - **Standing** — faction reputation, galactic flags, active crises
 - **Yard** — limited refit buttons for this visit
 - **Personnel** — hire / heal / transfer
@@ -573,7 +573,8 @@ Viewscreen and SFX are unchanged. Campaign state is visible on the bridge and hu
 
 - **Captain's Ready Room** (left column) — ship skill bars (0–100, band `b0`–`b10`) and faction reputation summary (standing, flags, crises).
 - **Crew cards** — overlay **Injured / KIA / Transferred** badge plus service time (`Nt`). Expanded dossier still lists status, service, missions, and Ask for advice.
-- **Starbase hub** — Campaign log card lists recent missions (stardate, title, outcome, casualties). Standing and yard/personnel stay on the hub.
+- **In-mission ship panel** — live hull, shields, and systems only. Scars are not shown during play.
+- **Starbase hub** — Campaign log, standing, yard/personnel, and the **scar record** on the Vessel card.
 
 `npm run test:phase8` covers the campaign checklist (baselines, death/scar/flag, skill DC, advice not a turn, universe ticks, standing-aware briefs, profile save/load, mid-mission `activeRunId`).
 
