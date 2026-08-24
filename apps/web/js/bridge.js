@@ -138,8 +138,10 @@ const els = {
   starbaseMeta: document.getElementById("starbase-meta"),
   starbaseNotice: document.getElementById("starbase-notice"),
   starbaseShip: document.getElementById("starbase-ship"),
+  starbaseStanding: document.getElementById("starbase-standing"),
   starbaseYard: document.getElementById("starbase-yard"),
   starbasePeople: document.getElementById("starbase-people"),
+  starbaseLog: document.getElementById("starbase-log"),
   starbasePrimary: document.getElementById("starbase-primary"),
   btnVoice: document.getElementById("btn-voice"),
   btnVoiceMenu: document.getElementById("btn-voice-menu"),
@@ -2601,12 +2603,7 @@ function renderStarbaseScreen(state) {
 
   if (els.starbaseShip) {
     const cap = ship ? shieldDisplayCap(ship) : 0;
-    const living = (ship?.crew || []).filter(
-      (c) => (c.status || "active") === "active"
-    ).length;
-    const injured = (ship?.crew || []).filter((c) => c.status === "injured")
-      .length;
-    const dead = (ship?.crew || []).filter((c) => c.status === "dead");
+    const officers = displayBridgeCrew(ship?.crew || []);
     const damaged = ship
       ? Object.entries(ship.systems || {})
           .filter(([, v]) => v !== "ok")
@@ -2618,23 +2615,73 @@ function renderStarbaseScreen(state) {
           .map(([k, v]) => `${k} ${v}`)
           .join(" · ")
       : "—";
-    els.starbaseShip.textContent = [
-      ship
-        ? `Hull ${ship.integrity}/${ship.maxIntegrity}`
-        : "No vessel docked.",
-      ship
-        ? `Shields ${ship.shieldIntegrity}/${cap}${
-            ship.shieldGridOnline ? "" : " (offline)"
-          }${ship.systems?.shields === "damaged" ? " · emitters damaged" : ""}`
-        : "",
-      `Crew ${living} active` +
-        (injured ? ` · ${injured} injured` : "") +
-        (dead.length ? ` · KIA ${dead.map((c) => c.name).join(", ")}` : ""),
-      `Systems: ${damaged}`,
-      `Skills: ${skills}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const roster = officers.length
+      ? `<ul class="starbase-roster">${officers
+          .map((c) => {
+            const st = c.status || "active";
+            const svc =
+              typeof c.serviceTurns === "number" ? `${c.serviceTurns}t` : "";
+            return `<li><span class="starbase-roster-name">${escapeHtml(
+              c.name
+            )}</span><span class="starbase-roster-role">${escapeHtml(
+              c.role
+            )}</span><span class="starbase-badge is-${escapeHtml(
+              st
+            )}">${escapeHtml(st)}</span>${
+              svc ? `<span class="muted">${escapeHtml(svc)}</span>` : ""
+            }</li>`;
+          })
+          .join("")}</ul>`
+      : `<p class="starbase-empty">No officers on the roster.</p>`;
+    els.starbaseShip.innerHTML = ship
+      ? `<div>Hull ${ship.integrity}/${ship.maxIntegrity}</div>
+         <div>Shields ${ship.shieldIntegrity}/${cap}${
+           ship.shieldGridOnline ? "" : " (offline)"
+         }${ship.systems?.shields === "damaged" ? " · emitters damaged" : ""}</div>
+         <div>Systems: ${escapeHtml(damaged)}</div>
+         <div class="starbase-skills">Skills: ${escapeHtml(skills)}</div>
+         ${roster}`
+      : `<p class="starbase-empty">No vessel docked.</p>`;
+  }
+
+  if (els.starbaseStanding) {
+    const rep = u?.factionReputation || {};
+    const repLines = Object.entries(rep)
+      .map(([k, v]) => {
+        const n = Number(v) || 0;
+        const sign = n > 0 ? "+" : "";
+        return `<li><span>${escapeHtml(k)}</span><span>${sign}${n}</span></li>`;
+      })
+      .join("");
+    const crises = (u?.activeCrises || []).join(", ") || "none";
+    const flags = (u?.galacticFlags || []).join(", ") || "none";
+    els.starbaseStanding.innerHTML = u
+      ? `<ul class="starbase-rep">${repLines}</ul>
+         <div>Crises: ${escapeHtml(crises)}</div>
+         <div>Flags: ${escapeHtml(flags)}</div>`
+      : `<p class="starbase-empty">No galaxy standing on file.</p>`;
+  }
+
+  if (els.starbaseLog) {
+    const log = Array.isArray(state.campaignLog) ? state.campaignLog : [];
+    if (!log.length) {
+      els.starbaseLog.innerHTML = `<p class="starbase-empty">No prior missions on file.</p>`;
+    } else {
+      els.starbaseLog.innerHTML = `<ul class="starbase-log-list">${log
+        .slice(-12)
+        .reverse()
+        .map((e) => {
+          const cas = e.casualties?.length
+            ? ` · ${escapeHtml(e.casualties.join(", "))}`
+            : "";
+          return `<li><span class="starbase-log-when">${escapeHtml(
+            e.stardate || ""
+          )}</span> ${escapeHtml(e.title || "Mission")} <span class="starbase-badge is-${escapeHtml(
+            e.outcome || ""
+          )}">${escapeHtml(e.outcome || "")}</span>${cas}</li>`;
+        })
+        .join("")}</ul>`;
+    }
   }
 
   const choices = Array.isArray(state.pendingChoices)
@@ -2645,7 +2692,12 @@ function renderStarbaseScreen(state) {
   const primary = [];
   for (const label of choices) {
     if (/^review starbase/i.test(label)) continue;
-    if (/^begin another mission/i.test(label) || /^save and stand down/i.test(label)) {
+    if (/^view campaign log/i.test(label)) continue;
+    if (
+      /^choose next mission/i.test(label) ||
+      /^begin another mission/i.test(label) ||
+      /^save and stand down/i.test(label)
+    ) {
       primary.push(label);
     } else if (/^(heal|hire|transfer):/i.test(label)) {
       people.push(label);

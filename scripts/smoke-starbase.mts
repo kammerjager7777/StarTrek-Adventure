@@ -1,21 +1,31 @@
 /**
- * Quick smoke for starbase refit / recruitment pure rules.
- * Run: npx tsx scripts/smoke-starbase.mts
+ * Phase 6 starbase hub: refit, recruitment, campaign log, choice labels.
+ * Run: npm run test:starbase
  */
 import {
-  initStarbaseSession,
-  hireRecruit,
-  healCrewAtStarbase,
-  transferCrewMember,
   deepStructuralRefit,
+  formatCampaignLog,
+  healCrewAtStarbase,
+  hireRecruit,
+  initStarbaseSession,
   refitHull,
-  stationClassFromRep,
-  budgetsForStation,
-  formatRecruitLine,
-  repairSystemAtStarbase,
   refitShields,
+  repairSystemAtStarbase,
+  starbaseHubChoices,
+  stationClassFromRep,
+  transferCrewMember,
 } from "../packages/game-core/src/campaign.ts";
-import type { Ship, UniverseState } from "../packages/game-core/src/types.ts";
+import type { CampaignLogEntry, Ship, UniverseState } from "../packages/game-core/src/types.ts";
+
+let failed = 0;
+function assert(cond: unknown, msg: string): void {
+  if (cond) {
+    console.log("ok ", msg);
+    return;
+  }
+  failed++;
+  console.error("FAIL", msg);
+}
 
 const ship = {
   id: "s1",
@@ -71,62 +81,72 @@ const universe = {
   activeCrises: [],
 } as UniverseState;
 
-console.log("station", stationClassFromRep(40), budgetsForStation("fleet_yards"));
+assert(stationClassFromRep(40) === "fleet_yards", "rep 40 is fleet yards");
+assert(stationClassFromRep(4) === "outpost", "rep 4 is outpost");
+
 const sess = initStarbaseSession(ship, { universe });
-console.log("session", {
-  class: sess.stationClass,
-  recruitBudget: sess.recruitBudget,
-  systemRepairBudget: sess.systemRepairBudget,
-  medicalBudget: sess.medicalBudget,
-  offers: sess.recruitOffers.map((c) => formatRecruitLine(c)),
-});
+assert(sess.stationClass === "fleet_yards", "session uses fleet yards");
+assert(sess.recruitOffers.length >= 2, "slate has recruits");
+
+const labels = starbaseHubChoices({ ship, starbase: sess });
+assert(labels.some((l) => /view campaign log/i.test(l)), "hub offers campaign log");
+assert(labels.some((l) => /choose next mission/i.test(l)), "hub offers next mission");
+assert(labels.some((l) => /save and stand down/i.test(l)), "hub offers stand down");
+assert(labels.some((l) => /refit hull/i.test(l)), "hub offers hull refit");
+assert(labels.some((l) => /^hire:/i.test(l)), "hub offers hire");
+
+const emptyLog = formatCampaignLog([]);
+assert(/no prior missions/i.test(emptyLog), "empty log message");
+
+const entries: CampaignLogEntry[] = [
+  {
+    missionId: "m1",
+    title: "Skirmish",
+    stardate: "48001.2",
+    outcome: "success",
+    keyFlags: ["saved_colony"],
+    casualties: [],
+    skillGains: { tactical: 4 },
+    reputationDeltas: { federation: 5 },
+  },
+];
+assert(formatCampaignLog(entries).includes("Skirmish"), "log includes title");
 
 const deep = deepStructuralRefit(ship, sess);
-console.log("deep", deep.ok, deep.message);
+assert(deep.ok, "deep structural refit allowed on heavy damage");
 let s = deep.ship || ship;
 let se = deep.session;
-
-// After deep refit, hull slot is used — standard refit should fail
 const hullAgain = refitHull(s, se);
-console.log("hull-after-deep", hullAgain.ok, hullAgain.message);
+assert(hullAgain.ok === false, "hull slot consumed after deep refit");
 
 const heal = healCrewAtStarbase(s, se, "c2");
-console.log("heal", heal.ok, heal.message);
+assert(heal.ok, "sickbay heals injured officer");
 s = heal.ship || s;
 se = heal.session;
 
-// Fresh session for hire/transfer without deep-refit consuming system budget
 const sess2 = initStarbaseSession(s, { universe });
 const repair = repairSystemAtStarbase(s, sess2, "warp");
-console.log("repair-warp", repair.ok, repair.message);
+assert(repair.ok, "fleet yards can repair destroyed warp");
 s = repair.ship || s;
 se = repair.session;
 
 const shields = refitShields(s, se);
-console.log("shields", shields.ok, shields.message);
+assert(shields.ok, "shield recharge works when emitters not destroyed");
 s = shields.ship || s;
 se = shields.session;
 
 if (se.recruitOffers[0]) {
   const h = hireRecruit(s, se, se.recruitOffers[0].id);
-  console.log("hire", h.ok, h.message);
+  assert(h.ok, "hire recruit succeeds");
   s = h.ship || s;
   se = h.session;
 }
 
 const t = transferCrewMember(s, se, "c1");
-console.log("transfer", t.ok, t.message);
+assert(typeof t.ok === "boolean", "transfer returns a result");
 
-// Outpost budgets
-const lowU = {
-  ...universe,
-  factionReputation: { ...universe.factionReputation, federation: -10 },
-};
-const outpost = initStarbaseSession(ship, { universe: lowU });
-console.log("outpost", {
-  class: outpost.stationClass,
-  recruitBudget: outpost.recruitBudget,
-  systemRepairBudget: outpost.systemRepairBudget,
-});
-
-console.log("OK");
+if (failed) {
+  console.error(`\n${failed} assertion(s) failed`);
+  process.exit(1);
+}
+console.log("\nPhase 6 starbase hub: all assertions passed");

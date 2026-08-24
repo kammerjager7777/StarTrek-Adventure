@@ -45,16 +45,22 @@ Player action (UI)
   → POST /api/games/:id/action
   → Gamemaster (phase router)
       ├─ setup stages → structured / setupContent LLM
-      └─ playing
-           ├─ parse option | freeform
-           ├─ applyMechanics (dice, shields, systems, flags)
-           ├─ llmGamemaster → JSON scene (narration, options, sfx, …)
-           ├─ applySceneSideEffects + endMission clamps
-           └─ save GameState
+      ├─ playing
+      │    ├─ parse option | freeform
+      │    ├─ applyMechanics (dice, shields, systems, flags)
+      │    ├─ llmGamemaster → JSON scene (narration, options, sfx, …)
+      │    ├─ applySceneSideEffects + endMission clamps
+      │    └─ save GameState
+      └─ starbase (campaign hub)
+           ├─ refit / hire / heal / transfer (game-core referee)
+           ├─ view campaign log (no play turn)
+           ├─ choose next mission → mission_offer + universe
+           └─ save & stand down → profile, clear activeRunId
   → PublicGameView to client
   → bridge.js render
       ├─ typewriter + options
       ├─ ship/crew/objectives panels
+      ├─ starbase overlay when phase === starbase
       ├─ playStateDeltaSfx + playNarratorSfx(turn.sfx)
       ├─ autoSpeakBeat (Grok TTS)
       └─ viewscreen playlist (Imagine frames)
@@ -133,7 +139,12 @@ Durable campaigns are **profile-centric** (Phase 1), scoped per account:
 | Campaign profile | `data/users/{slug}/profiles/{id}.json` | `GET/POST /api/profiles`, `GET/DELETE /api/profiles/:id`, `POST /api/profiles/:id/continue` |
 | Mid-mission run | `data/users/{slug}/saves/{runId}.json` | `GET /api/games`, `POST /api/games/:id/action` |
 
-`updateProfileFromRun` merges ship, living crew, skills, and universe into the profile on debrief (and appends `campaignLog`). Continue resumes `activeRunId` if present; otherwise starts the next mission from the profile.
+`updateProfileFromRun` merges ship, living crew, skills, and universe into the profile on debrief (and appends `campaignLog`). It also stores `lastMissionType` / `lastDifficulty`.
+
+**Continue your story** (`POST /api/profiles/:id/continue`):
+
+- If `activeRunId` points at an **active** save → resume that run (mission or docked hub).
+- Else → new run at **`mission_offer`** with profile ship/crew/universe injected (defaults `exploration` / `medium` if last type/difficulty unset).
 
 The Campaign modal lists captains/ships first; session runs without a `profileId` are marked legacy.
 

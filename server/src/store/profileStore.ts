@@ -266,6 +266,8 @@ export async function updateProfileFromRun(
         crew,
         skills: computeShipSkills({ ...ship, crew }, crew),
         universe,
+        lastMissionType: runState.missionType || profile.lastMissionType || null,
+        lastDifficulty: runState.difficulty || profile.lastDifficulty || null,
       },
       entry
     );
@@ -277,6 +279,8 @@ export async function updateProfileFromRun(
       crew,
       skills,
       universe,
+      lastMissionType: runState.missionType || profile.lastMissionType || null,
+      lastDifficulty: runState.difficulty || profile.lastDifficulty || null,
       updatedAt: new Date().toISOString(),
     };
   }

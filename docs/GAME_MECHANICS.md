@@ -28,7 +28,7 @@ LLM generates scene (narration, options, sfx, objective updates, …)
      ↓
 apply scene side effects → next turn
      ↓
-(debrief when mission ends)
+debrief → starbase hub (refit / recruit / log / next mission)
 ```
 
 During **playing**:
@@ -53,8 +53,9 @@ During **playing**:
 | `mission_offer` | Pick among generated missions (or “more”) |
 | `mission_brief` | Briefing; accept to begin |
 | `playing` | Core mission loop |
-| `debrief` | Success/failure wrap-up |
-| `post_mission` | After debrief choices |
+| `debrief` | Success/failure wrap-up (immediately opens the hub) |
+| `starbase` | Campaign hub — refit, recruit, campaign log, next mission, stand down |
+| `post_mission` | Terminal after **Save and stand down**; Continue starts a new run |
 
 Run `status`: `active` | `completed` | `abandoned`.
 
@@ -519,7 +520,16 @@ Out-of-band consult (Phase 5). Code is the referee; the LLM only writes the frag
 - Dedicated skill pack: `content/skills/crew-advice.md` (not mixed into play-turn prompts).
 
 ### 16.6 Starbase (campaign hub)
-- After debrief, phase `starbase`: hub summary, refit, recruitment, then next mission or save & stand down.
+Phase 6. After debrief the run stays `active` and phase becomes `starbase`. Dedicated overlay (not the mission bridge) shows:
+
+- **Vessel** — hull, shields, systems, **skill totals**, roster with status badges (active / injured / KIA) and service time
+- **Standing** — faction reputation, galactic flags, active crises
+- **Yard** — limited refit buttons for this visit
+- **Personnel** — hire / heal / transfer
+- **Campaign log** — last missions from the profile (`GameState.campaignLog` snapshot)
+
+Hub orders (`starbaseHubChoices`): Review status, Refit (hull / deep / shields / systems), Recruit, Heal, Transfer, **View campaign log**, **Choose next mission**, **Save and stand down**.
+
 - **Facility tier** from Federation reputation:
   - `outpost` (rep &lt; 5): limited repairs/recruits
   - `starbase` (rep ≥ 5): standard yards
@@ -536,6 +546,11 @@ Out-of-band consult (Phase 5). Code is the referee; the LLM only writes the frag
   - Sickbay: clear injured officers (`medicalBudget`)
   - Transfer: free a billet (`transferBudget`; cannot transfer last active officer)
 - Session state on `GameState.starbase` (`StarbaseSession`); cleared when leaving for a new mission.
+- **Choose next mission** keeps current type/difficulty and opens `mission_offer` with **universe injected** (standing-aware offers).
+- **Save and stand down** writes the profile, clears `activeRunId`, sets `post_mission` / `completed`. That run is finished.
+- **Continue your story** (History): if `activeRunId` is an active save, resume it (including a docked hub). Otherwise start a new run from the profile at **`mission_offer`** with ship, crew, skills, universe, and last type/difficulty restored (`exploration` / `medium` if unset).
+
+Code is the referee for budgets, hires, and skill deltas. The LLM does not invent repair amounts.
 
 ---
 

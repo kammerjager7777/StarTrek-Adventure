@@ -612,6 +612,8 @@ export function createCampaignProfile(input: {
     universe: input.universe || emptyUniverse(stardateForEra(ship.era)),
     campaignLog: [],
     activeRunId: null,
+    lastMissionType: null,
+    lastDifficulty: null,
     ownerEmail: input.ownerEmail || null,
   };
 }
@@ -811,6 +813,120 @@ export function formatRecruitLine(c: CrewMember, compact = false): string {
     return `${rank}${c.name} — ${c.role} [${QUALITY_LABEL[q]}]`;
   }
   return `${rank}${c.name} — ${c.role} · ${c.species || "Unknown"} · ${QUALITY_LABEL[q]} · ${skills}`;
+}
+
+export function formatCampaignLog(
+  entries: CampaignLogEntry[] | null | undefined
+): string {
+  const list = entries || [];
+  if (!list.length) return "No prior missions on file.";
+  return list
+    .slice(-12)
+    .reverse()
+    .map((e) => {
+      const cas = e.casualties?.length
+        ? ` · casualties ${e.casualties.join(", ")}`
+        : "";
+      return `${e.stardate} — ${e.title} [${e.outcome}]${cas}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Numbered hub orders for a starbase visit (Phase 6).
+ * Code owns budgets; the UI / LLM must not invent extra refits.
+ */
+export function starbaseHubChoices(state: {
+  ship?: Ship | null;
+  starbase?: StarbaseSession | null;
+}): string[] {
+  const session = state.starbase;
+  const ship = state.ship;
+  const labels: string[] = ["Review starbase status"];
+  const hullGain =
+    session?.stationClass === "fleet_yards"
+      ? 55
+      : session?.stationClass === "starbase"
+        ? 40
+        : 28;
+
+  if (ship && session) {
+    const ratio =
+      ship.maxIntegrity > 0 ? ship.integrity / ship.maxIntegrity : 1;
+    if (
+      !session.deepRefitUsed &&
+      !session.hullRefitUsed &&
+      ratio <= 0.55 &&
+      session.systemsRepaired.length < session.systemRepairBudget
+    ) {
+      labels.push("Deep structural refit (major hull restore)");
+    }
+    if (!session.hullRefitUsed && ship.integrity < ship.maxIntegrity) {
+      labels.push(`Refit hull plating (+up to ${hullGain})`);
+    }
+    if (!session.shieldRefitUsed && ship.systems?.shields !== "destroyed") {
+      labels.push("Recharge shield grid (full)");
+    }
+    const remaining =
+      session.systemRepairBudget - session.systemsRepaired.length;
+    if (remaining > 0) {
+      const fleet = session.stationClass === "fleet_yards";
+      for (const [k, v] of Object.entries(ship.systems || {})) {
+        if (v !== "ok" && !session.systemsRepaired.includes(k)) {
+          const name =
+            k === "lifeSupport"
+              ? "Life support"
+              : k.charAt(0).toUpperCase() + k.slice(1);
+          const to = v === "destroyed" ? (fleet ? "ok" : "damaged") : "ok";
+          labels.push(`Repair: ${name} (${v}→${to})`);
+        }
+      }
+    }
+    if (session.medicalUsed < session.medicalBudget) {
+      for (const c of ship.crew || []) {
+        if (c.status === "injured") {
+          labels.push(
+            `Heal: ${c.name} (injured${
+              c.injuryTurnsRemaining != null
+                ? `, ${c.injuryTurnsRemaining} turns left`
+                : ""
+            })`
+          );
+        }
+      }
+    }
+    if (session.transfersUsed < session.transferBudget) {
+      const living = (ship.crew || []).filter(
+        (c) =>
+          (c.status || "active") === "active" || c.status === "injured"
+      );
+      if (living.length > 1) {
+        for (const c of living.slice(0, 6)) {
+          labels.push(`Transfer: ${c.name} — ${c.role}`);
+        }
+      }
+    }
+    if (session.recruitsHired < session.recruitBudget) {
+      for (const c of session.recruitOffers) {
+        const q = c.quality || "standard";
+        const rank = c.rank ? `${c.rank} ` : "";
+        const top = c.skills
+          ? Object.entries(c.skills)
+              .sort((a, b) => (b[1] as number) - (a[1] as number))
+              .slice(0, 2)
+              .map(([k, v]) => `${k.slice(0, 3)} ${v}`)
+              .join(" · ")
+          : "";
+        labels.push(
+          `Hire: ${rank}${c.name} — ${c.role} [${q}]${top ? ` (${top})` : ""}`
+        );
+      }
+    }
+  }
+  labels.push("View campaign log");
+  labels.push("Choose next mission");
+  labels.push("Save and stand down");
+  return labels;
 }
 
 /** Roles the ship is thin on (missing/dead/injured) */

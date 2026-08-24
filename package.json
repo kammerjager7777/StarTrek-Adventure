@@ -15,7 +15,8 @@
     "test:skills": "tsx scripts/smoke-skills.mts",
     "test:universe": "tsx scripts/smoke-universe.mts",
     "test:advice": "tsx scripts/smoke-advice.mts",
-    "test:voices": "tsx scripts/smoke-voice-gender.mts"
+    "test:voices": "tsx scripts/smoke-voice-gender.mts",
+    "test:starbase": "tsx scripts/smoke-starbase.mts"
   },
   "engines": {
     "node": ">=20"

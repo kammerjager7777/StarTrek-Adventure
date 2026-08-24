@@ -196,6 +196,10 @@ export type CampaignProfile = {
   campaignLog: CampaignLogEntry[];
   /** Optional mid-mission resume */
   activeRunId?: string | null;
+  /** Last selected mission type — used when Continue skips setup. */
+  lastMissionType?: MissionType | null;
+  /** Last selected difficulty — used when Continue skips setup. */
+  lastDifficulty?: Difficulty | null;
   /**
    * Account that owns this campaign (normalized email).
    * All profile list/load/continue is scoped by this field + user data dir.
@@ -418,6 +422,8 @@ export type GameState = {
   adviceCooldowns?: Record<string, number> | null;
   /** Temporary cache of the most recent officer consult (Phase 5). */
   lastAdvice?: LastAdvice | null;
+  /** Snapshot of the campaign log for the starbase hub (mirrors profile). */
+  campaignLog?: CampaignLogEntry[] | null;
   /** AI-generated ship offers during ship_select */
   setupShips?: Array<{
     id: string;

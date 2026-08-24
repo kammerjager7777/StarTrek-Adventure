@@ -2827,9 +2827,12 @@ body.starbase-active .shell {
 
 .starbase-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
   flex: 1;
+}
+.starbase-card-wide {
+  grid-column: 1 / -1;
 }
 @media (max-width: 960px) {
   .starbase-grid {
@@ -2870,6 +2873,68 @@ body.starbase-active .shell {
 .starbase-empty {
   color: var(--muted);
   font-size: 0.88rem;
+}
+.starbase-skills {
+  margin: 0.35rem 0 0.6rem;
+  color: var(--lcars-blue);
+  font-size: 0.82rem;
+}
+.starbase-roster,
+.starbase-rep,
+.starbase-log-list {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+.starbase-roster li,
+.starbase-rep li,
+.starbase-log-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  align-items: baseline;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  font-size: 0.84rem;
+}
+.starbase-roster-name {
+  font-weight: 700;
+}
+.starbase-roster-role,
+.starbase-log-when {
+  color: var(--muted);
+}
+.starbase-rep li {
+  justify-content: space-between;
+}
+.starbase-badge {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.starbase-badge.is-active {
+  color: var(--ok);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.starbase-badge.is-injured {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+.starbase-badge.is-dead,
+.starbase-badge.is-failed {
+  color: var(--danger);
+  border-color: rgba(251, 113, 133, 0.45);
+}
+.starbase-badge.is-success {
+  color: var(--ok);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.starbase-badge.is-transferred,
+.starbase-badge.is-abandoned {
+  color: var(--muted);
 }
 
 .starbase-foot {

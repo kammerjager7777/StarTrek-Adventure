@@ -16,7 +16,9 @@ import type {
 import {
   applyReputation,
   capitalizeName,
+  formatCampaignLog,
   interpretCaptainName,
+  starbaseHubChoices,
 } from "../../../packages/game-core/src/index.js";
 import { tracedTool } from "../debug/sessionDebugLog.js";
 import {
@@ -356,10 +358,13 @@ export async function advanceSetup(
     }
 
     case "debrief":
-    case "starbase":
-    case "post_mission": {
+    case "starbase": {
       return handleStarbase(next, input, state);
     }
+
+    case "post_mission":
+      // Save & stand down is terminal for this run — Continue your story starts a new one.
+      return next;
 
     default:
       return next;
@@ -371,7 +376,7 @@ async function handleStarbase(
   input: string,
   prev: GameState
 ): Promise<GameState> {
-  let next = await ensureStarbaseSession(state);
+  let next = await attachCampaignLog(await ensureStarbaseSession(state));
   const choice = parseChoice(input, next.pendingChoices);
   const text = input.trim().toLowerCase();
   const session = next.starbase!;
@@ -381,12 +386,18 @@ async function handleStarbase(
   const pickLabel =
     choice && labels[choice - 1] ? labels[choice - 1].toLowerCase() : text;
 
-  // Begin next mission
+  // Choose next mission
   if (
-    choice === labels.findIndex((l) => /begin another|next mission/i.test(l)) + 1 ||
-    /begin another|new mission|next mission|choose next/i.test(text)
+    /choose next mission|begin another|new mission|next mission/i.test(pickLabel) ||
+    /choose next mission|begin another|new mission|next mission/i.test(text)
   ) {
     return leaveStarbaseForMission(next, input, prev);
+  }
+
+  // View campaign log (no budgets, no play turn)
+  if (/view campaign log|campaign log/i.test(pickLabel) || /campaign log/i.test(text)) {
+    const logText = formatCampaignLog(next.campaignLog);
+    return paintStarbase(next, logText, prev, input);
   }
 
   // Save & stand down
@@ -637,96 +648,22 @@ async function ensureStarbaseSession(state: GameState): Promise<GameState> {
 }
 
 function starbaseChoiceLabels(state: GameState): string[] {
-  const session = state.starbase;
-  const ship = state.ship;
-  const labels: string[] = ["Review starbase status"];
-  const hullGain =
-    session?.stationClass === "fleet_yards"
-      ? 55
-      : session?.stationClass === "starbase"
-        ? 40
-        : 28;
+  return starbaseHubChoices(state);
+}
 
-  if (ship && session) {
-    const ratio =
-      ship.maxIntegrity > 0 ? ship.integrity / ship.maxIntegrity : 1;
-    if (
-      !session.deepRefitUsed &&
-      !session.hullRefitUsed &&
-      ratio <= 0.55 &&
-      session.systemsRepaired.length < session.systemRepairBudget
-    ) {
-      labels.push("Deep structural refit (major hull restore)");
+async function attachCampaignLog(state: GameState): Promise<GameState> {
+  if (state.campaignLog?.length) return state;
+  if (!state.profileId || !state.ownerEmail) return state;
+  try {
+    const { readProfile } = await import("../store/profileStore.js");
+    const profile = await readProfile(state.profileId, state.ownerEmail);
+    if (profile?.campaignLog?.length) {
+      return { ...state, campaignLog: profile.campaignLog };
     }
-    if (!session.hullRefitUsed && ship.integrity < ship.maxIntegrity) {
-      labels.push(`Refit hull plating (+up to ${hullGain})`);
-    }
-    if (!session.shieldRefitUsed && ship.systems?.shields !== "destroyed") {
-      labels.push("Recharge shield grid (full)");
-    }
-    const remaining =
-      session.systemRepairBudget - session.systemsRepaired.length;
-    if (remaining > 0) {
-      const fleet = session.stationClass === "fleet_yards";
-      for (const [k, v] of Object.entries(ship.systems || {})) {
-        if (v !== "ok" && !session.systemsRepaired.includes(k)) {
-          const name =
-            k === "lifeSupport"
-              ? "Life support"
-              : k.charAt(0).toUpperCase() + k.slice(1);
-          const to =
-            v === "destroyed" ? (fleet ? "ok" : "damaged") : "ok";
-          labels.push(`Repair: ${name} (${v}→${to})`);
-        }
-      }
-    }
-    // Sickbay
-    if (session.medicalUsed < session.medicalBudget) {
-      for (const c of ship.crew || []) {
-        if (c.status === "injured") {
-          labels.push(
-            `Heal: ${c.name} (injured${
-              c.injuryTurnsRemaining != null
-                ? `, ${c.injuryTurnsRemaining} turns left`
-                : ""
-            })`
-          );
-        }
-      }
-    }
-    // Transfers (list active/injured, not last active alone handled by rules)
-    if (session.transfersUsed < session.transferBudget) {
-      const living = (ship.crew || []).filter(
-        (c) =>
-          (c.status || "active") === "active" || c.status === "injured"
-      );
-      if (living.length > 1) {
-        for (const c of living.slice(0, 6)) {
-          labels.push(`Transfer: ${c.name} — ${c.role}`);
-        }
-      }
-    }
-    // Recruitment slate with quality + skill brief
-    if (session.recruitsHired < session.recruitBudget) {
-      for (const c of session.recruitOffers) {
-        const q = c.quality || "standard";
-        const rank = c.rank ? `${c.rank} ` : "";
-        const top = c.skills
-          ? Object.entries(c.skills)
-              .sort((a, b) => (b[1] as number) - (a[1] as number))
-              .slice(0, 2)
-              .map(([k, v]) => `${k.slice(0, 3)} ${v}`)
-              .join(" · ")
-          : "";
-        labels.push(
-          `Hire: ${rank}${c.name} — ${c.role} [${q}]${top ? ` (${top})` : ""}`
-        );
-      }
-    }
+  } catch {
+    /* ignore */
   }
-  labels.push("Begin another mission");
-  labels.push("Save and stand down");
-  return labels;
+  return state;
 }
 
 async function paintStarbase(
@@ -735,7 +672,7 @@ async function paintStarbase(
   prev: GameState,
   input: string
 ): Promise<GameState> {
-  const next = await ensureStarbaseSession(state);
+  const next = await attachCampaignLog(await ensureStarbaseSession(state));
   const labels = starbaseChoiceLabels(next);
   const body = [
     buildStarbaseSummary(next),
@@ -766,6 +703,27 @@ async function paintStarbase(
   );
 }
 
+/**
+ * After the hub, pick the next assignment. Keep type/difficulty when known
+ * and jump to mission_offer with universe still on state (Phase 6).
+ */
+export async function beginNextCampaignMission(
+  state: GameState
+): Promise<GameState> {
+  let next: GameState = {
+    ...state,
+    mission: null,
+    turn: null,
+    debrief: null,
+    missionOffers: null,
+    starbase: null,
+    status: "active",
+  };
+  if (!next.missionType) return goMissionType(next);
+  if (!next.difficulty) return goDifficulty(next);
+  return offerMissions(next);
+}
+
 async function leaveStarbaseForMission(
   state: GameState,
   input: string,
@@ -779,15 +737,14 @@ async function leaveStarbaseForMission(
     missionOffers: null,
     starbase: null,
     status: "active",
-    phase: "mission_type",
   };
   try {
     const { updateProfileFromRun } = await import("../store/profileStore.js");
-    await updateProfileFromRun(next, { clearActiveRun: true });
+    await updateProfileFromRun(next, { clearActiveRun: false });
   } catch {
     /* ignore */
   }
-  next = await goMissionType(next);
+  next = await beginNextCampaignMission(next);
   return logPlayerChoice(next, input, prev.pendingChoices);
 }
 
@@ -1921,6 +1878,7 @@ async function finishMission(
         profileId: profile.id,
         universe: profile.universe,
         ship: profile.ship,
+        campaignLog: profile.campaignLog,
       };
     }
   } catch (err) {

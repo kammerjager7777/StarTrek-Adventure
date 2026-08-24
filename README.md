@@ -37,7 +37,9 @@ Check AI link: `GET http://127.0.0.1:3000/api/ai/status`
 4. Choose mission type + difficulty  
 5. Accept a mission and **Begin**  
 6. Each turn: pick a **numbered option**, or type a free-text **order** / **question**  
-7. Meta commands (examples): `mission status`, `hint`, `recap`, `divert power to shields`, `change difficulty hard`, `restart`, `new mission`  
+7. After debrief you dock at **starbase**: refit, recruit, read the campaign log, choose the next mission, or save & stand down  
+8. **Continue your story** in History resumes a run, or offers the next mission with the same ship and galaxy  
+9. Meta commands (examples): `mission status`, `hint`, `recap`, `divert power to shields`, `change difficulty hard`, `restart`, `new mission`  
 
 **Voice ▾ menu:** auto-TTS, speed, **Bridge ambient**, **LCARS SFX** (TrekCore combat/UI sounds).  
 **Themes:** Classic or LCARS.
@@ -62,7 +64,8 @@ StarTrek-Adventure/
 - **Code is the referee** — dice, shields/hull, systems, scars, objectives, end clamps  
 - **LLM is the narrator** — prose, options, intel, flags, `sfx[]`, viewscreen prompts  
 - **Setup** is structured (name → ship → mission) for reliability  
-- **Saves** every turn; history modal can resume / delete runs  
+- **Saves** every turn; History resumes campaigns (profile ship/crew/universe) or mid-mission runs  
+- **Starbase hub** after each mission (refit, recruit, campaign log)  
 
 ## Docs
 

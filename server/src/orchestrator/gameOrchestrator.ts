@@ -17,6 +17,7 @@ import {
 } from "../../../packages/game-core/src/index.js";
 import {
   advanceSetup,
+  beginNextCampaignMission,
   LlmNarratorError,
   resolveChoiceLabel,
   resolvePlayTurn,
@@ -394,7 +395,10 @@ export async function continueProfile(
     ship,
     profileId: profile.id,
     universe: profile.universe || emptyUniverse(stardateForEra(ship.era)),
-    phase: "mission_type",
+    campaignLog: profile.campaignLog || [],
+    missionType: profile.lastMissionType || "exploration",
+    difficulty: profile.lastDifficulty || "medium",
+    phase: "mission_offer",
   };
 
   await initSessionDebugLog(state);
@@ -409,37 +413,7 @@ export async function continueProfile(
   });
 
   const before = state;
-  const { generateMissionTypePrompt } = await import(
-    "../agents/setupContent.js"
-  );
-  const prompt = await generateMissionTypePrompt(state);
-  const defaults = [
-    "Science — technology and problem-solving",
-    "Exploration — discovery and diplomacy",
-    "Search & Rescue — find and save those in peril",
-    "Battle — starship combat and strategy",
-    "Expanded — complex multi-skill Hardcore scenario",
-  ];
-  const choiceTexts =
-    prompt.choices?.length >= 5 ? prompt.choices.slice(0, 5) : defaults;
-  state = {
-    ...state,
-    phase: "mission_type",
-    pendingQuestion:
-      prompt.narration ||
-      "Captain, what manner of mission shall we undertake?",
-    pendingChoices: choiceTexts.map((text, i) => ({
-      id: i + 1,
-      text,
-      risk:
-        i === choiceTexts.length - 1
-          ? ("trap" as const)
-          : i >= 3
-            ? ("high" as const)
-            : ("medium" as const),
-    })),
-  };
-
+  state = await beginNextCampaignMission(state);
   state = await finalizeAction(before, state);
   return toView(state);
 }

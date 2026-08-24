@@ -37,7 +37,21 @@ Host already resolved dice and damage — narrate those results; do not re-roll 
 May emit `sfx[]` for bridge audio.  
 Respect destroyed/damaged systems in options and narration.
 
-## debrief / starbase
-Casualties/damage implications, objectives completed/failed/missed, condensed narrative of the run.
-After debrief the host moves to **starbase** (campaign hub): ship/crew status, reputation-tiered facility, refit (hull / deep structural / shields / systems), recruitment slate with quality tiers, sickbay heals, transfers, then begin another mission or save & stand down. Code is the referee for budgets and skill deltas — do not invent repair amounts or hire skills.
+## debrief
+Casualties/damage implications, objectives completed/failed/missed, condensed narrative of the run. Host then opens the **starbase** hub — do not keep generating play-turn JSON.
+
+## starbase
+Campaign hub after debrief (Phase 6). Host UI shows skill totals, crew status, reputation snapshot, and campaign log.
+
+Player orders the host understands (code referee):
+- Refit (limited per visit): hull, deep structural, shields, systems
+- Recruit / sickbay / transfer
+- View campaign log
+- Choose next mission → host goes to **mission_offer** with current universe injected
+- Save and stand down → campaign saved; Continue your story later
+
+Do **not** invent repair amounts, hire skills, deaths, or reputation changes. Do **not** treat hub clicks as play turns (no dice, no `playTurnCount`).
 **Advice** requests from crew cards are out-of-band (no dice, no play turn). Host returns a short fragment (narration + one officer line + optional extra option) and caches `lastAdvice`.
+
+## Continue your story
+If the captain continues from History: resume `activeRunId` when a run is still active. Otherwise the host starts at **mission_offer** with the profile’s ship, crew, and universe. Do not re-ask name or ship.

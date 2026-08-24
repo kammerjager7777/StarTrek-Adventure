@@ -29,6 +29,9 @@ You command a Starfleet starship. An AI Gamemaster — **Narrator** — narrates
 7. **Mission brief** — Background, main + secondary objectives, ship status  
 8. **Playing** — Captain’s log, crew dialogue, 3–4 options (or free-text), challenges  
 9. **End** — Debrief: damage, objectives, narrative recap  
+10. **Starbase (campaign hub)** — After debrief you dock: skill summary, crew status, reputation, campaign log. Refit (limited), recruit, choose the next mission, or save & stand down.
+
+**Continue your story** (History) resumes an in-progress run, or — if you stood down — jumps to the next **mission offer** with the same ship, crew, and living galaxy. You do not re-pick a captain or vessel.
 
 ## How a play turn feels
 
@@ -90,6 +93,8 @@ Natural **20** = critical success. Action modifiers can raise DCs further.
 ## Long-term consequences
 
 Decisions set **flags** (trap choices, critical failures, diplomatic fallout, `red_alert_active`, etc.) that color later scenes and can drive UI/audio (e.g. red-alert bed).
+
+Campaigns persist **ship skills**, **living crew**, **faction reputation**, and a **campaign log** of missions. Officers can be injured or lost; replacements are hired at starbase. Ask an officer for advice on the crew card (does not spend a turn).
 
 ## Bridge presentation (product)
 
