@@ -801,7 +801,6 @@ body.init-active .shell {
   pointer-events: none;
 }
 
-.crew-status-badge,
 .crew-service-badge {
   display: inline-flex;
   align-items: center;
@@ -812,36 +811,82 @@ body.init-active .shell {
   text-transform: uppercase;
   border-radius: 3px;
   line-height: 1.4;
-  text-shadow: none;
-}
-
-.crew-status-badge.is-injured {
-  background: #b45309;
-  color: #fff7ed;
-}
-
-.crew-status-badge.is-dead {
-  background: #991b1b;
-  color: #fecaca;
-}
-
-.crew-status-badge.is-transferred {
-  background: #334155;
-  color: #e2e8f0;
-}
-
-.crew-service-badge {
   background: rgba(2, 6, 23, 0.72);
   color: #e2e8f0;
   border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 .crew-tab.is-dead .crew-fill-photo {
-  filter: grayscale(0.85) brightness(0.72);
+  filter: grayscale(0.9) brightness(0.55);
 }
 
 .crew-tab.is-injured .crew-fill-photo {
-  filter: saturate(0.7);
+  filter: saturate(0.55) brightness(0.9);
+}
+
+.crew-tab.is-injured {
+  border-color: #b45309;
+}
+
+.crew-injured-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 10px 8px;
+  border: 1px solid rgba(180, 83, 9, 0.55);
+  border-radius: 8px;
+  background: rgba(120, 53, 15, 0.35);
+}
+
+.crew-injured-word {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.crew-injured-copy {
+  font-size: 0.75rem;
+  color: #fed7aa;
+}
+
+.crew-duty-stamp {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  background: rgba(20, 4, 8, 0.55);
+}
+
+.crew-duty-stamp.is-dead {
+  background:
+    linear-gradient(180deg, rgba(40, 6, 10, 0.35), rgba(12, 2, 4, 0.72));
+}
+
+.crew-duty-stamp-word {
+  font-size: clamp(1.35rem, 4.2vw, 2rem);
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fecaca;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85);
+  transform: rotate(-12deg);
+  border: 3px solid rgba(254, 202, 202, 0.85);
+  padding: 6px 14px 4px;
+}
+
+.crew-duty-stamp-note {
+  max-width: 90%;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #fca5a5;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
 }
 
 .crew-card-overlay {

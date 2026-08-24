@@ -1737,7 +1737,6 @@ function crewDutyBadge(c) {
 }
 
 function officerCardHtml(c, { generating = false } = {}) {
-  const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
   const service = typeof c.serviceTurns === "number" ? c.serviceTurns : 0;
   const missions = typeof c.missionsServed === "number" ? c.missionsServed : 0;
   const duty = crewDutyBadge(c);
@@ -1748,6 +1747,15 @@ function officerCardHtml(c, { generating = false } = {}) {
     : `<div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
         crewInitials(c.name)
       )}</div>`;
+  const deceased =
+    duty?.cls === "is-dead"
+      ? `<div class="crew-duty-stamp is-dead" role="status">
+            <span class="crew-duty-stamp-word">Deceased</span>
+            <span class="crew-duty-stamp-note">${escapeHtml(
+              c.deathCause || "Lost in the line of duty"
+            )}</span>
+          </div>`
+      : "";
   return `<article class="crew-tab${generating ? " is-imaging" : ""}${
     duty ? ` ${duty.cls}` : ""
   }" data-crew-id="${escapeHtml(c.id)}">
@@ -1762,13 +1770,6 @@ function officerCardHtml(c, { generating = false } = {}) {
               : ""
           }
           <div class="crew-card-badges">
-            ${
-              duty
-                ? `<span class="crew-status-badge ${duty.cls}">${escapeHtml(
-                    duty.label
-                  )}</span>`
-                : ""
-            }
             <span class="crew-service-badge" title="Service time">${service}t</span>
           </div>
           <div class="crew-card-gradient"></div>
@@ -1782,10 +1783,6 @@ function officerCardHtml(c, { generating = false } = {}) {
             <div><span class="crew-label">Species</span>${escapeHtml(
               c.species || "Unknown"
             )}</div>
-            <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
-            <div><span class="crew-label">Status</span>${escapeHtml(
-              duty ? duty.label : c.status || "active"
-            )}</div>
             <div><span class="crew-label">Service</span>${service} turns${
               missions ? ` · ${missions} missions` : ""
             }</div>
@@ -1795,16 +1792,10 @@ function officerCardHtml(c, { generating = false } = {}) {
             <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
               c.bio || "No dossier on file."
             )}</div>
-            ${
-              c.status === "dead"
-                ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
-                    c.deathCause || "lost in the line of duty"
-                  )}</div>`
-                : ""
-            }
             ${crewAdviceBlockHtml(c)}
           </div>
         </div>
+        ${deceased}
       </article>`;
 }
 
@@ -1957,7 +1948,20 @@ function applyCrewCarousel(index, { hail = false } = {}) {
 }
 
 function crewAdviceBlockHtml(c) {
-  const active = (c.status || "active") === "active";
+  const status = c.status || "active";
+  if (status === "dead") return "";
+  if (status === "injured") {
+    return `<div class="crew-span crew-injured-slot" role="status">
+              <span class="crew-injured-word">Injured</span>
+              <span class="crew-injured-copy">Unable to consult from sickbay</span>
+            </div>`;
+  }
+  if (status === "transferred") {
+    return `<div class="crew-span crew-injured-slot" role="status">
+              <span class="crew-injured-word">Transferred</span>
+              <span class="crew-injured-copy">No longer on this roster</span>
+            </div>`;
+  }
   const last = current?.state?.lastAdvice;
   const lastNote =
     last?.memberId === c.id && last.advice
@@ -1976,19 +1980,13 @@ function crewAdviceBlockHtml(c) {
                 maxlength="140"
                 placeholder="Optional question"
                 data-advice-id="${escapeHtml(c.id)}"
-                ${active ? "" : "disabled "}
                 autocomplete="off"
               />
               <button
                 type="button"
                 class="lcars-btn secondary crew-advice-btn"
                 data-advice-id="${escapeHtml(c.id)}"
-                ${active ? "" : "disabled "}
-                title="${
-                  active
-                    ? "Ask this officer for advice (does not spend a turn)"
-                    : "Only active officers can advise"
-                }"
+                title="Ask this officer for advice (does not spend a turn)"
               >Ask for advice</button>
             </div>`;
 }
@@ -2082,6 +2080,8 @@ async function onCrewCardExpand(tab, crewList) {
 
   const member = (crewList || []).find((c) => c.id === id);
   if (!member) return;
+  const status = member.status || "active";
+  if (status !== "active") return;
   // Need an active run for TTS
   if (!current?.state?.runId || !aiReady) return;
 
