@@ -377,27 +377,6 @@ body.init-active .shell {
   max-height: none;
 }
 
-.panel.left .ready-room-section {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 36%;
-}
-
-.panel.left .ready-room-section .panel-title {
-  flex: 0 0 auto;
-}
-
-.panel.left #ready-room-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding-right: 18px;
-  box-sizing: border-box;
-}
-
 .panel.left .crew-section {
   flex: 1 1 auto;
   min-height: 0; /* allow shrink so overflow can scroll */
@@ -414,8 +393,70 @@ body.init-active .shell {
   padding-right: 2px;
 }
 
+.panel.right {
+  overflow: hidden;
+}
+
+.panel.right .panel-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 6px;
+}
+
+.panel.right .objectives-section {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.panel.right .ready-room-section {
+  flex: 0 1 auto;
+  max-height: 36%;
+  min-height: 0;
+}
+
+.panel.right .ready-room-section .panel-title {
+  flex: 0 0 auto;
+}
+
+.panel.right #ready-room-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 14px;
+  box-sizing: border-box;
+}
+
+.panel.right .meta-section {
+  flex: 0 1 auto;
+  max-height: 22%;
+  min-height: 0;
+}
+
+.panel.right .run-section {
+  flex: 0 0 auto;
+}
+
+.panel.right .run-section.is-expanded {
+  flex: 0 1 auto;
+  max-height: 26%;
+}
+
+.panel.right .run-section .panel-collapse-toggle {
+  margin: 8px 0 0;
+}
+
+.panel.right .run-section.is-expanded .collapsible-body-inner {
+  overflow: auto;
+  min-height: 0;
+}
+
 .panel.right #objectives-panel,
-.panel.right #meta-panel {
+.panel.right #meta-panel,
+.panel.right #run-panel {
   overflow-y: auto;
 }
 
@@ -911,8 +952,7 @@ body.init-active .shell {
 }
 
 .panel.right #meta-panel {
-  flex: 0 1 auto;
-  max-height: 30%;
+  flex: 1 1 auto;
   min-height: 0;
 }
 

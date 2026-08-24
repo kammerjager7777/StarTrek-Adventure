@@ -203,11 +203,6 @@
             <div id="ship-panel" class="panel-body muted">No ship selected</div>
           </section>
 
-          <section class="panel-section ready-room-section">
-            <h2 class="panel-title">Ready Room</h2>
-            <div id="ready-room-panel" class="panel-body muted">—</div>
-          </section>
-
           <section class="panel-section crew-section">
             <h2 class="panel-title">Crew</h2>
             <div id="crew-panel" class="panel-body crew-panel muted">—</div>
@@ -316,14 +311,44 @@
         </section>
 
         <aside class="panel right">
-          <h2 class="panel-title">Objectives</h2>
-          <div id="objectives-panel" class="panel-body muted">—</div>
+          <section class="panel-section objectives-section">
+            <h2 class="panel-title">Objectives</h2>
+            <div id="objectives-panel" class="panel-body muted">—</div>
+          </section>
 
-          <h2 class="panel-title">Meta</h2>
-          <div id="meta-panel" class="panel-body meta-list"></div>
+          <section class="panel-section ready-room-section">
+            <h2 class="panel-title">Ready Room</h2>
+            <div id="ready-room-panel" class="panel-body muted">—</div>
+          </section>
 
-          <h2 class="panel-title">Run</h2>
-          <div id="run-panel" class="panel-body muted small">No active run</div>
+          <section class="panel-section meta-section">
+            <h2 class="panel-title">Meta</h2>
+            <div id="meta-panel" class="panel-body meta-list"></div>
+          </section>
+
+          <section
+            class="panel-section run-section collapsible-panel is-collapsed"
+            id="run-section"
+            data-panel="run"
+          >
+            <button
+              type="button"
+              class="panel-collapse-toggle run-toggle"
+              id="run-toggle"
+              aria-expanded="false"
+              aria-controls="run-body"
+              title="Expand or collapse run debug"
+            >
+              <span class="collapse-chevron" aria-hidden="true">▸</span>
+              <span class="collapse-label">Run</span>
+              <span class="collapse-summary" id="run-collapse-summary">No active run</span>
+            </button>
+            <div class="collapsible-body" id="run-body">
+              <div class="collapsible-body-inner">
+                <div id="run-panel" class="panel-body muted small">No active run</div>
+              </div>
+            </div>
+          </section>
         </aside>
       </main>
 

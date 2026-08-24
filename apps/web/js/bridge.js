@@ -102,6 +102,9 @@ const els = {
   objectives: document.getElementById("objectives-panel"),
   meta: document.getElementById("meta-panel"),
   run: document.getElementById("run-panel"),
+  runSection: document.getElementById("run-section"),
+  runToggle: document.getElementById("run-toggle"),
+  runCollapseSummary: document.getElementById("run-collapse-summary"),
   viewscreen: document.getElementById("viewscreen-content"),
   viewscreenCaption: document.getElementById("viewscreen-caption"),
   viewscreenMeta: document.getElementById("viewscreen-meta"),
@@ -785,6 +788,15 @@ function render(view, opts = {}) {
       nv ? ` · GM ${nv.voiceName || nv.voiceId}` : ""
     } · ${voice.speed}×`,
   ].join("\n");
+  if (els.runCollapseSummary) {
+    els.runCollapseSummary.textContent = [
+      s.phase || s.status,
+      s.difficulty,
+      s.runId ? `${s.runId.slice(0, 8)}…` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
 
   renderShip(s.ship);
   renderReadyRoom(s.ship, s.universe);
@@ -3510,16 +3522,17 @@ function loadPanelExpandedPrefs() {
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
     // Default: viewscreen collapsed until mission-start Incoming Communication
-    if (!raw) return { viewscreen: false, history: false };
+    if (!raw) return { viewscreen: false, history: false, run: false };
     const parsed = JSON.parse(raw);
     return {
       // Only open if the user explicitly expanded it
       viewscreen: parsed.viewscreen === true,
       // History is always collapsed unless the user explicitly expanded it
       history: parsed.history === true,
+      run: parsed.run === true,
     };
   } catch {
-    return { viewscreen: false, history: false };
+    return { viewscreen: false, history: false, run: false };
   }
 }
 
@@ -3530,6 +3543,7 @@ function savePanelExpandedPrefs() {
       JSON.stringify({
         viewscreen: isPanelExpanded(els.viewscreenPanel),
         history: isPanelExpanded(els.logHistoryPanel),
+        run: isPanelExpanded(els.runSection),
       })
     );
   } catch {
@@ -3579,6 +3593,9 @@ function initCollapsiblePanels() {
     Boolean(prefs.history),
     { persist: false }
   );
+  setPanelExpanded(els.runSection, els.runToggle, Boolean(prefs.run), {
+    persist: false,
+  });
   // Clear stale open state from older builds once
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
@@ -3606,6 +3623,11 @@ function initCollapsiblePanels() {
   if (els.logHistoryToggle) {
     els.logHistoryToggle.addEventListener("click", () => {
       togglePanel(els.logHistoryPanel, els.logHistoryToggle);
+    });
+  }
+  if (els.runToggle) {
+    els.runToggle.addEventListener("click", () => {
+      togglePanel(els.runSection, els.runToggle);
     });
   }
 }
