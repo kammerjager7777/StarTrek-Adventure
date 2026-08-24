@@ -18,16 +18,23 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 ### Bridge UI
 
 - [x] Classic + LCARS themes  
+- [x] Header: TNG combadge + Star Trek Adventure (same icon as favicon)  
 - [x] Mission log typewriter, options bar, Engage, soft errors  
 - [x] Ship panel (hull, shields, systems)  
 - [x] Starbase vessel card (scars / lasting damage log)  
-- [x] Captain’s Ready Room (skill bars + reputation)  
-- [x] Crew cards + expand hail (Injured / KIA badges, service time)  
+- [x] Captain’s Ready Room (right rail under Objectives; skill bars + standing)  
+- [x] Right rail: Objectives + Ready Room hug content; Meta fills leftover; expanding Run shrinks Meta  
+- [x] Crew carousel (stacked portraits when collapsed; dots + one-card-per-scroll when expanded)  
+- [x] Crew hail on open/switch; speaking officer border flash (hail, advice, log lines)  
+- [x] Injured / deceased shown on the card (consult replaced or whole-card stamp)  
+- [x] LCARS scan shimmer on panel titles including Crew  
 - [x] Objectives panel with success/failure presentation  
 - [x] Collapsible viewscreen + mission history strip  
-- [x] Run history modal (resume / delete)  
+- [x] Run history modal (resume / delete); in-mission Run panel collapsed by default  
 - [x] New Game full-screen init (crew portraits / voice locks)  
 - [x] Incoming Communication mission-start presentation  
+- [x] Full-width LCARS starbase hub + decorative rails  
+- [x] Mission board: type → difficulty (Expanded = Hardcore), hover details, briefing TTS  
 
 ### Narrator & media
 
@@ -36,7 +43,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Campaign-layer skill packs (no invented skills/deaths/reputation; starbase + advice flow)  
 - [x] Session debug JSONL  
 - [x] Grok TTS (auto-voice, speed, pause/stop, line replay)  
-- [x] Locked voice identities (Narrator + crew)  
+- [x] Locked voice identities (Narrator + crew; gender-matched)  
 - [x] Viewscreen journey frames (Imagine) + visual bibles  
 - [x] Crew portrait generation  
 
@@ -62,6 +69,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Continue your story → resume mission, or reload the starbase hub  
 - [x] LLM skill packs aligned with the referee  
 - [x] Captain’s Ready Room (skill bars + standing)  
+- [x] Player is the captain (not listed as a bridge officer)  
 
 ### Docs
 

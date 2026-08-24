@@ -104,15 +104,16 @@ Campaigns persist **ship skills**, **living crew**, **faction reputation**, and 
 
 ## Bridge presentation (product)
 
-- **Themes:** Classic or LCARS  
-- **Ready Room:** Skill bars and faction standing (right rail, under Objectives)  
-- **Crew:** Collapse to a stacked portrait list; expand for the carousel dossier (starts on the first officer)  
+- **Themes:** Classic or LCARS (LCARS titles share a scan shimmer, including Crew)  
+- **Header:** TNG combadge + Star Trek Adventure  
+- **Ready Room:** Skill bars and faction standing (right rail, under Objectives). The section hugs its content so Meta can use leftover height. Expanding **Run** shrinks Meta, not Ready Room.  
+- **Crew:** Collapse to an equal stacked portrait list (carousel off); expand for the vertical carousel (side dots, one officer per scroll). Hail when opening from the stack or switching officers — not when the open card is clicked again. While that officer’s audio plays (hail, advice, or a mission-log line), the card border flashes purple↔yellow. Injured replaces consult; deceased stamps the card. The player captain is not on the roster.  
 - **Scars:** Lasting damage record on the starbase vessel card (not the in-mission panel)  
 - **Viewscreen:** Journey-book images; Incoming Communication at mission start  
-- **Voice:** Auto-play Narrator + crew; per-line replay  
+- **Voice:** Auto-play Narrator + crew (gender-matched locks); per-line replay  
 - **Audio:** TNG bridge ambient + TrekCore SFX (orders, combat, narrator cues)  
 - **History:** Resume / delete prior runs  
-- **Starbase hub:** Campaign log, yard, personnel  
+- **Starbase hub:** Full-width LCARS home when not in a mission — campaign log, yard, personnel. **Choose next mission** opens the board (type, difficulty; Expanded locked to Hardcore). Hover a card for the briefing; speaker pip reads it aloud.  
 
 ## Related
 

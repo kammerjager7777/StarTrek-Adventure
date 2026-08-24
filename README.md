@@ -53,8 +53,8 @@ StarTrek-Adventure/
 ├── server/                   # API, gamemaster, tools, xAI services
 ├── packages/game-core/       # Shared types + pure rules (dice, combat)
 ├── content/skills/           # GM / setup / viewscreen skill packs
-├── data/saves/               # Persisted runs (gitignored)
-├── data/debug/               # Per-run JSONL debug logs
+├── data/users/{email}/       # Per-account saves, profiles, debug logs
+├── data/media/               # Portraits, viewscreen frames, TTS cache
 └── docs/                     # Design, mechanics, architecture, roadmap
 ```
 
@@ -63,8 +63,8 @@ StarTrek-Adventure/
 - **Code is the referee** — dice, shields/hull, systems, scars, objectives, end clamps  
 - **LLM is the narrator** — prose, options, intel, flags, `sfx[]`, viewscreen prompts  
 - **Setup** is structured (name → ship → mission) for reliability  
-- **Saves** every turn; History resumes campaigns (profile ship/crew/universe) or mid-mission runs  
-- **Starbase hub** after each mission (refit, recruit, campaign log)  
+- **Saves** every turn, scoped per account; History resumes campaigns (profile ship/crew/universe) or mid-mission runs  
+- **Starbase hub** is home whenever you are not in a mission (refit, recruit, campaign log)  
 
 ## Docs
 
@@ -85,14 +85,14 @@ StarTrek-Adventure/
 | Text API | `GET /api/games/{runId}/debug.txt` |
 | List logs | `GET /api/debug` |
 
-Events include user input, narrator output, tool calls (dice, integrity, flags), phase changes, and errors. Run id appears in the Run panel.
+Events include user input, narrator output, tool calls (dice, integrity, flags), phase changes, and errors. Run id appears in the collapsible Run panel (right rail). Account-scoped logs also live under `data/users/{email}/debug/`.
 
 ## Production (GCP)
 
-Private Cloud Run + **IAP** (your Gmail only). Details: **[deploy/gcp/README.md](deploy/gcp/README.md)**.
+Private Cloud Run with an **app-level Google allow-list** (LCARS sign-in page; not IAP). Details: **[deploy/gcp/README.md](deploy/gcp/README.md)**.
 
 **Open:** https://sta-bridge-ledmkjy2mq-uc.a.run.app  
-Sign in with **`mrarcam00@gmail.com`**.
+Sign in with an allowed Gmail (`mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, or `npgibbs@gmail.com`).
 
 ```bash
 # Optional local proxy
@@ -103,7 +103,7 @@ Sign in with **`mrarcam00@gmail.com`**.
 |--|--|
 | Project | `star-trek-adventure-3524d3` |
 | Region | `us-central1` |
-| Access | IAP → Google login; only your Gmail |
+| Access | Google Sign-In; allow-listed Gmail only |
 
 ## License / IP
 

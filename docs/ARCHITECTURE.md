@@ -60,7 +60,8 @@ Player action (UI)
   → PublicGameView to client
   → bridge.js render
       ├─ typewriter + options
-      ├─ ship / Ready Room (skills + standing) / crew cards
+      ├─ ship / Ready Room (skills + standing) / crew carousel
+      ├─ speaking-officer card flash from TTS speaker (hail, advice, log lines)
       ├─ starbase overlay when phase === starbase (includes campaign log)
       ├─ playStateDeltaSfx + playNarratorSfx(turn.sfx)
       ├─ autoSpeakBeat (Grok TTS)
@@ -126,6 +127,8 @@ Advice (`POST /api/games/:id/crew/advice`) is not a phase and not a play turn.
 | `trekSfx.js` | TrekCore catalog: orders, combat deltas, UI, **narrator sfx[]**, red-alert loop |
 
 Toggle: Voice ▾ → **LCARS SFX** / **Bridge ambient**. Catalog: `apps/web/assets/sfx/README.md`.
+
+Crew TTS (auto-voice, hail, advice, or a clicked log line) lights the matching `.crew-tab` with `is-speaking` for the duration of that officer’s audio.
 
 ## Narrator-controlled SFX
 

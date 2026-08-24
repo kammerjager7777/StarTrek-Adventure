@@ -568,13 +568,15 @@ Phase 7. Packs in `content/skills/` keep the narrator aligned with the referee:
 
 Setup prompts load `setup-content.md`. Play turns load a compact concatenation (advice pack excluded).
 
-### 16.8 Bridge UI (Phase 8)
+### 16.8 Bridge UI (Phase 8+)
 Viewscreen and SFX are unchanged. Campaign state is visible on the bridge and hub:
 
-- **Captain's Ready Room** (right column, under Objectives) — ship skill bars (0–100, band `b0`–`b10`) and faction reputation summary (standing, flags, crises). **Run** is collapsed by default.
-- **Crew cards** — always open. Active officers show consult. Injured replaces consult. Deceased stamps the whole card.
+- **Header** — TNG Starfleet combadge + “Star Trek Adventure” (same mark as the favicon). Classic / LCARS / Voice / New Game / Campaign stay in the top bar.
+- **Captain's Ready Room** (right column, under Objectives) — ship skill bars (0–100, band `b0`–`b10`) and faction reputation summary (standing, flags, crises). Objectives and Ready Room size to their content; **Meta** fills leftover height. **Run** is collapsed by default; expanding it shrinks Meta, not Ready Room.
+- **Crew** — collapse to an equal stacked portrait list (carousel off, roster-colored borders). Expand for a vertical carousel (side dots; one card per scroll/gesture; starts on the first officer or the officer you clicked). Active officers show consult; Injured replaces consult; deceased stamps the whole card. No Voice / Portrait / Loyalty / Status fields on the dossier.
+- **Crew hail & speaking** — hail when opening from the stack or switching officers (dots/scroll); do not re-hail a card that is already open. While that officer’s TTS plays (hail, advice, or a clickable mission-log line), the matching card border runs a purple↔yellow gradient. Pause freezes it; stop/end clears it. Collapsed stacked cards still flash if that officer is speaking.
 - **In-mission ship panel** — live hull, shields, and systems only. Scars are not shown during play.
-- **Starbase hub** — Campaign log, standing, yard/personnel, and the **scar record** on the Vessel card.
+- **Starbase hub** — full-width LCARS home when not in a mission. Campaign log, standing, yard/personnel, decorative rails, and the **scar record** on the Vessel card. **Choose next mission** opens the board: pick type then difficulty (**Expanded is locked to Hardcore**), hover-expand briefing, speaker pip to read aloud. Incoming Communication shows while the board compiles.
 
 `npm run test:phase8` covers the campaign checklist (baselines, death/scar/flag, skill DC, advice not a turn, universe ticks, standing-aware briefs, profile save/load, mid-mission `activeRunId`).
 
