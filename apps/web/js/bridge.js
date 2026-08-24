@@ -3128,9 +3128,27 @@ function renderMissionBoard(state) {
             }`;
           const btn = starbaseButton(choices[i]?.text || title);
           card.appendChild(btn);
+          card.addEventListener("mouseenter", () => {
+            if (!card.classList.contains("is-held-shut")) {
+              card.classList.add("is-open");
+            }
+          });
+          card.addEventListener("mouseleave", () => {
+            card.classList.remove("is-held-shut");
+            if (!card.classList.contains("is-pinned")) {
+              card.classList.remove("is-open");
+            }
+          });
           card.addEventListener("click", (e) => {
             if (e.target.closest("button")) return;
-            card.classList.toggle("is-open");
+            const pinned = card.classList.toggle("is-pinned");
+            if (pinned) {
+              card.classList.add("is-open");
+              card.classList.remove("is-held-shut");
+            } else {
+              card.classList.remove("is-open");
+              card.classList.add("is-held-shut");
+            }
           });
           host.appendChild(card);
         });

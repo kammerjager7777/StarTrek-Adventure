@@ -3209,8 +3209,6 @@ body.mission-board-active .shell {
     padding 0.22s ease,
     border-color 0.22s ease;
 }
-.mission-card:hover .mission-card-extra,
-.mission-card:focus-within .mission-card-extra,
 .mission-card.is-open .mission-card-extra {
   max-height: 22rem;
   opacity: 1;
