@@ -86,11 +86,10 @@ body.init-active .shell {
 
 .brand-mark {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: auto;
+  height: 28px;
   display: block;
-  color: var(--lcars-blue);
-  filter: drop-shadow(0 0 8px var(--lcars-blue));
+  object-fit: contain;
 }
 
 .top-actions {
@@ -2728,8 +2727,6 @@ body.red-alert .top-bar {
   animation: red-alert-bar 1.2s ease-in-out infinite;
 }
 body.red-alert .brand-mark {
-  color: #ef4444;
-  filter: drop-shadow(0 0 10px #ef4444);
   animation: red-alert-pip 0.7s steps(2, end) infinite;
 }
 body.red-alert .log-panel {
