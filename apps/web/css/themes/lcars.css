@@ -136,12 +136,14 @@ html[data-ui-theme="lcars"] #init-percent {
     animation: lcars-rail-shift 8s linear infinite;
   }
 
-  html[data-ui-theme="lcars"] .panel-title {
+  html[data-ui-theme="lcars"] .panel-title,
+  html[data-ui-theme="lcars"] .panel.left .crew-toggle {
     position: relative;
     overflow: hidden;
   }
 
-  html[data-ui-theme="lcars"] .panel-title::after {
+  html[data-ui-theme="lcars"] .panel-title::after,
+  html[data-ui-theme="lcars"] .panel.left .crew-toggle::after {
     content: "";
     position: absolute;
     left: -40%;
@@ -234,6 +236,7 @@ html[data-ui-theme="lcars"] #init-percent {
 
 @media (prefers-reduced-motion: reduce) {
   html[data-ui-theme="lcars"] .panel-title::after,
+  html[data-ui-theme="lcars"] .panel.left .crew-toggle::after,
   html[data-ui-theme="lcars"] .top-bar::after,
   html[data-ui-theme="lcars"] .waiting-banner,
   html[data-ui-theme="lcars"] .sys-damaged,
@@ -568,6 +571,26 @@ html[data-ui-theme="lcars"] .crew-tab.is-hailing {
   animation: lcars-wait-pulse 0.9s ease-in-out infinite;
 }
 
+html[data-ui-theme="lcars"] .crew-tab.is-speaking,
+html[data-ui-theme="lcars"] .crew-tab.is-speaking.is-hailing {
+  border-color: var(--lcars-peach);
+  box-shadow: none;
+  animation: none;
+}
+
+html[data-ui-theme="lcars"] .crew-tab.is-speaking::after {
+  padding: 2px;
+  border-radius: 0 16px 0 0;
+  background: linear-gradient(
+    120deg,
+    var(--lcars-bar-2),
+    var(--lcars-peach),
+    var(--lcars-bar-4),
+    var(--lcars-bar-2)
+  );
+  background-size: 300% 300%;
+}
+
 html[data-ui-theme="lcars"] .crew-tab.is-injured {
   border-color: var(--lcars-bar);
 }
@@ -578,6 +601,15 @@ html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-hailing,
 html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-injured,
 html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-pinned {
   border: 2px solid var(--lcars-bar-2);
+  box-shadow: none;
+  animation: none;
+}
+
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-speaking,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-carousel-slide.is-active .crew-tab.is-speaking,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-speaking.is-hailing,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-speaking.is-pinned {
+  border: 2px solid var(--lcars-peach);
   box-shadow: none;
   animation: none;
 }

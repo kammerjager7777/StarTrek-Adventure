@@ -894,6 +894,7 @@ function stopVoicePlayback() {
     voice.objectUrl = null;
   }
   setSpeechBedsDucked(false);
+  clearSpeakingCrew();
   updateVoiceToggleUi();
 }
 
@@ -908,6 +909,7 @@ function pauseVoicePlayback() {
     }
   }
   updateVoiceToggleUi();
+  syncSpeakingCrewHighlight();
   voiceLog("paused");
 }
 
@@ -923,6 +925,7 @@ function resumeVoicePlayback() {
     });
   }
   updateVoiceToggleUi();
+  syncSpeakingCrewHighlight();
   voiceLog("resumed");
 }
 
@@ -962,6 +965,100 @@ function clearSpeakableHighlight() {
   document
     .querySelectorAll(".speakable.is-speaking-line")
     .forEach((el) => el.classList.remove("is-speaking-line"));
+}
+
+function normalizeSpeakerKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^(cmdr|commander|lt\.?\s*cmdr|captain|counselor|doctor|dr)\.?\s+/i, "")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findOfficerBySpeaker(speaker) {
+  const raw = String(speaker || "").trim();
+  const key = normalizeSpeakerKey(raw);
+  if (!key || key === "narrator" || key === "computer" || key === "captain") {
+    return null;
+  }
+  const officers = displayBridgeCrew(current?.state?.ship?.crew || []);
+  if (!officers.length) return null;
+  const byId = officers.find((c) => c.id === raw);
+  if (byId) return byId;
+  const exact = officers.find((c) => normalizeSpeakerKey(c.name) === key);
+  if (exact) return exact;
+  const last = key.split(" ").pop();
+  const lastHits = officers.filter(
+    (c) => normalizeSpeakerKey(c.name).split(" ").pop() === last
+  );
+  if (lastHits.length === 1) return lastHits[0];
+  const fuzzy = officers.filter((c) => {
+    const n = normalizeSpeakerKey(c.name);
+    return n.includes(key) || key.includes(n);
+  });
+  if (fuzzy.length === 1) return fuzzy[0];
+  const roleHits = officers.filter((c) =>
+    normalizeSpeakerKey(c.role).includes(key)
+  );
+  if (roleHits.length === 1) return roleHits[0];
+  return null;
+}
+
+function highlightMatchingCrewLine(speaker, text) {
+  const wantSpeaker = normalizeSpeakerKey(speaker);
+  const wantText = String(text || "").trim();
+  if (!wantSpeaker || wantSpeaker === "narrator") return;
+  const nodes = [
+    ...document.querySelectorAll(".log-entry.current .speakable.crew-line"),
+    ...document.querySelectorAll(".log-entry.past .speakable.crew-line"),
+  ];
+  let match = null;
+  for (const el of nodes) {
+    if (normalizeSpeakerKey(el.dataset.voiceSpeaker) !== wantSpeaker) continue;
+    const clip = String(el.dataset.voiceText || "").trim();
+    if (
+      !wantText ||
+      clip === wantText ||
+      clip.startsWith(wantText) ||
+      wantText.startsWith(clip) ||
+      clip.includes(wantText.slice(0, 48))
+    ) {
+      match = el;
+      if (clip === wantText || clip.startsWith(wantText)) break;
+    }
+  }
+  if (match) match.classList.add("is-speaking-line");
+}
+
+function syncSpeakingCrewHighlight() {
+  const tabs = els.crew?.querySelectorAll(".crew-tab[data-crew-id]") || [];
+  const paused = Boolean(voice.paused);
+  tabs.forEach((tab) => {
+    const on =
+      Boolean(speakingCrewId) &&
+      tab.getAttribute("data-crew-id") === speakingCrewId;
+    tab.classList.toggle("is-speaking", on);
+    tab.classList.toggle("is-speaking-paused", on && paused);
+  });
+}
+
+function setSpeakingCrew(speaker, { highlightLine = false, text = "" } = {}) {
+  const officer = findOfficerBySpeaker(speaker);
+  speakingCrewId = officer?.id || null;
+  syncSpeakingCrewHighlight();
+  if (highlightLine) highlightMatchingCrewLine(speaker, text);
+}
+
+function clearSpeakingCrew() {
+  speakingCrewId = null;
+  if (!els.crew) return;
+  els.crew
+    .querySelectorAll(".crew-tab.is-speaking, .crew-tab.is-speaking-paused")
+    .forEach((tab) => {
+      tab.classList.remove("is-speaking", "is-speaking-paused");
+    });
 }
 
 function markSpeakable(el, { speaker, text }) {
@@ -1013,6 +1110,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
   setSpeechBedsDucked(true);
   clearSpeakableHighlight();
   if (highlightEl) highlightEl.classList.add("is-speaking-line");
+  setSpeakingCrew(speaker);
   updateVoiceToggleUi();
 
   voiceLog("replay_start", {
@@ -1063,6 +1161,7 @@ async function replaySpeech(speaker, text, highlightEl = null) {
       voice.paused = false;
       setSpeechBedsDucked(false);
       clearSpeakableHighlight();
+      clearSpeakingCrew();
       updateVoiceToggleUi();
     }
   }
@@ -1298,6 +1397,11 @@ async function autoSpeakBeat(state) {
 
   voice.speaking = true;
   setSpeechBedsDucked(true);
+  clearSpeakableHighlight();
+  setSpeakingCrew(units[0].speaker, {
+    highlightLine: true,
+    text: units[0].text,
+  });
   updateVoiceToggleUi();
 
   voiceLog("beat_start", {
@@ -1322,6 +1426,12 @@ async function autoSpeakBeat(state) {
 
       await waitWhilePaused(token);
       if (token !== voice.token || !voice.enabled) break;
+
+      clearSpeakableHighlight();
+      setSpeakingCrew(units[i].speaker, {
+        highlightLine: true,
+        text: units[i].text,
+      });
 
       const result = await nextFetch;
       if (token !== voice.token || !voice.enabled) break;
@@ -1372,6 +1482,8 @@ async function autoSpeakBeat(state) {
       voice.speaking = false;
       voice.paused = false;
       setSpeechBedsDucked(false);
+      clearSpeakableHighlight();
+      clearSpeakingCrew();
       updateVoiceToggleUi();
     }
   }
@@ -1661,6 +1773,8 @@ let crewWheelGestureLock = false;
 let crewWheelSettleTimer = null;
 let crewHailSeq = 0;
 let crewHailQuietUntil = 0;
+/** Roster officer whose TTS is currently playing (card border flash). */
+let speakingCrewId = null;
 
 /** Viewscreen journey-book rotation */
 let viewscreenRotateTimer = null;
@@ -1764,7 +1878,7 @@ function officerCardHtml(c, { generating = false } = {}) {
       : "";
   return `<article class="crew-tab${generating ? " is-imaging" : ""}${
     duty ? ` ${duty.cls}` : ""
-  }" data-crew-id="${escapeHtml(c.id)}">
+  }" data-crew-id="${escapeHtml(c.id)}" data-crew-name="${escapeHtml(c.name)}">
         <div class="crew-card-face">
           ${photo}
           ${
@@ -1863,6 +1977,7 @@ function paintCrewCarousel(officers, { showGenerating = false, pendingCount = 0 
   bindCrewCarousel(officers);
   updateCrewCollapseSummary(officers);
   syncCrewRosterLayout();
+  syncSpeakingCrewHighlight();
 }
 
 function isCrewRosterExpanded() {
