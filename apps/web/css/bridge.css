@@ -627,6 +627,7 @@ body.init-active .shell {
   background: #0a0f1a;
   min-height: 0;
   height: 100%;
+  box-sizing: border-box;
   transition: border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
@@ -647,8 +648,8 @@ body.init-active .shell {
   position: relative;
   display: block;
   width: 100%;
-  flex: 1 1 42%;
-  min-height: 120px;
+  flex: 1 1 0;
+  min-height: 96px;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -924,11 +925,9 @@ body.init-active .shell {
 
 .crew-tab-details {
   display: block;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
-  max-height: 58%;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   background: #0c1220;
 }
 
@@ -939,10 +938,10 @@ body.init-active .shell {
 .crew-detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  font-size: 0.78rem;
-  line-height: 1.35;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  font-size: 0.75rem;
+  line-height: 1.3;
   border-top: 1px solid var(--border);
   white-space: normal !important;
 }
@@ -2950,18 +2949,18 @@ body.init-active .shell {
 .crew-advice-block {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.28rem;
 }
 .crew-advice-q {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 9px;
+  padding: 5px 8px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: #0b1220;
   color: var(--text);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 .crew-advice-q:focus {
   outline: none;
@@ -2974,9 +2973,13 @@ body.init-active .shell {
   cursor: not-allowed;
 }
 .crew-advice-btn {
-  margin-top: 0.1rem;
-  width: 100%;
-  font-size: 0.8rem;
+  margin-top: 0.05rem;
+  width: auto;
+  align-self: flex-start;
+  padding: 4px 12px;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
 }
 .crew-last-advice {
   color: var(--lcars-blue);
