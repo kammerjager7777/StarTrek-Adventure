@@ -1720,7 +1720,7 @@ function crewDutyBadge(c) {
   return null;
 }
 
-function officerCardHtml(c, { generating = false, portraitStatus = "none" } = {}) {
+function officerCardHtml(c, { generating = false } = {}) {
   const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
   const service = typeof c.serviceTurns === "number" ? c.serviceTurns : 0;
   const missions = typeof c.missionsServed === "number" ? c.missionsServed : 0;
@@ -1779,14 +1779,6 @@ function officerCardHtml(c, { generating = false, portraitStatus = "none" } = {}
             <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
               c.bio || "No dossier on file."
             )}</div>
-            <div class="crew-span"><span class="crew-label">Voice</span>${escapeHtml(
-              c.voice
-                ? `${c.voice.voiceName || c.voice.voiceId} · ${c.voice.baselineTone || "locked"}`
-                : "unassigned"
-            )}</div>
-            <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
-              portraitStatus
-            )}</div>
             ${
               c.status === "dead"
                 ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
@@ -1823,10 +1815,7 @@ function renderCrew(ship, playerName = "") {
       .map((c) => {
         const needsImg = crewNeedsPortrait(c);
         const generating = showGenerating && needsImg;
-        const portraitStatus = generating
-          ? "generating"
-          : c.portraitStatus || (c.imageUrl ? "ready" : "none");
-        return officerCardHtml(c, { generating, portraitStatus });
+        return officerCardHtml(c, { generating });
       })
       .join("");
 
@@ -2229,10 +2218,7 @@ function renderCrewWithoutPortraitKick(ship) {
       .map((c) => {
         const needsImg = crewNeedsPortrait(c);
         const generating = showGenerating && needsImg;
-        const portraitStatus = generating
-          ? "generating"
-          : c.portraitStatus || (c.imageUrl ? "ready" : "none");
-        return officerCardHtml(c, { generating, portraitStatus });
+        return officerCardHtml(c, { generating });
       })
       .join("");
   bindCrewCardExpandHandlers(officers);
