@@ -16,11 +16,13 @@ import type {
 } from "../../../packages/game-core/src/index.js";
 import {
   DEFAULT_SYSTEMS,
+  baselineSkillsForRole,
   inferCrewGender,
   normalizeRegistryNumber,
   sanitizeBridgeCrew,
   sexFieldIsBlank,
 } from "../../../packages/game-core/src/index.js";
+import { loadSetupSkill } from "../content/loader.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { ensureCrewVoices } from "../services/voice/voiceIdentity.js";
 import { isLlmConfigured } from "./llmGamemaster.js";
@@ -139,7 +141,7 @@ async function callSetupJson(
         temperature: purpose === "setup_ships" ? 0.85 : 0.95,
         max_tokens: maxTokens,
         messages: [
-          { role: "system", content: system },
+          { role: "system", content: await withSetupSkill(system) },
           { role: "user", content: JSON.stringify(user) },
         ],
       });
@@ -178,7 +180,17 @@ async function callSetupJson(
 const SETUP_SYSTEM = `You are the Narrator, a Star Trek adventure Gamemaster (Picard tone).
 Generate setup content aligned with the Star Trek universe: Federation, Starfleet, exploration, diplomacy, ethics, wonder.
 Prefer original ship/mission names that feel canon-adjacent; do not paste protected episode scripts.
+Never invent skill numbers, crew deaths, or reputation scores — host standing, flags, and role baselines are absolute.
 Always respond with pure JSON only (no markdown fences).`;
+
+async function withSetupSkill(system: string): Promise<string> {
+  try {
+    const pack = await loadSetupSkill();
+    return [pack, "", system].join("\n");
+  } catch {
+    return system;
+  }
+}
 
 export async function generateOpeningGreeting(state: GameState): Promise<string> {
   try {
@@ -434,6 +446,7 @@ export function shipOfferToShip(offer: SetupShipOffer): Ship {
       imageUrl: null,
       portraitStatus: "none" as const,
       loyalty: 50 + Math.floor(Math.random() * 21),
+      skills: baselineSkillsForRole(c.role),
     };
   });
 

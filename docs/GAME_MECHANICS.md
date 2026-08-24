@@ -482,6 +482,7 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - Mission end applies XP via `calculateSkillGains` to **participating crew**, then `computeShipSkills` refreshes `profile.skills`. Extra XP if the main objective completed; command tick if any secondary completed.
 - Mechanical snapshot sent to the LLM includes `skillTotals` and `skillModifier` — the model must not invent numbers.
 - UI shows skill bars plus a 10-point band (`b0`–`b10`) for later badge work.
+- New officers (custom-ship roster and starbase recruits) get **role-appropriate** `baselineSkillsForRole` from the host. The LLM must not emit skill scores.
 
 ### 16.2 Crew lifecycle
 - Status: `active` | `injured` | `dead` | `transferred`.
@@ -496,7 +497,7 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - New profiles get `emptyUniverse(stardateForEra(ship.era))` — Federation standing starts at **+5**, others **0**.
 - `tickUniverse` every **5** mission play turns and on debrief: advance stardate, mild reputation drift toward 0, chance of a galactic crisis, hostility flags at low standing (Klingon/Romulan/Cardassian ≤ −40, Borg ≤ −20).
 - `lastTickTurn` is **per mission** (reset to 0 when play starts) so a new assignment still ticks.
-- LLM may send `reputationDeltas`; host clamps ±15 via `applyReputation`. Debrief also applies `reputationDeltaFromFlags`.
+- LLM may send `reputationDeltas`; host clamps ±15 via `applyReputation`. Debrief also applies `reputationDeltaFromFlags`. Optional `crewStatusUpdates` are proposals only (never applied as deaths or skill changes).
 - Mission offers receive current standing, flags, and crises so antagonists/ports reflect the campaign.
 
 ### 16.4 Profiles & account isolation
@@ -552,6 +553,20 @@ Hub orders (`starbaseHubChoices`): Review status, Refit (hull / deep / shields /
 - **Continue your story** / resume (History or refresh): if a live run is mid-mission, resume that beat. If you were at starbase (or stood down), **load the starbase hub** with ship, crew, skills, universe, and campaign log. **Choose next mission** is how you leave the dock for `mission_offer`.
 
 Code is the referee for budgets, hires, and skill deltas. The LLM does not invent repair amounts.
+
+### 16.7 LLM skill packs
+Phase 7. Packs in `content/skills/` keep the narrator aligned with the referee:
+
+| Pack | Contract |
+|------|----------|
+| `core-gm.md` | Never invent skill numbers, deaths, or reputation. `mechanicalResults` + living crew + skill totals are absolute. Dead crew only as “remember when”. |
+| `play-json.md` | Optional `reputationDeltas` (host clamps ±15) and `crewStatusUpdates` (**proposals only** — host does not apply deaths/injuries). Advice is a separate short in-character path. |
+| `setup-content.md` | Mission offers respect current reputation and galactic flags. Recruitment / custom crew use role-appropriate baselines (host assigns numbers). |
+| `stages.md` | Starbase is home when not playing; advice is out-of-band; Choose next mission opens the board. |
+| `voice-identity.md` | Unchanged — voices stay locked. |
+| `crew-advice.md` | Short, in-character consult; no dice. |
+
+Setup prompts load `setup-content.md`. Play turns load a compact concatenation (advice pack excluded).
 
 ---
 

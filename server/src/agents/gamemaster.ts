@@ -1959,6 +1959,19 @@ function applySceneSideEffects(state: GameState, scene: LlmScene): GameState {
     );
     next = { ...next, universe };
   }
+  // crewStatusUpdates are proposals only — referee already owns injury/death.
+  if (scene.crewStatusUpdates?.length) {
+    tracedTool(
+      next.runId,
+      next.phase,
+      "crew_status_proposals",
+      { proposals: scene.crewStatusUpdates, applied: false },
+      {
+        ok: true,
+        message: "Crew status proposals noted; host did not apply them.",
+      }
+    );
+  }
   return next;
 }
 

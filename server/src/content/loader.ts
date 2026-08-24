@@ -85,6 +85,16 @@ export async function loadAdviceSkill(): Promise<string> {
   return adviceSkillCache;
 }
 
+let setupSkillCache: string | null = null;
+
+/** Setup / mission-board pack — not mixed into play-turn compact prompts. */
+export async function loadSetupSkill(): Promise<string> {
+  if (setupSkillCache != null) return setupSkillCache;
+  const file = path.join(ROOT, "content/skills", "setup-content.md");
+  setupSkillCache = await fs.readFile(file, "utf8");
+  return setupSkillCache;
+}
+
 /**
  * Compact skill pack for play turns (faster prompts).
  * Caps total size so the system message does not dominate latency.

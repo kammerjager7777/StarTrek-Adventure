@@ -24,13 +24,18 @@ Schema:
   ],
   "endMission": null,
   "sfx": ["phaser", "shield_hit"],
-  "reputationDeltas": { "klingon": -5, "federation": 2 }
+  "reputationDeltas": { "klingon": -8 },
+  "crewStatusUpdates": [
+    { "name": "Tuvok", "status": "injured", "note": "Disruptor graze on the bridge" }
+  ]
 }
 ```
 
-Optional `reputationDeltas` are **suggestions only** (host clamps ±15). Do not invent skill numbers or crew deaths — host applies those.
+Optional `reputationDeltas` are **proposals only** (host clamps ±15).  
+Optional `crewStatusUpdates` are **proposals only** (`active` | `injured` | `dead` | `transferred`). The host may discard every entry. Never invent skill numbers or crew deaths as facts — if the snapshot still lists an officer as living, they are alive.
 
-**Crew advice** is a separate host path (`POST /crew/advice`), not a play scene. Do not emit an advice consult as a normal playing JSON turn.
+## Advice (not a play turn)
+The captain may consult one officer via `POST /crew/advice` (skill: `crew-advice.md`). That scene is **short and in-character**: one narrator frame sentence, 2–4 officer sentences, optional extra order. No dice, no damage, no deaths, no reputation. Do **not** emit an advice consult as a normal playing JSON turn.
 
 ## Rules
 - Exactly 3 or 4 options; ids 1..n sequential

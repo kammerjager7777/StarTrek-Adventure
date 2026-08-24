@@ -31,6 +31,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 
 - [x] xAI LLM Gamemaster (required for play)  
 - [x] Skill packs in `content/skills/`  
+- [x] Campaign-layer skill packs (no invented skills/deaths/reputation; starbase + advice flow)  
 - [x] Session debug JSONL  
 - [x] Grok TTS (auto-voice, speed, pause/stop, line replay)  
 - [x] Locked voice identities (Narrator + crew)  

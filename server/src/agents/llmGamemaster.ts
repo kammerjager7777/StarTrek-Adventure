@@ -6,6 +6,7 @@
 import OpenAI from "openai";
 import type {
   CrewLine,
+  CrewStatus,
   Faction,
   GameState,
   ObjectiveStatus,
@@ -55,6 +56,16 @@ export type LlmScene = {
   sfx: string[];
   /** Optional standing changes — host clamps and applies. */
   reputationDeltas?: Partial<Record<Faction, number>>;
+  /**
+   * Optional crew status notes. Proposals only — host never applies
+   * deaths, injuries, or skill numbers from this field.
+   */
+  crewStatusUpdates?: Array<{
+    name?: string;
+    id?: string;
+    status?: CrewStatus;
+    note?: string;
+  }>;
   /** Always true for successful LLM scenes; false only if parse produced empty filler */
   usedLlm: boolean;
 };
@@ -398,6 +409,37 @@ function normalizeScene(raw: unknown, fallbackNotes: string[]): LlmScene {
     if (Object.keys(deltas).length) reputationDeltas = deltas;
   }
 
+  const CREW_STATUSES: CrewStatus[] = [
+    "active",
+    "injured",
+    "dead",
+    "transferred",
+  ];
+  let crewStatusUpdates: LlmScene["crewStatusUpdates"];
+  if (Array.isArray(obj.crewStatusUpdates)) {
+    const rows: NonNullable<LlmScene["crewStatusUpdates"]> = [];
+    for (const raw of obj.crewStatusUpdates) {
+      if (!raw || typeof raw !== "object") continue;
+      const item = raw as Record<string, unknown>;
+      const status =
+        typeof item.status === "string" &&
+        CREW_STATUSES.includes(item.status as CrewStatus)
+          ? (item.status as CrewStatus)
+          : undefined;
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      const id = typeof item.id === "string" ? item.id.trim() : "";
+      const note = typeof item.note === "string" ? item.note.trim() : "";
+      if (!status && !name && !id && !note) continue;
+      rows.push({
+        ...(name ? { name } : {}),
+        ...(id ? { id } : {}),
+        ...(status ? { status } : {}),
+        ...(note ? { note } : {}),
+      });
+    }
+    if (rows.length) crewStatusUpdates = rows.slice(0, 8);
+  }
+
   return {
     narration,
     crewDialogue,
@@ -409,6 +451,7 @@ function normalizeScene(raw: unknown, fallbackNotes: string[]): LlmScene {
     endMission,
     sfx,
     reputationDeltas,
+    crewStatusUpdates,
     // Only count as a real LLM scene if we got narration text
     usedLlm: Boolean(narration),
   };
@@ -447,7 +490,8 @@ async function callXaiJson(
             "You are the live Gamemaster for the PLAYING phase.",
             "The host already resolved dice and integrity. Treat mechanicalResults as absolute truth.",
             "Return ONE JSON object only (no markdown fences) with keys:",
-            "narration, crewDialogue[{speaker,line}], options[{id,text,risk}], viewscreenPrompt, newIntel[], setFlags[], objectiveUpdates[{id,status}], endMission, sfx[], reputationDeltas{faction:number}.",
+            "narration, crewDialogue[{speaker,line}], options[{id,text,risk}], viewscreenPrompt, newIntel[], setFlags[], objectiveUpdates[{id,status}], endMission, sfx[], reputationDeltas{faction:number}, crewStatusUpdates[{name,status,note}].",
+            "reputationDeltas and crewStatusUpdates are optional proposals — never invent skill numbers, deaths, or reputation as facts. Living crew and mechanicalResults.skillTotals are absolute. Dead crew only as 'remember when'.",
             "Narration: 1–3 short paragraphs max (TTS-friendly). crewDialogue: 0–2 short lines.",
             "options: exactly 3–4, risk one of low|medium|high|trap. endMission: null unless mission truly ends.",
             "sfx: optional string array (0–4) of bridge sound cues that match THIS beat's fiction — played on the client as the scene lands.",
@@ -578,7 +622,7 @@ export async function generatePlayScene(
         "Only set endMission to failed if the main objective is truly lost or the ship is effectively finished.",
         "Partial progress = keep playing (endMission null).",
         "Do not mention raw d20 numbers in narration.",
-        "mechanicalResults.skillTotals and skillModifier are absolute. Do not invent skill numbers. Negative skillModifier means crew expertise made this order easier.",
+        "mechanicalResults.skillTotals, skillModifier, and the living crew list are absolute. Do not invent skill numbers, deaths, or reputation. Dead officers may appear only as memory ('remember when'). crewStatusUpdates are proposals the host may discard.",
         `Current playTurnCount=${state.mission?.playTurnCount ?? 0}.`,
         `Hull ${state.ship?.integrity ?? "?"}/${state.ship?.maxIntegrity ?? "?"}; Shields ${state.ship?.shieldIntegrity ?? "?"}/${state.ship?.maxShieldIntegrity ?? "?"} (${state.ship?.shieldGridOnline ? "online" : `offline, recharge ${state.ship?.shieldRechargeTurns ?? "?"}`}).`,
         state.universe

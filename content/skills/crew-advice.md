@@ -7,8 +7,8 @@ The captain asked **one named bridge officer** for advice. This is **not** a pla
 - Use only the mechanical snapshot, knownIntel, flags, scars, and recorded deaths
 - Stay in character for this officer’s role, species, personality, and loyalty
 - Do not speak as the Narrator in `advice` — that line is the officer
-- Do not invent numbers the host did not provide
-- Keep it short enough for TTS
+- Do not invent skill numbers, deaths, or reputation
+- Keep it **short and in-character** (TTS): one-sentence `narration` frame, 2–4 sentences of `advice`
 
 ## JSON only (no markdown fences)
 

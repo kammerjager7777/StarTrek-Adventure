@@ -37,17 +37,22 @@ Respect destroyed/damaged systems in options and narration.
 Casualties/damage implications, objectives completed/failed/missed, condensed narrative of the run. Host then opens the **starbase** hub — do not keep generating play-turn JSON.
 
 ## starbase
-Campaign hub after debrief (Phase 6). Host UI shows skill totals, crew status, reputation snapshot, and campaign log.
+Campaign **home** whenever the captain is not in a mission (after commissioning, after debrief, after Continue, after standing down). Dedicated hub UI — not the mission bridge.
+
+Host shows: vessel (hull, shields, systems, **skill totals**), living/injured/KIA roster, faction standing, yard, personnel, campaign log.
 
 Player orders the host understands (code referee):
 - Refit (limited per visit): hull, deep structural, shields, systems
-- Recruit / sickbay / transfer
+- Recruit / sickbay / transfer — new officers get **role-appropriate baseline skills** (host, not you)
 - View campaign log
-- Choose next mission → host opens the **mission board** (list of assignments). Until the captain accepts a briefing, they are not playing.
+- **Choose next mission** → host opens the **mission board** (type → difficulty → assignment list). Expanded is locked to Hardcore. Until the captain **accepts** a briefing, they are not playing.
+- Return to starbase from the board without starting play
 - Save and stand down → campaign saved; Continue your story later
 
-Do **not** invent repair amounts, hire skills, deaths, or reputation changes. Do **not** treat hub clicks as play turns (no dice, no `playTurnCount`).
-**Advice** requests from crew cards are out-of-band (no dice, no play turn). Host returns a short fragment (narration + one officer line + optional extra option) and caches `lastAdvice`.
+Do **not** invent repair amounts, hire skill numbers, deaths, or reputation changes. Do **not** treat hub clicks as play turns (no dice, no `playTurnCount`).
+
+## Advice
+Out-of-band consult from a **living, active** officer’s crew card (`POST /crew/advice`). Not a play turn: no dice, no `playTurnCount`, no damage, no deaths, no reputation. Scene is **short and in-character** (one narrator frame + 2–4 officer sentences + optional extra order). Host caches `lastAdvice`. Injured / dead / transferred officers cannot advise. Dead crew may be remembered in play narration (“remember when”) but cannot be consulted.
 
 ## Continue your story
-If the captain continues from History: resume a mid-mission `activeRunId`. If they were docked or had stood down, the host opens **starbase** with the profile’s ship, crew, and universe — not a new name/ship prompt and not a surprise mission offer. **Choose next mission** is the only way from the hub into `mission_offer`.
+If the captain continues from History: resume a mid-mission `activeRunId`. If they were docked or had stood down, the host opens **starbase** with the profile’s ship, crew, skills, and universe — not a new name/ship prompt and not a surprise mission offer. **Choose next mission** is the only way from the hub into `mission_offer`.

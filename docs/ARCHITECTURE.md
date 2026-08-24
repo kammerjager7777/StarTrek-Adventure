@@ -86,7 +86,7 @@ Player action (UI)
 1. Player picks a numbered option **or** free-text order/question  
 2. **Code referee** runs `applyMechanics` (unless pure question)  
 3. **LLM** receives state snapshot + `mechanicalResults` → JSON scene  
-4. Code applies `newIntel`, `setFlags`, `objectiveUpdates`; clamps `endMission`  
+4. Code applies `newIntel`, `setFlags`, `objectiveUpdates`; clamps `endMission`; applies `reputationDeltas` (clamped). `crewStatusUpdates` are proposals only and are **not** applied.  
 5. Client plays mechanics SFX, **narrator `sfx[]`**, TTS, viewscreen updates  
 6. Debug log records user, tools, and LLM previews  
 
