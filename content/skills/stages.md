@@ -54,4 +54,4 @@ Do **not** invent repair amounts, hire skills, deaths, or reputation changes. Do
 **Advice** requests from crew cards are out-of-band (no dice, no play turn). Host returns a short fragment (narration + one officer line + optional extra option) and caches `lastAdvice`.
 
 ## Continue your story
-If the captain continues from History: resume `activeRunId` when a run is still active. Otherwise the host starts at **mission_offer** with the profile’s ship, crew, and universe. Do not re-ask name or ship.
+If the captain continues from History: resume a mid-mission `activeRunId`. If they were docked or had stood down, the host opens **starbase** with the profile’s ship, crew, and universe — not a new name/ship prompt and not a surprise mission offer. **Choose next mission** is the only way from the hub into `mission_offer`.

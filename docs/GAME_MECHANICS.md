@@ -547,8 +547,8 @@ Hub orders (`starbaseHubChoices`): Review status, Refit (hull / deep / shields /
   - Transfer: free a billet (`transferBudget`; cannot transfer last active officer)
 - Session state on `GameState.starbase` (`StarbaseSession`); cleared when leaving for a new mission.
 - **Choose next mission** keeps current type/difficulty and opens `mission_offer` with **universe injected** (standing-aware offers).
-- **Save and stand down** writes the profile, clears `activeRunId`, sets `post_mission` / `completed`. That run is finished.
-- **Continue your story** (History): if `activeRunId` is an active save, resume it (including a docked hub). Otherwise start a new run from the profile at **`mission_offer`** with ship, crew, skills, universe, and last type/difficulty restored (`exploration` / `medium` if unset).
+- **Save and stand down** writes the profile and clears `activeRunId`. The ship stays docked.
+- **Continue your story** / resume (History or refresh): if a live run is mid-mission, resume that beat. If you were at starbase (or stood down), **load the starbase hub** with ship, crew, skills, universe, and campaign log. **Choose next mission** is how you leave the dock for `mission_offer`.
 
 Code is the referee for budgets, hires, and skill deltas. The LLM does not invent repair amounts.
 

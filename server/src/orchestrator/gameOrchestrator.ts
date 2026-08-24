@@ -17,7 +17,7 @@ import {
 } from "../../../packages/game-core/src/index.js";
 import {
   advanceSetup,
-  beginNextCampaignMission,
+  hydrateStarbase,
   LlmNarratorError,
   resolveChoiceLabel,
   resolvePlayTurn,
@@ -246,13 +246,21 @@ export async function startNewGame(
 
 export { AiUnavailableError, LlmNarratorError };
 
+function isStarbaseResume(state: GameState): boolean {
+  return (
+    state.phase === "starbase" ||
+    state.phase === "debrief" ||
+    state.phase === "post_mission"
+  );
+}
+
 export async function getGame(
   runId: string,
   ownerEmail: string
 ): Promise<PublicGameView | null> {
   const state = await readSave(runId, ownerEmail);
   if (!state) return null;
-  const normalized = normalizeState(state);
+  let normalized = normalizeState(state);
   // Persist voice re-locks (profile upgrades / uniqueness) so they stick
   const voiceChanged =
     normalized.narratorVoice?.voiceId !== state.narratorVoice?.voiceId ||
@@ -261,6 +269,28 @@ export async function getGame(
       const prev = state.ship?.crew?.[i];
       return c.voice?.voiceId !== prev?.voice?.voiceId;
     });
+  if (isStarbaseResume(normalized) && normalized.ship) {
+    const freshVisit = normalized.phase === "post_mission";
+    const hub = await hydrateStarbase(
+      {
+        ...normalized,
+        status: "active",
+        starbase: freshVisit ? null : normalized.starbase,
+      },
+      freshVisit
+        ? "Welcome back, Captain. Your ship is docked; the yard is standing by."
+        : null
+    );
+    await writeSave({ ...hub, updatedAt: new Date().toISOString() });
+    if (freshVisit && hub.profileId) {
+      try {
+        await updateProfileFromRun(hub);
+      } catch {
+        /* ignore */
+      }
+    }
+    return toView(hub);
+  }
   if (voiceChanged) {
     await writeSave({ ...normalized, updatedAt: new Date().toISOString() });
   }
@@ -352,23 +382,46 @@ export async function continueProfile(
   const profile = await readProfile(profileId, ownerEmail);
   if (!profile) return null;
 
-  // Resume mid-mission if present
+  const named = interpretCaptainName(profile.captainName);
+
+  // Resume an in-progress run (including a docked starbase visit)
   if (profile.activeRunId) {
     const existing = await readSave(profile.activeRunId, ownerEmail);
-    if (existing && existing.status === "active") {
-      const named = interpretCaptainName(
-        existing.playerName || profile.captainName
-      );
-      return toView(
-        normalizeState({
-          ...existing,
-          playerName: named,
-        })
-      );
+    if (existing && (existing.status === "active" || isStarbaseResume(existing))) {
+      const resumed = normalizeState({
+        ...existing,
+        playerName: interpretCaptainName(
+          existing.playerName || profile.captainName
+        ),
+        profileId: profile.id,
+        campaignLog: existing.campaignLog?.length
+          ? existing.campaignLog
+          : profile.campaignLog,
+      });
+      if (isStarbaseResume(resumed) && resumed.ship) {
+        const freshVisit = resumed.phase === "post_mission";
+        const hub = await hydrateStarbase(
+          {
+            ...resumed,
+            status: "active",
+            starbase: freshVisit ? null : resumed.starbase,
+          },
+          "Welcome back, Captain. Your ship is docked; the yard is standing by."
+        );
+        await writeSave({ ...hub, updatedAt: new Date().toISOString() });
+        await writeProfile({
+          ...profile,
+          ownerEmail,
+          activeRunId: hub.runId,
+          updatedAt: new Date().toISOString(),
+        });
+        return toView(hub);
+      }
+      return toView(resumed);
     }
   }
 
-  // New run from profile state
+  // Stood down (or no live run): dock at starbase with the saved ship / universe
   const now = new Date().toISOString();
   const stardate =
     profile.universe?.stardate ||
@@ -390,7 +443,7 @@ export async function continueProfile(
     runId: randomUUID(),
     createdAt: now,
     updatedAt: now,
-    playerName: interpretCaptainName(profile.captainName),
+    playerName: named,
     ownerEmail,
     ship,
     profileId: profile.id,
@@ -398,7 +451,9 @@ export async function continueProfile(
     campaignLog: profile.campaignLog || [],
     missionType: profile.lastMissionType || "exploration",
     difficulty: profile.lastDifficulty || "medium",
-    phase: "mission_offer",
+    phase: "starbase",
+    status: "active",
+    starbase: null,
   };
 
   await initSessionDebugLog(state);
@@ -413,7 +468,10 @@ export async function continueProfile(
   });
 
   const before = state;
-  state = await beginNextCampaignMission(state);
+  state = await hydrateStarbase(
+    state,
+    "Welcome back, Captain. Your ship is docked; the yard is standing by."
+  );
   state = await finalizeAction(before, state);
   return toView(state);
 }

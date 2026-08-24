@@ -666,11 +666,9 @@ async function attachCampaignLog(state: GameState): Promise<GameState> {
   return state;
 }
 
-async function paintStarbase(
+async function composeStarbaseState(
   state: GameState,
-  notice: string | null,
-  prev: GameState,
-  input: string
+  notice: string | null
 ): Promise<GameState> {
   const next = await attachCampaignLog(await ensureStarbaseSession(state));
   const labels = starbaseChoiceLabels(next);
@@ -682,25 +680,39 @@ async function paintStarbase(
   ]
     .filter(Boolean)
     .join("\n");
-  return logPlayerChoice(
-    {
-      ...next,
-      phase: "starbase",
-      status: "active",
-      pendingQuestion: body,
-      pendingChoices: numbered(labels),
-      turn: {
-        sceneId: randomUUID(),
-        narration: body,
-        crewDialogue: [],
-        options: numbered(labels),
-        viewscreenPrompt: "Federation starbase spacedock, ship in repair cradle",
-        sfx: notice ? ["power_up2"] : [],
-      },
+  return {
+    ...next,
+    phase: "starbase",
+    status: "active",
+    pendingQuestion: body,
+    pendingChoices: numbered(labels),
+    turn: {
+      sceneId: next.turn?.sceneId || randomUUID(),
+      narration: body,
+      crewDialogue: [],
+      options: numbered(labels),
+      viewscreenPrompt: "Federation starbase spacedock, ship in repair cradle",
+      sfx: notice ? ["power_up2"] : [],
     },
-    input,
-    prev.pendingChoices
-  );
+  };
+}
+
+async function paintStarbase(
+  state: GameState,
+  notice: string | null,
+  prev: GameState,
+  input: string
+): Promise<GameState> {
+  const composed = await composeStarbaseState(state, notice);
+  return logPlayerChoice(composed, input, prev.pendingChoices);
+}
+
+/** Rebuild the hub (session, log, choices) without treating it as a player order. */
+export async function hydrateStarbase(
+  state: GameState,
+  notice?: string | null
+): Promise<GameState> {
+  return composeStarbaseState(state, notice ?? null);
 }
 
 /**

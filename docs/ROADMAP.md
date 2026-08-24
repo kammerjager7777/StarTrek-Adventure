@@ -63,7 +63,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] “Ask for advice” on crew cards  
 - [x] Starbase hub after debrief (skills, crew status, reputation, campaign log)  
 - [x] Richer recruitment / refit economy (quality tiers, sickbay, transfers, facility tier)  
-- [x] Continue your story → resume run or next mission offer with universe 
+- [x] Continue your story → resume mission, or reload the starbase hub 
 - [ ] Multi-mission story arcs with long callbacks  
 
 ### Crew & ship identity

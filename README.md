@@ -38,7 +38,7 @@ Check AI link: `GET http://127.0.0.1:3000/api/ai/status`
 5. Accept a mission and **Begin**  
 6. Each turn: pick a **numbered option**, or type a free-text **order** / **question**  
 7. After debrief you dock at **starbase**: refit, recruit, read the campaign log, choose the next mission, or save & stand down  
-8. **Continue your story** in History resumes a run, or offers the next mission with the same ship and galaxy  
+8. **Continue your story** in History resumes a mission, or returns you to starbase if that is where you left 
 9. Meta commands (examples): `mission status`, `hint`, `recap`, `divert power to shields`, `change difficulty hard`, `restart`, `new mission`  
 
 **Voice ▾ menu:** auto-TTS, speed, **Bridge ambient**, **LCARS SFX** (TrekCore combat/UI sounds).  

@@ -31,7 +31,7 @@ You command a Starfleet starship. An AI Gamemaster — **Narrator** — narrates
 9. **End** — Debrief: damage, objectives, narrative recap  
 10. **Starbase (campaign hub)** — After debrief you dock: skill summary, crew status, reputation, campaign log. Refit (limited), recruit, choose the next mission, or save & stand down.
 
-**Continue your story** (History) resumes an in-progress run, or — if you stood down — jumps to the next **mission offer** with the same ship, crew, and living galaxy. You do not re-pick a captain or vessel.
+**Continue your story** (History) resumes an in-progress mission, or — if you saved at starbase / stood down — returns you to the **starbase hub** with the same ship, crew, and galaxy. Choose next mission from the dock. You do not re-pick a captain or vessel.
 
 ## How a play turn feels
 

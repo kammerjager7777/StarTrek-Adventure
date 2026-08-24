@@ -143,8 +143,8 @@ Durable campaigns are **profile-centric** (Phase 1), scoped per account:
 
 **Continue your story** (`POST /api/profiles/:id/continue`):
 
-- If `activeRunId` points at an **active** save → resume that run (mission or docked hub).
-- Else → new run at **`mission_offer`** with profile ship/crew/universe injected (defaults `exploration` / `medium` if last type/difficulty unset).
+- If `activeRunId` is a **playing** save → resume that mission beat.
+- If the save is docked (`starbase` / `debrief` / `post_mission`) or there is no live run → **open the starbase hub** with profile ship/crew/universe. Next assignment is **Choose next mission**.
 
 The Campaign modal lists captains/ships first; session runs without a `profileId` are marked legacy.
 
