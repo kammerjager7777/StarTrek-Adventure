@@ -1057,17 +1057,22 @@ html[data-ui-theme="lcars"] .starbase-rail-block {
   font-weight: 900;
   border-radius: 0 22px 22px 0;
 }
-html[data-ui-theme="lcars"] .starbase-rail-block.is-ops {
+html[data-ui-theme="lcars"] .starbase-rail-block.is-classic {
+  background: #111;
+  color: var(--lcars-peach);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-lcars {
   background: var(--lcars-bar);
 }
-html[data-ui-theme="lcars"] .starbase-rail-block.is-dock {
-  background: var(--lcars-peach);
-}
-html[data-ui-theme="lcars"] .starbase-rail-block.is-yard {
-  background: var(--lcars-bar-2);
-}
-html[data-ui-theme="lcars"] .starbase-rail-block.is-log {
+html[data-ui-theme="lcars"] .starbase-rail-block.is-voice,
+html[data-ui-theme="lcars"] .starbase-rail-block.is-voice-menu {
   background: var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-new {
+  background: var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-campaign {
+  background: var(--lcars-bar-2);
 }
 html[data-ui-theme="lcars"] .starbase-rail-cap {
   background: var(--lcars-bar);
