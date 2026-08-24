@@ -211,12 +211,6 @@ function applyUiTheme(theme, { persist = true, silent = false } = {}) {
       next === "lcars" ? "true" : "false"
     );
   }
-  document.querySelectorAll(".hub-theme-classic").forEach((btn) => {
-    btn.setAttribute("aria-pressed", next === "classic" ? "true" : "false");
-  });
-  document.querySelectorAll(".hub-theme-lcars").forEach((btn) => {
-    btn.setAttribute("aria-pressed", next === "lcars" ? "true" : "false");
-  });
   if (!silent && prev !== next) {
     unlockLcarsAudio();
     uiSound(next === "lcars" ? "theme-lcars" : "theme-classic");
@@ -804,26 +798,11 @@ function isVoiceMenuOpen() {
   return Boolean(els.voiceMenu && !els.voiceMenu.classList.contains("hidden"));
 }
 
-function setVoiceMenuOpen(open, anchor = null) {
+function setVoiceMenuOpen(open) {
   if (!els.voiceMenu) return;
   els.voiceMenu.classList.toggle("hidden", !open);
   if (els.btnVoiceMenu) {
     els.btnVoiceMenu.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-  document.querySelectorAll(".hub-voice-menu").forEach((btn) => {
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-  });
-  if (open && anchor) {
-    const r = anchor.getBoundingClientRect();
-    els.voiceMenu.style.position = "fixed";
-    els.voiceMenu.style.left = `${Math.min(r.right + 8, window.innerWidth - 280)}px`;
-    els.voiceMenu.style.top = `${Math.max(8, r.top)}px`;
-    els.voiceMenu.style.zIndex = "80";
-  } else {
-    els.voiceMenu.style.position = "";
-    els.voiceMenu.style.left = "";
-    els.voiceMenu.style.top = "";
-    els.voiceMenu.style.zIndex = "";
   }
 }
 
@@ -849,16 +828,6 @@ function updateVoiceToggleUi() {
       ? "Auto-voice on — click to disable. Use ▾ for speed and pause."
       : "Auto-voice off — click to enable. Use ▾ for options.";
   }
-  document.querySelectorAll(".hub-voice-toggle").forEach((btn) => {
-    let label = "Voice: Off";
-    if (voice.enabled) {
-      if (voice.paused && voice.speaking) label = "Voice: Paused";
-      else if (voice.speaking) label = "Voice: …";
-      else label = "Voice: On";
-    }
-    btn.textContent = label;
-    btn.setAttribute("aria-pressed", voice.enabled ? "true" : "false");
-  });
 
   const active = Boolean(voice.speaking);
   if (els.btnVoicePause) {
@@ -4538,39 +4507,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-function bindHubRails() {
-  document.querySelectorAll(".hub-theme-classic").forEach((btn) => {
-    btn.addEventListener("click", () => applyUiTheme("classic"));
-  });
-  document.querySelectorAll(".hub-theme-lcars").forEach((btn) => {
-    btn.addEventListener("click", () => applyUiTheme("lcars"));
-  });
-  document.querySelectorAll(".hub-voice-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      void toggleVoice();
-    });
-  });
-  document.querySelectorAll(".hub-voice-menu").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const open = els.voiceMenu?.classList.contains("hidden");
-      setVoiceMenuOpen(Boolean(open), btn);
-    });
-  });
-  document.querySelectorAll(".hub-new-game").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      uiSound("new-game");
-      newGame();
-    });
-  });
-  document.querySelectorAll(".hub-campaign").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      uiSound("secondary");
-      openHistory();
-    });
-  });
-}
-
 els.btnNew.addEventListener("click", () => {
   uiSound("new-game");
   newGame();
@@ -4589,8 +4525,6 @@ initLcarsFx();
 initBridgeAmbient();
 initTrekSfx();
 initUiTheme();
-bindHubRails();
-updateVoiceToggleUi();
 if (els.btnThemeClassic) {
   els.btnThemeClassic.addEventListener("click", () => applyUiTheme("classic"));
 }
