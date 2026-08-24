@@ -3001,16 +3001,59 @@ function renderMissionBoard(state) {
         offers.forEach((offer, i) => {
           const card = document.createElement("article");
           card.className = "mission-card";
+          card.tabIndex = 0;
           const title = offer.title || choices[i]?.text || `Mission ${i + 1}`;
+          const summary = offer.summary || offer.background || "";
+          const background = offer.background || "";
+          const showBg =
+            background &&
+            background.trim().toLowerCase() !== String(summary).trim().toLowerCase();
+          const secondaries = Array.isArray(offer.secondaries)
+            ? offer.secondaries.filter(Boolean)
+            : [];
+          const extraBits = [];
+          if (showBg) {
+            extraBits.push(
+              `<p class="mission-card-background">${escapeHtml(background)}</p>`
+            );
+          }
+          if (offer.main) {
+            extraBits.push(
+              `<p class="mission-card-obj"><span class="mission-card-label">Primary</span>${escapeHtml(
+                offer.main
+              )}</p>`
+            );
+          }
+          if (secondaries.length) {
+            extraBits.push(
+              `<p class="mission-card-label">Secondary</p><ul class="mission-card-secondaries">${secondaries
+                .map((s) => `<li>${escapeHtml(s)}</li>`)
+                .join("")}</ul>`
+            );
+          }
+          if (offer.location) {
+            extraBits.push(
+              `<p class="mission-card-obj"><span class="mission-card-label">Theatre</span>${escapeHtml(
+                offer.location
+              )}</p>`
+            );
+          }
           card.innerHTML = `<p class="mission-card-meta">${escapeHtml(
             [offer.type, offer.location].filter(Boolean).join(" · ")
           )}</p>
             <h3>${escapeHtml(title)}</h3>
-            <p class="mission-card-summary">${escapeHtml(
-              offer.summary || offer.background || ""
-            )}</p>`;
+            <p class="mission-card-summary">${escapeHtml(summary)}</p>
+            ${
+              extraBits.length
+                ? `<div class="mission-card-extra">${extraBits.join("")}</div>`
+                : ""
+            }`;
           const btn = starbaseButton(choices[i]?.text || title);
           card.appendChild(btn);
+          card.addEventListener("click", (e) => {
+            if (e.target.closest("button")) return;
+            card.classList.toggle("is-open");
+          });
           host.appendChild(card);
         });
       } else {

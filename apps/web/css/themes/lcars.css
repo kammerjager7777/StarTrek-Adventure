@@ -1216,6 +1216,19 @@ html[data-ui-theme="lcars"] .mission-card h3 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+html[data-ui-theme="lcars"] .mission-card:hover,
+html[data-ui-theme="lcars"] .mission-card:focus-within,
+html[data-ui-theme="lcars"] .mission-card.is-open {
+  box-shadow:
+    inset 10px 0 0 0 var(--lcars-peach),
+    0 0 0 1px var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .mission-card-label {
+  color: var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .mission-card-extra {
+  border-top-color: #333;
+}
 html[data-ui-theme="lcars"] .mission-board-brief {
   background: #000;
   border: none;

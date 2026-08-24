@@ -3124,7 +3124,6 @@ body.mission-board-active .shell {
 .mission-card {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto auto;
   column-gap: 16px;
   row-gap: 6px;
   padding: 14px 16px;
@@ -3132,7 +3131,15 @@ body.mission-board-active .shell {
   border: 1px solid var(--border);
   border-radius: 0 18px 0 0;
   text-align: left;
-  align-items: center;
+  align-items: start;
+  cursor: default;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.mission-card:hover,
+.mission-card:focus-within,
+.mission-card.is-open {
+  border-color: var(--lcars-peach, #f79d65);
 }
 .mission-card h3 {
   margin: 0;
@@ -3154,9 +3161,56 @@ body.mission-board-active .shell {
   font-size: 0.92rem;
   line-height: 1.45;
 }
+.mission-card-extra {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid transparent;
+  transition:
+    max-height 0.28s ease,
+    opacity 0.22s ease,
+    margin 0.22s ease,
+    padding 0.22s ease,
+    border-color 0.22s ease;
+}
+.mission-card:hover .mission-card-extra,
+.mission-card:focus-within .mission-card-extra,
+.mission-card.is-open .mission-card-extra {
+  max-height: 22rem;
+  opacity: 1;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top-color: rgba(148, 163, 184, 0.22);
+}
+.mission-card-background,
+.mission-card-obj {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.mission-card-label {
+  display: inline-block;
+  margin-right: 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lcars-blue, #7dd3fc);
+}
+.mission-card-secondaries {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
 .mission-card .lcars-btn {
   grid-column: 2;
-  grid-row: 1 / -1;
+  grid-row: 1 / 4;
   width: auto;
   min-width: 220px;
   align-self: center;
@@ -3170,6 +3224,11 @@ body.mission-board-active .shell {
     grid-column: 1;
     grid-row: auto;
     width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mission-card-extra {
+    transition: none;
   }
 }
 .mission-board-brief {
