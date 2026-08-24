@@ -375,6 +375,11 @@ html[data-ui-theme="lcars"] .lcars-btn.secondary {
   border-radius: 18px 0 18px 0;
 }
 
+html[data-ui-theme="lcars"] .feedback-btn {
+  padding: 10px 14px;
+  border-radius: 0 14px 0 0;
+}
+
 html[data-ui-theme="lcars"] .lcars-btn.danger {
   background: var(--lcars-pink);
   color: #000;
@@ -1177,6 +1182,28 @@ html[data-ui-theme="lcars"] .modal-head h2 {
   color: var(--lcars-peach);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+html[data-ui-theme="lcars"] .feedback-field textarea {
+  background: #050505;
+  border: 2px solid var(--lcars-bar-2);
+  border-radius: 0 12px 0 0;
+  color: var(--text);
+}
+
+html[data-ui-theme="lcars"] .feedback-field textarea:focus {
+  outline: none;
+  border-color: var(--lcars-bar);
+}
+
+html[data-ui-theme="lcars"] .feedback-preview {
+  border: 2px solid var(--lcars-bar-2);
+  border-radius: 0 12px 0 0;
+  background: #050505;
+}
+
+html[data-ui-theme="lcars"] .feedback-context dt {
+  color: var(--lcars-blue);
 }
 
 html[data-ui-theme="lcars"] .hint {

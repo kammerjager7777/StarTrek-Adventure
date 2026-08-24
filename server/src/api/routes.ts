@@ -37,6 +37,13 @@ import {
 } from "../auth/access.js";
 import { googleClientId, verifyGoogleIdToken } from "../auth/google.js";
 import { clearSessionCookie, setSessionCookie } from "../auth/session.js";
+import {
+  clampFeedbackMessage,
+  decodeScreenshotData,
+  extForMime,
+  isAllowedImageMime,
+  submitFeedback,
+} from "../services/feedback/googleInbox.js";
 
 export const apiRouter = Router();
 
@@ -121,6 +128,64 @@ apiRouter.use(requireUser);
 apiRouter.use(requireAllowedUser);
 
 /** Who am I — for UI account label */
+apiRouter.post("/feedback", async (req, res) => {
+  const message = clampFeedbackMessage(req.body?.message);
+  if (!message) {
+    res.status(400).json({ error: "Write a note first." });
+    return;
+  }
+
+  let screenshot: { mime: string; bytes: Buffer; filename: string } | undefined;
+  const shot = req.body?.screenshot;
+  if (shot && (shot.data || shot.bytes)) {
+    const mime = String(shot.mime || "image/png").trim();
+    if (!isAllowedImageMime(mime)) {
+      res.status(400).json({
+        error: "Attach a PNG, JPEG, GIF, or WebP screenshot.",
+      });
+      return;
+    }
+    const bytes = decodeScreenshotData(mime, String(shot.data || ""));
+    if (!bytes) {
+      res.status(400).json({
+        error: "That screenshot could not be read or is larger than 4.5 MB.",
+      });
+      return;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    screenshot = {
+      mime,
+      bytes,
+      filename: `sta-feedback-${stamp}.${extForMime(mime)}`,
+    };
+  }
+
+  const ctx = req.body?.context && typeof req.body.context === "object" ? req.body.context : {};
+  try {
+    const result = await submitFeedback({
+      from: req.user!.email,
+      message,
+      userAgent: String(req.get("user-agent") || ""),
+      screenshot,
+      context: {
+        theme: String(ctx.theme || "").slice(0, 40),
+        phase: String(ctx.phase || "").slice(0, 40),
+        runId: String(ctx.runId || "").slice(0, 80),
+        href: String(ctx.href || "").slice(0, 300),
+        captain: String(ctx.captain || "").slice(0, 80),
+        ship: String(ctx.ship || "").slice(0, 80),
+      },
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("Feedback submit failed:", err);
+    res.status(502).json({
+      error: "Could not deliver feedback.",
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 apiRouter.get("/me", async (req, res) => {
   const user = req.user!;
   try {

@@ -19,7 +19,7 @@ const HOST =
     : "127.0.0.1");
 
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "8mb" }));
 
 // Health for Cloud Run / LB (no AI call)
 app.get("/healthz", (_req, res) => {

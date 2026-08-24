@@ -60,6 +60,14 @@
           <span id="narrator-badge" class="badge narrator-badge sr-only" aria-hidden="true">narrator: …</span>
         </div>
         <div class="top-actions">
+          <button
+            type="button"
+            id="btn-feedback"
+            class="lcars-btn secondary feedback-btn"
+            title="Send development feedback"
+          >
+            Feedback
+          </button>
           <div
             class="theme-toggle"
             id="theme-toggle"
@@ -404,6 +412,70 @@
         </div>
       </div>
 
+    </div>
+
+    <div
+      id="feedback-modal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feedback-modal-title"
+    >
+      <div class="modal-card feedback-modal-card">
+        <div class="modal-head">
+          <h2 id="feedback-modal-title">Send feedback</h2>
+          <button type="button" id="btn-close-feedback" class="lcars-btn secondary">
+            Close
+          </button>
+        </div>
+        <p class="hint">
+          Development notes go to the review sheet, with an optional screenshot.
+        </p>
+        <form id="feedback-form" class="feedback-form">
+          <label class="feedback-field">
+            <span>What happened?</span>
+            <textarea
+              id="feedback-message"
+              name="message"
+              rows="5"
+              maxlength="8000"
+              required
+              placeholder="Bug, confusing UI, missing copy, idea…"
+            ></textarea>
+          </label>
+          <div class="feedback-shot">
+            <div class="feedback-shot-row">
+              <label class="lcars-btn secondary feedback-file-btn">
+                Attach screenshot
+                <input
+                  id="feedback-file"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  hidden
+                />
+              </label>
+              <span class="muted feedback-shot-hint">or paste an image</span>
+              <button
+                type="button"
+                id="btn-clear-feedback-shot"
+                class="lcars-btn secondary hidden"
+              >
+                Remove
+              </button>
+            </div>
+            <div id="feedback-preview" class="feedback-preview hidden">
+              <img id="feedback-preview-img" alt="Screenshot preview" />
+            </div>
+          </div>
+          <dl id="feedback-context" class="feedback-context"></dl>
+          <p id="feedback-status" class="feedback-status hidden" role="status"></p>
+          <div class="feedback-actions">
+            <button type="submit" id="btn-send-feedback" class="lcars-btn">
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <div id="scar-modal" class="modal hidden" role="dialog" aria-modal="true">

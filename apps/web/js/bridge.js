@@ -124,6 +124,18 @@ const els = {
   btnRetryAi: document.getElementById("btn-retry-ai"),
   btnNew: document.getElementById("btn-new"),
   btnHistory: document.getElementById("btn-history"),
+  btnFeedback: document.getElementById("btn-feedback"),
+  btnCloseFeedback: document.getElementById("btn-close-feedback"),
+  feedbackModal: document.getElementById("feedback-modal"),
+  feedbackForm: document.getElementById("feedback-form"),
+  feedbackMessage: document.getElementById("feedback-message"),
+  feedbackFile: document.getElementById("feedback-file"),
+  feedbackPreview: document.getElementById("feedback-preview"),
+  feedbackPreviewImg: document.getElementById("feedback-preview-img"),
+  btnClearFeedbackShot: document.getElementById("btn-clear-feedback-shot"),
+  feedbackContext: document.getElementById("feedback-context"),
+  feedbackStatus: document.getElementById("feedback-status"),
+  btnSendFeedback: document.getElementById("btn-send-feedback"),
   btnCloseHistory: document.getElementById("btn-close-history"),
   historyModal: document.getElementById("history-modal"),
   historyList: document.getElementById("history-list"),
@@ -4802,6 +4814,161 @@ function closeHistory() {
   els.historyModal.classList.add("hidden");
 }
 
+/** Optional screenshot attached in the feedback modal (base64, no data: prefix). */
+let feedbackShot = null;
+
+function currentUiTheme() {
+  return document.documentElement.getAttribute("data-ui-theme") === "classic"
+    ? "classic"
+    : "lcars";
+}
+
+function feedbackContextSnapshot() {
+  const state = current?.state;
+  return {
+    theme: currentUiTheme(),
+    phase: String(state?.phase || ""),
+    runId: String(state?.runId || ""),
+    href: String(window.location.href || ""),
+    captain: String(state?.playerName || ""),
+    ship: String(state?.ship?.name || ""),
+    email: currentUser?.email || getLocalUserEmail() || "",
+  };
+}
+
+function paintFeedbackContext() {
+  if (!els.feedbackContext) return;
+  const ctx = feedbackContextSnapshot();
+  const rows = [
+    ["From", ctx.email || "this session"],
+    ["Theme", ctx.theme],
+    ["Phase", ctx.phase || "—"],
+    ["Run", ctx.runId ? ctx.runId.slice(0, 8) : "—"],
+    ["Captain", ctx.captain || "—"],
+    ["Ship", ctx.ship || "—"],
+  ];
+  els.feedbackContext.innerHTML = rows
+    .map(
+      ([k, v]) =>
+        `<dt>${escapeHtml(k)}</dt><dd title="${escapeHtml(v)}">${escapeHtml(v)}</dd>`
+    )
+    .join("");
+}
+
+function setFeedbackStatus(text, kind = "") {
+  if (!els.feedbackStatus) return;
+  const msg = String(text || "");
+  els.feedbackStatus.textContent = msg;
+  els.feedbackStatus.classList.toggle("hidden", !msg);
+  els.feedbackStatus.classList.toggle("is-ok", kind === "ok");
+  els.feedbackStatus.classList.toggle("is-err", kind === "err");
+}
+
+function clearFeedbackShot() {
+  feedbackShot = null;
+  if (els.feedbackFile) els.feedbackFile.value = "";
+  if (els.feedbackPreviewImg) {
+    els.feedbackPreviewImg.removeAttribute("src");
+  }
+  els.feedbackPreview?.classList.add("hidden");
+  els.btnClearFeedbackShot?.classList.add("hidden");
+}
+
+function applyFeedbackShot(mime, dataUrl) {
+  const data = String(dataUrl || "").replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
+  if (!data) return false;
+  feedbackShot = { mime: mime || "image/png", data };
+  if (els.feedbackPreviewImg) {
+    els.feedbackPreviewImg.src = `data:${feedbackShot.mime};base64,${feedbackShot.data}`;
+  }
+  els.feedbackPreview?.classList.remove("hidden");
+  els.btnClearFeedbackShot?.classList.remove("hidden");
+  return true;
+}
+
+function readFeedbackFile(file) {
+  if (!file || !String(file.type || "").startsWith("image/")) {
+    setFeedbackStatus("Attach an image file (PNG, JPEG, GIF, or WebP).", "err");
+    return;
+  }
+  if (file.size > 4.5 * 1024 * 1024) {
+    setFeedbackStatus("That screenshot is larger than 4.5 MB.", "err");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    applyFeedbackShot(file.type, String(reader.result || ""));
+    setFeedbackStatus("");
+  };
+  reader.onerror = () => {
+    setFeedbackStatus("Could not read that image.", "err");
+  };
+  reader.readAsDataURL(file);
+}
+
+async function openFeedback() {
+  if (!els.feedbackModal) return;
+  uiSound("open");
+  setFeedbackStatus("");
+  if (!currentUser) await refreshCurrentUser();
+  paintFeedbackContext();
+  els.feedbackModal.classList.remove("hidden");
+  els.feedbackMessage?.focus();
+}
+
+function closeFeedback() {
+  if (!els.feedbackModal || els.feedbackModal.classList.contains("hidden")) {
+    return;
+  }
+  uiSound("close");
+  els.feedbackModal.classList.add("hidden");
+}
+
+async function sendFeedback(e) {
+  e?.preventDefault();
+  const message = String(els.feedbackMessage?.value || "").trim();
+  if (!message) {
+    setFeedbackStatus("Write a note first.", "err");
+    els.feedbackMessage?.focus();
+    return;
+  }
+  const ctx = feedbackContextSnapshot();
+  const body = {
+    message,
+    context: {
+      theme: ctx.theme,
+      phase: ctx.phase,
+      runId: ctx.runId,
+      href: ctx.href,
+      captain: ctx.captain,
+      ship: ctx.ship,
+    },
+  };
+  if (feedbackShot) body.screenshot = feedbackShot;
+  if (els.btnSendFeedback) els.btnSendFeedback.disabled = true;
+  setFeedbackStatus("Sending…");
+  try {
+    const result = await api("/feedback", {
+      method: "POST",
+      body: JSON.stringify(body),
+      timeoutMs: 60_000,
+    });
+    uiSound("ok");
+    if (result?.destination === "local") {
+      setFeedbackStatus("Saved on this machine (Google inbox is not configured yet).", "ok");
+    } else {
+      setFeedbackStatus("Sent. It will show up in the feedback sheet.", "ok");
+    }
+    if (els.feedbackMessage) els.feedbackMessage.value = "";
+    clearFeedbackShot();
+  } catch (err) {
+    uiSound("deny");
+    setFeedbackStatus(err?.message || "Could not send feedback.", "err");
+  } finally {
+    if (els.btnSendFeedback) els.btnSendFeedback.disabled = false;
+  }
+}
+
 els.btnSetAccount?.addEventListener("click", () => {
   applyLocalAccountFromHistory();
 });
@@ -4832,6 +4999,11 @@ els.form.addEventListener("submit", (e) => {
 // Space with empty input also skips typewriter while focused on page
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  if (els.feedbackModal && !els.feedbackModal.classList.contains("hidden")) {
+    e.preventDefault();
+    closeFeedback();
+    return;
+  }
   if (typewriter.running) {
     e.preventDefault();
     typewriter.skip = true;
@@ -4849,6 +5021,31 @@ els.btnHistory.addEventListener("click", () => {
 els.btnCloseHistory.addEventListener("click", () => {
   uiSound("close");
   closeHistory();
+});
+els.btnFeedback?.addEventListener("click", () => openFeedback());
+els.btnCloseFeedback?.addEventListener("click", () => closeFeedback());
+els.feedbackForm?.addEventListener("submit", sendFeedback);
+els.feedbackFile?.addEventListener("change", () => {
+  const file = els.feedbackFile.files?.[0];
+  if (file) readFeedbackFile(file);
+});
+els.btnClearFeedbackShot?.addEventListener("click", () => {
+  clearFeedbackShot();
+  setFeedbackStatus("");
+});
+els.feedbackModal?.addEventListener("paste", (e) => {
+  const items = e.clipboardData?.items || [];
+  for (const item of items) {
+    if (item.kind === "file" && String(item.type || "").startsWith("image/")) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) readFeedbackFile(file);
+      return;
+    }
+  }
+});
+els.feedbackModal?.addEventListener("click", (e) => {
+  if (e.target === els.feedbackModal) closeFeedback();
 });
 
 // Classic / LCARS visual theme + SFX (no game logic)

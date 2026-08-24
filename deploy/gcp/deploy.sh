@@ -66,12 +66,35 @@ gcloud secrets add-iam-policy-binding SESSION_SECRET \
 ALLOWED_USERS="${ALLOWED_USERS:-$ALLOWED_USER}"
 GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 ACCESS_CONTACT_EMAIL="${ACCESS_CONTACT_EMAIL:-michaelstephens2011@gmail.com}"
+FEEDBACK_SHEET_ID="${FEEDBACK_SHEET_ID:-}"
+FEEDBACK_DRIVE_FOLDER_ID="${FEEDBACK_DRIVE_FOLDER_ID:-}"
+FEEDBACK_SHEET_TAB="${FEEDBACK_SHEET_TAB:-Sheet1}"
+
+if gcloud secrets describe GOOGLE_SA_JSON >/dev/null 2>&1; then
+  echo "==> Bind GOOGLE_SA_JSON secret"
+  gcloud secrets add-iam-policy-binding GOOGLE_SA_JSON \
+    --member="serviceAccount:${RUNTIME_SA}" \
+    --role="roles/secretmanager.secretAccessor" \
+    --quiet
+  SECRETS="XAI_API_KEY=XAI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_SA_JSON=GOOGLE_SA_JSON:latest"
+else
+  SECRETS="XAI_API_KEY=XAI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest"
+fi
 
 echo "==> Deploy Cloud Run (public HTML + app-level Google allow-list)"
 # ^|^ delimiter so ALLOWED_USERS may contain commas
 DEPLOY_ENV="^|^NODE_ENV=production|HOST=0.0.0.0|XAI_MODEL=${XAI_MODEL:-grok-4.5}|ALLOWED_USERS=${ALLOWED_USERS}|ACCESS_CONTACT_EMAIL=${ACCESS_CONTACT_EMAIL}"
 if [[ -n "$GOOGLE_CLIENT_ID" ]]; then
   DEPLOY_ENV="${DEPLOY_ENV}|GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
+fi
+if [[ -n "$FEEDBACK_SHEET_ID" ]]; then
+  DEPLOY_ENV="${DEPLOY_ENV}|FEEDBACK_SHEET_ID=${FEEDBACK_SHEET_ID}"
+fi
+if [[ -n "$FEEDBACK_DRIVE_FOLDER_ID" ]]; then
+  DEPLOY_ENV="${DEPLOY_ENV}|FEEDBACK_DRIVE_FOLDER_ID=${FEEDBACK_DRIVE_FOLDER_ID}"
+fi
+if [[ -n "$FEEDBACK_SHEET_TAB" ]]; then
+  DEPLOY_ENV="${DEPLOY_ENV}|FEEDBACK_SHEET_TAB=${FEEDBACK_SHEET_TAB}"
 fi
 
 gcloud run deploy "$SERVICE" \
@@ -87,7 +110,7 @@ gcloud run deploy "$SERVICE" \
   --max-instances=3 \
   --cpu-boost \
   --set-env-vars="$DEPLOY_ENV" \
-  --set-secrets="XAI_API_KEY=XAI_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest" \
+  --set-secrets="$SECRETS" \
   --allow-unauthenticated \
   --no-iap \
   --ingress=all

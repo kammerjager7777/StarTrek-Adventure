@@ -33,3 +33,7 @@ npm-debug.log*
 
 # Generated media (future Imagine / voice assets)
 data/media/
+
+# Local feedback fallback (Google inbox unconfigured)
+data/feedback/*
+!data/feedback/.gitkeep

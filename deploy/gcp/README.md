@@ -71,6 +71,29 @@ gcloud run deploy sta-bridge \
 - [Secret Manager](https://console.cloud.google.com/security/secret-manager?project=star-trek-adventure-3524d3)
 - [Cloud Build history](https://console.cloud.google.com/cloud-build/builds?project=star-trek-adventure-3524d3)
 
+## Dev feedback inbox
+
+The bridge **Feedback** button posts to `POST /api/feedback`. Production writes a row to a Google Sheet and stores screenshots in a Drive folder (service account). Local `npm run dev` without these env values saves under `data/feedback/` instead.
+
+| | |
+|--|--|
+| Sheet ID | `FEEDBACK_SHEET_ID` |
+| Drive folder ID | `FEEDBACK_DRIVE_FOLDER_ID` |
+| Service account JSON | Secret Manager `GOOGLE_SA_JSON` |
+
+**One-time setup**
+
+APIs, service account `sta-feedback@star-trek-adventure-3524d3.iam.gserviceaccount.com`, and Secret Manager `GOOGLE_SA_JSON` are already created.
+
+1. In your Google Drive, create a Sheet named **STA Dev Feedback** (keep the first tab `Sheet1`) and a folder named **STA Feedback screenshots**.
+2. Share **both** with `sta-feedback@star-trek-adventure-3524d3.iam.gserviceaccount.com` as **Editor**.
+3. Copy IDs from the URLs (`/d/SHEET_ID/` and `/folders/FOLDER_ID`) into `deploy/gcp/project.env` as `FEEDBACK_SHEET_ID` and `FEEDBACK_DRIVE_FOLDER_ID`.
+4. Redeploy.
+
+Until those IDs are set, local `npm run dev` still saves reports under `data/feedback/`. Production will refuse submits rather than writing to the ephemeral container disk.
+
+The Sheet columns are: Time, From, Message, Screenshot, Theme, Phase, Run, Captain, Ship, URL, User-Agent.
+
 ## Access gate
 
 Unauthenticated `GET /` serves the LCARS login page. APIs return `401 login_required` or `403 access_denied`.
