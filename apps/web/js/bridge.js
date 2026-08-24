@@ -1859,14 +1859,14 @@ function bindCrewCarousel(officers) {
   if (!root || !officers.length) return;
   const saved = officers.findIndex((c) => c.id === crewCarouselId);
   const start = saved >= 0 ? saved : 0;
-  applyCrewCarousel(start, { hail: false });
+  applyCrewCarousel(start);
 
   root.querySelectorAll(".crew-dot").forEach((dot) => {
     dot.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       const i = Number(dot.getAttribute("data-crew-index"));
-      if (!Number.isNaN(i)) applyCrewCarousel(i, { hail: true });
+      if (!Number.isNaN(i)) applyCrewCarousel(i);
     });
   });
 
@@ -1888,10 +1888,7 @@ function bindCrewCarousel(officers) {
       if (now - crewCarouselWheelLock < 320) return;
       crewCarouselWheelLock = now;
       e.preventDefault();
-      applyCrewCarousel(
-        crewCarouselIndex + (e.deltaY > 0 ? 1 : -1),
-        { hail: true }
-      );
+      applyCrewCarousel(crewCarouselIndex + (e.deltaY > 0 ? 1 : -1));
     },
     { passive: false }
   );
@@ -1900,21 +1897,21 @@ function bindCrewCarousel(officers) {
     if (e.target.closest("input, textarea")) return;
     if (e.key === "ArrowDown" || e.key === "PageDown") {
       e.preventDefault();
-      applyCrewCarousel(crewCarouselIndex + 1, { hail: true });
+      applyCrewCarousel(crewCarouselIndex + 1);
     } else if (e.key === "ArrowUp" || e.key === "PageUp") {
       e.preventDefault();
-      applyCrewCarousel(crewCarouselIndex - 1, { hail: true });
+      applyCrewCarousel(crewCarouselIndex - 1);
     } else if (e.key === "Home") {
       e.preventDefault();
-      applyCrewCarousel(0, { hail: true });
+      applyCrewCarousel(0);
     } else if (e.key === "End") {
       e.preventDefault();
-      applyCrewCarousel(officers.length - 1, { hail: true });
+      applyCrewCarousel(officers.length - 1);
     }
   });
 }
 
-function applyCrewCarousel(index, { hail = false } = {}) {
+function applyCrewCarousel(index) {
   const root = els.crew?.querySelector(".crew-carousel");
   const track = root?.querySelector(".crew-carousel-track");
   const slides = root?.querySelectorAll(".crew-carousel-slide") || [];
@@ -1929,27 +1926,15 @@ function applyCrewCarousel(index, { hail = false } = {}) {
     dot.setAttribute("aria-selected", on ? "true" : "false");
     dot.tabIndex = on ? 0 : -1;
   });
-  let activeTab = null;
   slides.forEach((slide, i) => {
     const on = i === crewCarouselIndex;
     slide.classList.toggle("is-active", on);
     slide.setAttribute("aria-hidden", on ? "false" : "true");
     const tab = slide.querySelector(".crew-tab");
     if (!tab) return;
-    if (on) {
-      tab.classList.add("is-pinned");
-      tab.classList.remove("is-held-shut");
-      tab.setAttribute("aria-expanded", "true");
-      activeTab = tab;
-    } else {
-      tab.classList.remove("is-pinned", "is-hailing", "is-held-shut");
-      tab.setAttribute("aria-expanded", "false");
-    }
+    tab.classList.remove("is-pinned", "is-hailing", "is-held-shut");
+    tab.setAttribute("aria-expanded", "false");
   });
-  if (hail && activeTab) {
-    const officers = displayBridgeCrew(current?.state?.ship?.crew || []);
-    void onCrewCardExpand(activeTab, officers);
-  }
 }
 
 function crewAdviceBlockHtml(c) {
