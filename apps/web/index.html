@@ -382,37 +382,48 @@
       aria-labelledby="starbase-title"
     >
       <div class="starbase-screen">
-        <header class="starbase-head">
-          <div class="starbase-kicker">Federation dockyard</div>
-          <h1 id="starbase-title" class="starbase-title">Starbase operations</h1>
-          <p id="starbase-meta" class="starbase-meta"></p>
-        </header>
-        <p id="starbase-notice" class="starbase-notice hidden" role="status"></p>
-        <div class="starbase-grid">
-          <section class="starbase-card" id="starbase-ship-card">
-            <h2>Vessel</h2>
-            <div id="starbase-ship" class="starbase-card-body"></div>
-          </section>
-          <section class="starbase-card" id="starbase-standing-card">
-            <h2>Standing</h2>
-            <div id="starbase-standing" class="starbase-card-body"></div>
-          </section>
-          <section class="starbase-card" id="starbase-yard-card">
-            <h2>Yard</h2>
-            <div id="starbase-yard" class="starbase-actions"></div>
-          </section>
-          <section class="starbase-card" id="starbase-people-card">
-            <h2>Personnel</h2>
-            <div id="starbase-people" class="starbase-actions"></div>
-          </section>
-          <section class="starbase-card starbase-card-wide" id="starbase-log-card">
-            <h2>Campaign log</h2>
-            <div id="starbase-log" class="starbase-card-body"></div>
-          </section>
+        <aside class="starbase-rail" aria-hidden="true">
+          <div class="starbase-rail-block is-ops">OPS</div>
+          <div class="starbase-rail-block is-dock">DOCK</div>
+          <div class="starbase-rail-block is-yard">YARD</div>
+          <div class="starbase-rail-block is-log">LOG</div>
+          <div class="starbase-rail-cap"></div>
+        </aside>
+        <div class="starbase-main">
+          <header class="starbase-head">
+            <div class="starbase-head-copy">
+              <div class="starbase-kicker">Federation dockyard</div>
+              <h1 id="starbase-title" class="starbase-title">Starbase operations</h1>
+            </div>
+            <p id="starbase-meta" class="starbase-meta"></p>
+          </header>
+          <p id="starbase-notice" class="starbase-notice hidden" role="status"></p>
+          <div class="starbase-grid">
+            <section class="starbase-card is-vessel" id="starbase-ship-card">
+              <h2>Vessel</h2>
+              <div id="starbase-ship" class="starbase-card-body"></div>
+            </section>
+            <section class="starbase-card is-standing" id="starbase-standing-card">
+              <h2>Standing</h2>
+              <div id="starbase-standing" class="starbase-card-body"></div>
+            </section>
+            <section class="starbase-card is-yard" id="starbase-yard-card">
+              <h2>Yard</h2>
+              <div id="starbase-yard" class="starbase-actions"></div>
+            </section>
+            <section class="starbase-card is-people" id="starbase-people-card">
+              <h2>Personnel</h2>
+              <div id="starbase-people" class="starbase-actions"></div>
+            </section>
+            <section class="starbase-card starbase-card-wide is-log" id="starbase-log-card">
+              <h2>Campaign log</h2>
+              <div id="starbase-log" class="starbase-card-body"></div>
+            </section>
+          </div>
+          <footer class="starbase-foot">
+            <div id="starbase-primary" class="starbase-primary"></div>
+          </footer>
         </div>
-        <footer class="starbase-foot">
-          <div id="starbase-primary" class="starbase-primary"></div>
-        </footer>
       </div>
     </div>
 

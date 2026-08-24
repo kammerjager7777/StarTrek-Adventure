@@ -2633,11 +2633,29 @@ function renderStarbaseScreen(state) {
           })
           .join("")}</ul>`
       : `<p class="starbase-empty">No officers on the roster.</p>`;
+    const hullPct = ship
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round((100 * ship.integrity) / (ship.maxIntegrity || 100))
+          )
+        )
+      : 0;
+    const shieldPct = ship
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round((100 * ship.shieldIntegrity) / (cap || 1))
+          )
+        )
+      : 0;
     els.starbaseShip.innerHTML = ship
-      ? `<div>Hull ${ship.integrity}/${ship.maxIntegrity}</div>
-         <div>Shields ${ship.shieldIntegrity}/${cap}${
-           ship.shieldGridOnline ? "" : " (offline)"
-         }${ship.systems?.shields === "damaged" ? " · emitters damaged" : ""}</div>
+      ? `<div class="starbase-meter"><span>Hull</span><span class="starbase-meter-track"><span class="starbase-meter-fill" style="width:${hullPct}%"></span></span><span class="starbase-meter-val">${ship.integrity}/${ship.maxIntegrity}</span></div>
+         <div class="starbase-meter"><span>Shields</span><span class="starbase-meter-track"><span class="starbase-meter-fill is-shield" style="width:${shieldPct}%"></span></span><span class="starbase-meter-val">${ship.shieldIntegrity}/${cap}${
+           ship.shieldGridOnline ? "" : " off"
+         }</span></div>
          <div>Systems: ${escapeHtml(damaged)}</div>
          <div class="starbase-skills">Skills: ${escapeHtml(skills)}</div>
          ${roster}`
@@ -2716,7 +2734,14 @@ function renderStarbaseScreen(state) {
       host.appendChild(p);
       return;
     }
-    for (const label of labels) host.appendChild(starbaseButton(label));
+    for (const label of labels) {
+      const extra = /^transfer:/i.test(label)
+        ? "secondary"
+        : /^heal:/i.test(label)
+          ? "secondary"
+          : "";
+      host.appendChild(starbaseButton(label, extra));
+    }
   };
   fill(els.starbaseYard, yard, "No yard work remaining this visit.");
   fill(els.starbasePeople, people, "No personnel actions this visit.");

@@ -1048,17 +1048,152 @@ html[data-ui-theme="lcars"] .red-alert-badge {
 html[data-ui-theme="lcars"] .starbase-overlay {
   background: #000;
 }
-html[data-ui-theme="lcars"] .starbase-head {
-  border-radius: 0 24px 0 0;
-  background: linear-gradient(90deg, #99cccc 0 22px, #000 22px);
-  border: 2px solid #99cccc;
+html[data-ui-theme="lcars"] .starbase-rail {
+  gap: 5px;
+  padding: 10px 0 12px 10px;
 }
-html[data-ui-theme="lcars"] .starbase-kicker,
-html[data-ui-theme="lcars"] .starbase-card h2 {
-  color: #99cccc;
+html[data-ui-theme="lcars"] .starbase-rail-block {
+  color: #000;
+  font-weight: 900;
+  border-radius: 0 22px 22px 0;
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-ops {
+  background: var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-dock {
+  background: var(--lcars-peach);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-yard {
+  background: var(--lcars-bar-2);
+}
+html[data-ui-theme="lcars"] .starbase-rail-block.is-log {
+  background: var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .starbase-rail-cap {
+  background: var(--lcars-bar);
+  border-radius: 0 0 var(--lcars-elbow) 0;
+}
+html[data-ui-theme="lcars"] .starbase-head {
+  border: none;
+  border-radius: 0 28px 0 0;
+  background: #000;
+  box-shadow: inset 0 -12px 0 0 var(--lcars-bar);
+  padding: 8px 8px 18px 4px;
+}
+html[data-ui-theme="lcars"] .starbase-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--lcars-bar) 0 28%,
+    var(--lcars-bar-2) 28% 46%,
+    var(--lcars-bar-3) 46% 64%,
+    var(--lcars-bar-4) 64% 82%,
+    var(--lcars-peach) 82% 100%
+  );
+  border-radius: 0 16px 0 0;
+}
+html[data-ui-theme="lcars"] .starbase-kicker {
+  color: var(--lcars-lilac);
+}
+html[data-ui-theme="lcars"] .starbase-title {
+  color: var(--lcars-peach);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+html[data-ui-theme="lcars"] .starbase-meta {
+  color: var(--lcars-peach);
+  padding-bottom: 4px;
+}
+html[data-ui-theme="lcars"] .starbase-notice {
+  background: #111;
+  border: none;
+  border-left: 14px solid var(--lcars-bar-3);
+  border-radius: 0 18px 0 0;
+  color: var(--lcars-peach);
 }
 html[data-ui-theme="lcars"] .starbase-card {
-  border: 2px solid #336666;
-  border-radius: 0 18px 0 0;
-  background: #050505;
+  background: #000;
+  border: none;
+  border-radius: 0;
+}
+html[data-ui-theme="lcars"] .starbase-card h2 {
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  border-radius: 0 22px 0 0;
+}
+html[data-ui-theme="lcars"] .starbase-card.is-vessel h2 {
+  background: var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .starbase-card.is-standing h2 {
+  background: var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .starbase-card.is-yard h2 {
+  background: var(--lcars-bar-4);
+}
+html[data-ui-theme="lcars"] .starbase-card.is-people h2 {
+  background: var(--lcars-bar-2);
+}
+html[data-ui-theme="lcars"] .starbase-card.is-log h2 {
+  background: var(--lcars-peach);
+}
+html[data-ui-theme="lcars"] .starbase-card-body,
+html[data-ui-theme="lcars"] .starbase-actions {
+  color: var(--text);
+}
+html[data-ui-theme="lcars"] .starbase-meter-track {
+  border-radius: 0 8px 0 8px;
+  background: #1a1208;
+}
+html[data-ui-theme="lcars"] .starbase-meter-fill {
+  background: var(--lcars-bar);
+  border-radius: 0;
+}
+html[data-ui-theme="lcars"] .starbase-meter-fill.is-shield {
+  background: var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .starbase-actions .lcars-btn:nth-child(4n + 1) {
+  background: var(--lcars-bar);
+}
+html[data-ui-theme="lcars"] .starbase-actions .lcars-btn:nth-child(4n + 2) {
+  background: var(--lcars-peach);
+}
+html[data-ui-theme="lcars"] .starbase-actions .lcars-btn:nth-child(4n + 3) {
+  background: var(--lcars-bar-2);
+}
+html[data-ui-theme="lcars"] .starbase-actions .lcars-btn:nth-child(4n + 4) {
+  background: var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .starbase-actions .lcars-btn.secondary {
+  background: var(--lcars-bar-2);
+}
+html[data-ui-theme="lcars"] .starbase-badge {
+  border-radius: 0 8px 0 8px;
+  color: #000;
+  border: none;
+  background: var(--lcars-peach);
+  font-weight: 800;
+}
+html[data-ui-theme="lcars"] .starbase-badge.is-active,
+html[data-ui-theme="lcars"] .starbase-badge.is-success {
+  background: var(--ok);
+}
+html[data-ui-theme="lcars"] .starbase-badge.is-injured {
+  background: var(--lcars-bar-4);
+}
+html[data-ui-theme="lcars"] .starbase-badge.is-dead,
+html[data-ui-theme="lcars"] .starbase-badge.is-failed {
+  background: var(--lcars-pink);
+}
+html[data-ui-theme="lcars"] .starbase-primary .lcars-btn {
+  border-radius: 0 28px 0 28px;
+  min-height: 52px;
+}
+html[data-ui-theme="lcars"] .starbase-primary .lcars-btn.secondary {
+  border-radius: 28px 0 28px 0;
 }

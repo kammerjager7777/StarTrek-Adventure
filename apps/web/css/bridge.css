@@ -2770,31 +2770,87 @@ body.starbase-active .shell {
   position: fixed;
   inset: 0;
   z-index: 40;
+  width: 100vw;
+  height: 100vh;
   background:
     radial-gradient(ellipse at 20% 0%, #12324a 0%, transparent 50%),
     linear-gradient(180deg, #071018, #05080e);
   color: var(--text);
-  overflow: auto;
-  padding: 18px 22px 28px;
+  overflow: hidden;
+  padding: 0;
 }
 .starbase-overlay.hidden {
   display: none;
 }
 
 .starbase-screen {
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 0;
+}
+
+.starbase-rail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 100%;
+  gap: 6px;
+  padding: 12px 0 16px 12px;
+}
+.starbase-rail-block {
+  flex: 1 1 0;
+  min-height: 48px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 4px 10px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #041018;
+  background: #38bdf8;
+  border-radius: 0 18px 18px 0;
+}
+.starbase-rail-block.is-ops { background: #38bdf8; flex: 1.4; }
+.starbase-rail-block.is-dock { background: #7dd3fc; flex: 1; }
+.starbase-rail-block.is-yard { background: #c4b5fd; flex: 1.1; }
+.starbase-rail-block.is-log { background: #fbbf24; flex: 0.7; }
+.starbase-rail-cap {
+  height: 28px;
+  background: #38bdf8;
+  border-radius: 0 0 22px 0;
+}
+
+.starbase-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 12px 16px 14px 10px;
 }
 
 .starbase-head {
-  padding: 14px 18px 12px 22px;
-  border-radius: 18px 8px 8px 18px;
-  background: linear-gradient(90deg, #38bdf8 0 18px, #0c1924 18px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 18px 14px 16px;
+  border-radius: 0 22px 0 0;
+  background: linear-gradient(90deg, #38bdf8 0 14px, #0c1924 14px);
   border: 1px solid #1e3a4c;
+  position: relative;
+}
+.starbase-head-copy {
+  min-width: 0;
 }
 .starbase-kicker {
   font-size: 0.72rem;
@@ -2803,20 +2859,24 @@ body.starbase-active .shell {
   color: #7dd3fc;
 }
 .starbase-title {
-  margin: 4px 0 2px;
-  font-size: 1.55rem;
-  letter-spacing: 0.04em;
+  margin: 2px 0 0;
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .starbase-meta {
   margin: 0;
   color: var(--muted);
   font-size: 0.92rem;
+  text-align: right;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .starbase-notice {
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 8px 16px;
+  border-radius: 0 16px 0 0;
   background: rgba(56, 189, 248, 0.12);
   border: 1px solid rgba(56, 189, 248, 0.35);
   color: #e0f2fe;
@@ -2827,42 +2887,76 @@ body.starbase-active .shell {
 
 .starbase-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: 1.15fr 0.85fr 1fr 1.2fr;
+  gap: 12px;
   flex: 1;
+  min-height: 0;
+  align-items: stretch;
 }
 .starbase-card-wide {
   grid-column: 1 / -1;
 }
-@media (max-width: 960px) {
+@media (max-width: 1280px) {
+  .starbase-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 820px) {
+  .starbase-screen {
+    grid-template-columns: 1fr;
+  }
+  .starbase-rail {
+    display: none;
+  }
   .starbase-grid {
     grid-template-columns: 1fr;
+  }
+  .starbase-overlay {
+    overflow: auto;
+  }
+  .starbase-main {
+    height: auto;
   }
 }
 
 .starbase-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 16px 16px;
-  min-height: 0;
-}
-.starbase-card h2 {
-  margin: 0 0 10px;
-  font-size: 0.82rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #7dd3fc;
-}
-.starbase-card-body {
-  font-size: 0.92rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-.starbase-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0 16px 0 0;
+  overflow: hidden;
+}
+.starbase-card h2 {
+  margin: 0;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #041018;
+  background: #38bdf8;
+}
+.starbase-card.is-standing h2 { background: #a5b4fc; }
+.starbase-card.is-yard h2 { background: #fbbf24; }
+.starbase-card.is-people h2 { background: #c4b5fd; }
+.starbase-card.is-log h2 { background: #7dd3fc; }
+.starbase-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px 12px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.starbase-actions {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 10px 12px;
 }
 .starbase-actions .lcars-btn,
 .starbase-primary .lcars-btn {
@@ -2874,16 +2968,45 @@ body.starbase-active .shell {
   color: var(--muted);
   font-size: 0.88rem;
 }
+.starbase-meter {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.starbase-meter-track {
+  display: block;
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(125, 211, 252, 0.15);
+  overflow: hidden;
+}
+.starbase-meter-fill {
+  display: block;
+  height: 100%;
+  background: #38bdf8;
+}
+.starbase-meter-fill.is-shield { background: #818cf8; }
+.starbase-meter-val {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.6rem;
+  text-align: right;
+}
 .starbase-skills {
-  margin: 0.35rem 0 0.6rem;
+  margin: 0.45rem 0 0.5rem;
   color: var(--lcars-blue);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
 }
 .starbase-roster,
 .starbase-rep,
 .starbase-log-list {
   list-style: none;
-  margin: 0.4rem 0 0;
+  margin: 0.35rem 0 0;
   padding: 0;
 }
 .starbase-roster li,
@@ -2938,7 +3061,7 @@ body.starbase-active .shell {
 }
 
 .starbase-foot {
-  padding-top: 4px;
+  padding-top: 2px;
 }
 .starbase-primary {
   display: flex;
@@ -2947,9 +3070,12 @@ body.starbase-active .shell {
 }
 .starbase-primary .lcars-btn {
   flex: 1;
-  min-width: 200px;
+  min-width: 220px;
+  min-height: 48px;
   text-align: center;
   justify-content: center;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
 }
 
 body.starbase-waiting .starbase-overlay {
