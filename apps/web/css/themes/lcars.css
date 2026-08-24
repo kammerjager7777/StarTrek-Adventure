@@ -488,8 +488,21 @@ html[data-ui-theme="lcars"] .panel-body.muted {
   color: var(--muted);
 }
 
-html[data-ui-theme="lcars"] .panel.left #crew-panel::-webkit-scrollbar-thumb {
-  background: var(--lcars-bar);
+html[data-ui-theme="lcars"] .crew-dot {
+  background: #333;
+  border-radius: 0;
+  width: 8px;
+  height: 8px;
+}
+
+html[data-ui-theme="lcars"] .crew-dot:hover,
+html[data-ui-theme="lcars"] .crew-dot:focus-visible {
+  background: var(--lcars-bar-3);
+}
+
+html[data-ui-theme="lcars"] .crew-dot.is-active {
+  background: var(--lcars-peach);
+  box-shadow: none;
   border-radius: 0;
 }
 

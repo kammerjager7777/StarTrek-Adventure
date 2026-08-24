@@ -410,21 +410,8 @@ body.init-active .shell {
 .panel.left #crew-panel {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 4px;
-  /* subtle scrollbar room */
-  scrollbar-gutter: stable;
-}
-
-.panel.left #crew-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.panel.left #crew-panel::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 999px;
+  overflow: hidden;
+  padding-right: 2px;
 }
 
 .panel.right #objectives-panel,
@@ -505,8 +492,87 @@ body.init-active .shell {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-right: 4px;
+  padding-right: 0;
   line-height: normal;
+  min-height: 0;
+  height: 100%;
+}
+
+.crew-carousel {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  outline: none;
+}
+
+.crew-carousel-viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 140px;
+  overflow: hidden;
+  position: relative;
+}
+
+.crew-carousel-track {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  will-change: transform;
+  transition: transform 0.32s ease;
+}
+
+.crew-carousel-slide {
+  flex: 0 0 100%;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.crew-carousel-slide .crew-tab {
+  min-height: 80px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-carousel-track {
+    transition: none;
+  }
+}
+
+.crew-dots {
+  flex: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+}
+
+.crew-dot {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.4);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.crew-dot:hover,
+.crew-dot:focus-visible {
+  background: rgba(247, 178, 103, 0.85);
+  outline: none;
+}
+
+.crew-dot.is-active {
+  background: var(--lcars-peach, #f7b267);
+  transform: scale(1.35);
+  box-shadow: 0 0 8px rgba(247, 178, 103, 0.45);
 }
 
 .crew-tab {

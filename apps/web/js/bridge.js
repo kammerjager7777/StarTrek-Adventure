@@ -1639,6 +1639,10 @@ function renderShip(ship) {
 
 let portraitRequestFor = null;
 let portraitsGenerating = false;
+/** Visible officer in the crew carousel (survives portrait re-renders). */
+let crewCarouselId = null;
+let crewCarouselIndex = 0;
+let crewCarouselWheelLock = 0;
 
 /** Viewscreen journey-book rotation */
 let viewscreenRotateTimer = null;
@@ -1803,27 +1807,148 @@ function renderCrew(ship, playerName = "") {
   const pendingCount = officers.filter(crewNeedsPortrait).length;
   const showGenerating = portraitsGenerating && pendingCount > 0;
 
-  els.crew.className = "panel-body crew-panel";
-  els.crew.innerHTML =
-    (showGenerating
-      ? `<div class="crew-imaging-banner" role="status" aria-live="polite">
-          <span class="crew-imaging-spinner" aria-hidden="true"></span>
-          <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
-        </div>`
-      : "") +
-    officers
-      .map((c) => {
-        const needsImg = crewNeedsPortrait(c);
-        const generating = showGenerating && needsImg;
-        return officerCardHtml(c, { generating });
-      })
-      .join("");
-
-  bindCrewCardExpandHandlers(officers);
-  bindCrewAdviceButtons(officers);
+  paintCrewCarousel(officers, { showGenerating, pendingCount });
   // Image crew once a ship is assigned (ship select init, mission boot, or playing)
   if (current?.state?.ship?.crew?.length) {
     maybeRequestPortraits();
+  }
+}
+
+function paintCrewCarousel(officers, { showGenerating = false, pendingCount = 0 } = {}) {
+  if (!els.crew) return;
+  els.crew.className = "panel-body crew-panel";
+  const banner = showGenerating
+    ? `<div class="crew-imaging-banner" role="status" aria-live="polite">
+          <span class="crew-imaging-spinner" aria-hidden="true"></span>
+          <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
+        </div>`
+    : "";
+  const slides = officers
+    .map((c) => {
+      const generating = showGenerating && crewNeedsPortrait(c);
+      return `<div class="crew-carousel-slide" data-crew-id="${escapeHtml(
+        c.id
+      )}">${officerCardHtml(c, { generating })}</div>`;
+    })
+    .join("");
+  const dots =
+    officers.length > 1
+      ? `<div class="crew-dots" role="tablist" aria-label="Bridge crew">${officers
+          .map((c, i) => {
+            const duty = crewDutyBadge(c);
+            const label = duty ? `${c.name} (${duty.label})` : c.name;
+            return `<button type="button" class="crew-dot" role="tab" data-crew-index="${i}" title="${escapeHtml(
+              label
+            )}" aria-label="${escapeHtml(label)}"></button>`;
+          })
+          .join("")}</div>`
+      : "";
+  els.crew.innerHTML = `${banner}<div class="crew-carousel" tabindex="0" aria-roledescription="carousel" aria-label="Bridge crew">
+      <div class="crew-carousel-viewport">
+        <div class="crew-carousel-track">${slides}</div>
+      </div>
+      ${dots}
+    </div>`;
+  bindCrewCardExpandHandlers(officers);
+  bindCrewAdviceButtons(officers);
+  bindCrewCarousel(officers);
+}
+
+function bindCrewCarousel(officers) {
+  const root = els.crew?.querySelector(".crew-carousel");
+  if (!root || !officers.length) return;
+  const saved = officers.findIndex((c) => c.id === crewCarouselId);
+  const start = saved >= 0 ? saved : 0;
+  applyCrewCarousel(start, { hail: false });
+
+  root.querySelectorAll(".crew-dot").forEach((dot) => {
+    dot.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const i = Number(dot.getAttribute("data-crew-index"));
+      if (!Number.isNaN(i)) applyCrewCarousel(i, { hail: true });
+    });
+  });
+
+  const viewport = root.querySelector(".crew-carousel-viewport");
+  viewport?.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.target.closest("input, textarea, button")) return;
+      if (Math.abs(e.deltaY) < 10) return;
+      const slide = root.querySelector(".crew-carousel-slide.is-active");
+      if (slide && slide.scrollHeight > slide.clientHeight + 8) {
+        const atTop = slide.scrollTop <= 4;
+        const atBottom =
+          slide.scrollTop + slide.clientHeight >= slide.scrollHeight - 4;
+        if (e.deltaY > 0 && !atBottom) return;
+        if (e.deltaY < 0 && !atTop) return;
+      }
+      const now = Date.now();
+      if (now - crewCarouselWheelLock < 320) return;
+      crewCarouselWheelLock = now;
+      e.preventDefault();
+      applyCrewCarousel(
+        crewCarouselIndex + (e.deltaY > 0 ? 1 : -1),
+        { hail: true }
+      );
+    },
+    { passive: false }
+  );
+
+  root.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowDown" || e.key === "PageDown") {
+      e.preventDefault();
+      applyCrewCarousel(crewCarouselIndex + 1, { hail: true });
+    } else if (e.key === "ArrowUp" || e.key === "PageUp") {
+      e.preventDefault();
+      applyCrewCarousel(crewCarouselIndex - 1, { hail: true });
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      applyCrewCarousel(0, { hail: true });
+    } else if (e.key === "End") {
+      e.preventDefault();
+      applyCrewCarousel(officers.length - 1, { hail: true });
+    }
+  });
+}
+
+function applyCrewCarousel(index, { hail = false } = {}) {
+  const root = els.crew?.querySelector(".crew-carousel");
+  const track = root?.querySelector(".crew-carousel-track");
+  const slides = root?.querySelectorAll(".crew-carousel-slide") || [];
+  const n = slides.length;
+  if (!track || !n) return;
+  crewCarouselIndex = ((index % n) + n) % n;
+  crewCarouselId = slides[crewCarouselIndex].getAttribute("data-crew-id");
+  track.style.transform = `translateY(-${crewCarouselIndex * 100}%)`;
+  root.querySelectorAll(".crew-dot").forEach((dot, i) => {
+    const on = i === crewCarouselIndex;
+    dot.classList.toggle("is-active", on);
+    dot.setAttribute("aria-selected", on ? "true" : "false");
+    dot.tabIndex = on ? 0 : -1;
+  });
+  let activeTab = null;
+  slides.forEach((slide, i) => {
+    const on = i === crewCarouselIndex;
+    slide.classList.toggle("is-active", on);
+    slide.setAttribute("aria-hidden", on ? "false" : "true");
+    const tab = slide.querySelector(".crew-tab");
+    if (!tab) return;
+    if (on) {
+      tab.classList.add("is-pinned");
+      tab.classList.remove("is-held-shut");
+      tab.setAttribute("aria-expanded", "true");
+      activeTab = tab;
+    } else {
+      tab.classList.remove("is-pinned", "is-hailing", "is-held-shut");
+      tab.setAttribute("aria-expanded", "false");
+    }
+  });
+  if (hail && activeTab) {
+    const officers = displayBridgeCrew(current?.state?.ship?.crew || []);
+    void onCrewCardExpand(activeTab, officers);
   }
 }
 
@@ -2229,23 +2354,7 @@ function renderCrewWithoutPortraitKick(ship) {
   }
   const pendingCount = officers.filter(crewNeedsPortrait).length;
   const showGenerating = portraitsGenerating && pendingCount > 0;
-  els.crew.className = "panel-body crew-panel";
-  els.crew.innerHTML =
-    (showGenerating
-      ? `<div class="crew-imaging-banner" role="status" aria-live="polite">
-          <span class="crew-imaging-spinner" aria-hidden="true"></span>
-          <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
-        </div>`
-      : "") +
-    officers
-      .map((c) => {
-        const needsImg = crewNeedsPortrait(c);
-        const generating = showGenerating && needsImg;
-        return officerCardHtml(c, { generating });
-      })
-      .join("");
-  bindCrewCardExpandHandlers(officers);
-  bindCrewAdviceButtons(officers);
+  paintCrewCarousel(officers, { showGenerating, pendingCount });
 }
 
 /** True when the player is accepting the mission brief to begin play */
