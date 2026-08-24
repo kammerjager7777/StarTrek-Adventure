@@ -1235,3 +1235,13 @@ html[data-ui-theme="lcars"] .mission-board-brief {
   border-left: 14px solid var(--lcars-bar);
   color: var(--text);
 }
+html[data-ui-theme="lcars"] .mission-board-filter-row .lcars-btn.is-locked,
+html[data-ui-theme="lcars"] .mission-board-filter-row .lcars-btn:disabled {
+  background: #2a2a2a;
+  color: #665544;
+  opacity: 0.45;
+  filter: none;
+}
+html[data-ui-theme="lcars"] .mission-board-lock-note {
+  color: var(--lcars-pink);
+}

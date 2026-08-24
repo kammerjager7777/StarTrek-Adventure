@@ -547,7 +547,7 @@ Hub orders (`starbaseHubChoices`): Review status, Refit (hull / deep / shields /
   - Transfer: free a billet (`transferBudget`; cannot transfer last active officer)
 - Session state on `GameState.starbase` (`StarbaseSession`); cleared when leaving for a new mission.
 - You stay on the **starbase hub whenever you are not playing a mission** (after commissioning a ship, after debrief, after Continue, after standing down).
-- **Choose next mission** leaves the hub for the **mission board**: pick **type** (science / exploration / search & rescue / battle / expanded) and **difficulty**, then a list of standing-aware assignments. Type and risk can be changed on the list. **Return to starbase** comes back to the dock without starting play.
+- **Choose next mission** leaves the hub for the **mission board**: pick **type** (science / exploration / search & rescue / battle / expanded) and **difficulty**, then a list of standing-aware assignments. Type and risk can be changed on the list. **Expanded is locked to Hardcore** (other difficulties are disabled). **Return to starbase** comes back to the dock without starting play.
 - **Save and stand down** writes the profile and clears `activeRunId`. The ship stays docked.
 - **Continue your story** / resume (History or refresh): if a live run is mid-mission, resume that beat. If you were at starbase (or stood down), **load the starbase hub** with ship, crew, skills, universe, and campaign log. **Choose next mission** is how you leave the dock for `mission_offer`.
 

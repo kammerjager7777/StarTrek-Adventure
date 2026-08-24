@@ -2558,11 +2558,18 @@ function shieldDisplayCap(ship) {
   return max;
 }
 
-function starbaseButton(label, extraClass = "") {
+function starbaseButton(label, extraClass = "", opts = {}) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = `lcars-btn${extraClass ? ` ${extraClass}` : ""}`;
   btn.textContent = label;
+  if (opts.disabled) {
+    btn.disabled = true;
+    btn.classList.add("is-locked");
+    btn.title = opts.title || "Unavailable";
+    return btn;
+  }
+  if (opts.title) btn.title = opts.title;
   btn.addEventListener("click", () => {
     uiSound("primary");
     sendAction(label);
@@ -2962,11 +2969,26 @@ function missionBoardFilterBar(state) {
   diffLabel.className = "mission-card-label";
   diffLabel.textContent = "Risk";
   diffRow.appendChild(diffLabel);
+  const expanded = state.missionType === "expanded";
   for (const d of ["Easy", "Medium", "Hard", "Hardcore"]) {
-    const on = String(state.difficulty || "").toLowerCase() === d.toLowerCase();
-    diffRow.appendChild(
-      starbaseButton(`Difficulty: ${d}`, on ? "" : "secondary")
-    );
+    const on =
+      String(state.difficulty || "").toLowerCase() === d.toLowerCase();
+    const locked = expanded && d !== "Hardcore";
+    const btn = starbaseButton(`Difficulty: ${d}`, on ? "" : "secondary", {
+      disabled: locked,
+      title: locked
+        ? "Expanded assignments are locked to Hardcore"
+        : expanded
+          ? "Expanded content is Hardcore only"
+          : `Set difficulty to ${d}`,
+    });
+    diffRow.appendChild(btn);
+  }
+  if (expanded) {
+    const note = document.createElement("span");
+    note.className = "mission-board-lock-note";
+    note.textContent = "Expanded is Hardcore only";
+    diffRow.appendChild(note);
   }
   bar.appendChild(typeRow);
   bar.appendChild(diffRow);

@@ -3138,6 +3138,20 @@ body.mission-board-active .shell {
   min-width: 0;
   flex: 1 1 auto;
 }
+.mission-board-filter-row .lcars-btn.is-locked,
+.mission-board-filter-row .lcars-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  filter: grayscale(0.55);
+  pointer-events: none;
+}
+.mission-board-lock-note {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--lcars-peach, #f79d65);
+}
 .mission-card {
   display: grid;
   grid-template-columns: 1fr auto;

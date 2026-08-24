@@ -330,6 +330,11 @@ export async function advanceSetup(
           state.pendingChoices
         );
       }
+      if (next.missionType === "expanded") {
+        next.difficulty = "hardcore";
+        next = await offerMissions(next);
+        return logPlayerChoice(next, input, state.pendingChoices);
+      }
       const map: Record<number, Difficulty> = {
         1: "easy",
         2: "medium",
@@ -375,6 +380,18 @@ export async function advanceSetup(
       }
       const diffChange = input.match(/^difficulty:\s*(.+)$/i);
       if (diffChange) {
+        if (next.missionType === "expanded") {
+          next.difficulty = "hardcore";
+          return logPlayerChoice(
+            {
+              ...next,
+              pendingQuestion:
+                "Expanded assignments are locked to Hardcore. Choose a different type to change risk.",
+            },
+            input,
+            state.pendingChoices
+          );
+        }
         const nextDiff = parseDifficultyInput(diffChange[1]);
         if (!nextDiff) {
           next.pendingQuestion = "Unknown difficulty.";
