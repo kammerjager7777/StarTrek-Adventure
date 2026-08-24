@@ -3172,11 +3172,46 @@ body.mission-board-active .shell {
 .mission-card.is-open {
   border-color: var(--lcars-peach, #f79d65);
 }
+.mission-card-title-row {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .mission-card h3 {
   margin: 0;
-  grid-column: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 1.15rem;
   letter-spacing: 0.04em;
+}
+.mission-card-speak {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0 10px 0 10px;
+  background: var(--lcars-orange, #f7b267);
+  color: #041018;
+  cursor: pointer;
+}
+.mission-card-speak svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.mission-card-speak:hover,
+.mission-card-speak:focus-visible {
+  filter: brightness(1.12);
+  outline: none;
+}
+.mission-card-speak.is-speaking-line {
+  animation: voice-pulse 1.2s ease-in-out infinite;
 }
 .mission-card-meta {
   margin: 0;

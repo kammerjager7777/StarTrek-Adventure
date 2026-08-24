@@ -1216,6 +1216,14 @@ html[data-ui-theme="lcars"] .mission-card h3 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+html[data-ui-theme="lcars"] .mission-card-speak {
+  background: var(--lcars-bar-3);
+  color: #000;
+  border-radius: 0 12px 0 12px;
+}
+html[data-ui-theme="lcars"] .mission-card-speak.is-speaking-line {
+  background: var(--lcars-peach);
+}
 html[data-ui-theme="lcars"] .mission-card:hover,
 html[data-ui-theme="lcars"] .mission-card:focus-within,
 html[data-ui-theme="lcars"] .mission-card.is-open {

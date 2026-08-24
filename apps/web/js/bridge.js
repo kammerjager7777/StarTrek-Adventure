@@ -2941,6 +2941,25 @@ async function fetchMissionBoard(runId, text, update) {
   return view;
 }
 
+function buildMissionBriefingSpeech(offer, title) {
+  const parts = [`Assignment: ${title}.`];
+  const type = String(offer?.type || "").replace(/_/g, " ");
+  if (type) parts.push(`Classification: ${type}.`);
+  if (offer?.location) parts.push(`Theatre: ${offer.location}.`);
+  if (offer?.summary) parts.push(String(offer.summary).trim());
+  const bg = String(offer?.background || "").trim();
+  const summary = String(offer?.summary || "").trim();
+  if (bg && bg.toLowerCase() !== summary.toLowerCase()) parts.push(bg);
+  if (offer?.main) parts.push(`Primary objective: ${offer.main}.`);
+  const secondaries = Array.isArray(offer?.secondaries)
+    ? offer.secondaries.filter(Boolean)
+    : [];
+  if (secondaries.length) {
+    parts.push(`Secondary objectives: ${secondaries.join(". ")}.`);
+  }
+  return parts.filter(Boolean).join(" ");
+}
+
 function missionBoardFilterBar(state) {
   const bar = document.createElement("div");
   bar.className = "mission-board-filters";
@@ -3119,13 +3138,38 @@ function renderMissionBoard(state) {
           card.innerHTML = `<p class="mission-card-meta">${escapeHtml(
             [offer.type, offer.location].filter(Boolean).join(" · ")
           )}</p>
-            <h3>${escapeHtml(title)}</h3>
+            <div class="mission-card-title-row">
+              <h3>${escapeHtml(title)}</h3>
+            </div>
             <p class="mission-card-summary">${escapeHtml(summary)}</p>
             ${
               extraBits.length
                 ? `<div class="mission-card-extra">${extraBits.join("")}</div>`
                 : ""
             }`;
+          const speakBtn = document.createElement("button");
+          speakBtn.type = "button";
+          speakBtn.className = "mission-card-speak";
+          speakBtn.title = "Read briefing aloud";
+          speakBtn.setAttribute("aria-label", `Read briefing for ${title}`);
+          speakBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm-2.5-7.2v2.1a6.6 6.6 0 0 1 0 10.2v2.1a8.7 8.7 0 0 0 0-14.4z"/></svg>';
+          const briefing = buildMissionBriefingSpeech(offer, title);
+          speakBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (speakBtn.classList.contains("is-speaking-line")) {
+              stopVoicePlayback();
+              speakBtn.classList.remove("is-speaking-line");
+              return;
+            }
+            uiSound("soft");
+            els.missionBoardList
+              ?.querySelectorAll(".mission-card-speak")
+              .forEach((b) => b.classList.remove("is-speaking-line"));
+            void replaySpeech("narrator", briefing, speakBtn);
+          });
+          card.querySelector(".mission-card-title-row")?.appendChild(speakBtn);
           const btn = starbaseButton(choices[i]?.text || title);
           card.appendChild(btn);
           card.addEventListener("mouseenter", () => {
