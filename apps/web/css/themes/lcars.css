@@ -258,7 +258,7 @@ html[data-ui-theme="lcars"] .top-bar {
   padding: 0 0 0 0;
   gap: 10px;
   align-items: stretch;
-  min-height: 52px;
+  min-height: 64px;
   /* Left elbow + bar */
   box-shadow: inset 48px 0 0 0 var(--lcars-bar);
   padding-left: 56px;
@@ -297,19 +297,19 @@ html[data-ui-theme="lcars"] .top-bar::after {
 }
 
 html[data-ui-theme="lcars"] .brand {
-  padding: 4px 0 14px;
-  gap: 8px;
+  padding: 6px 0 16px;
+  gap: 12px;
 }
 
 html[data-ui-theme="lcars"] .brand h1 {
   color: var(--lcars-peach);
   font-weight: 900;
   letter-spacing: 0.14em;
-  font-size: 1.05rem;
+  font-size: 1.4rem;
 }
 
 html[data-ui-theme="lcars"] .brand-mark {
-  height: 26px;
+  height: 40px;
 }
 
 html[data-ui-theme="lcars"] .top-actions {
