@@ -597,7 +597,9 @@ html[data-ui-theme="lcars"] .crew-duty-stamp-note {
   color: #ffcc99;
 }
 
-html[data-ui-theme="lcars"] .panel.left .crew-toggle {
+html[data-ui-theme="lcars"] .panel.left .crew-toggle,
+html[data-ui-theme="lcars"] .panel.left .crew-section.is-collapsed .crew-toggle,
+html[data-ui-theme="lcars"] .panel.left .crew-section.is-expanded .crew-toggle {
   border: none;
   border-radius: 0 18px 0 0;
   background: var(--lcars-bar);
@@ -608,6 +610,9 @@ html[data-ui-theme="lcars"] .panel.left .crew-toggle {
 html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-label,
 html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-chevron {
   color: #000;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-summary {
