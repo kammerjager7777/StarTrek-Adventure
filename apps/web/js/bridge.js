@@ -2957,6 +2957,33 @@ function buildMissionBriefingSpeech(offer, title) {
   return parts.filter(Boolean).join(" ");
 }
 
+const SPEAK_ALOUD_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm-2.5-7.2v2.1a6.6 6.6 0 0 1 0 10.2v2.1a8.7 8.7 0 0 0 0-14.4z"/></svg>';
+
+function makeSpeakAloudButton({ label, text }) {
+  const speakBtn = document.createElement("button");
+  speakBtn.type = "button";
+  speakBtn.className = "mission-card-speak";
+  speakBtn.title = "Read briefing aloud";
+  speakBtn.setAttribute("aria-label", label);
+  speakBtn.innerHTML = SPEAK_ALOUD_ICON;
+  speakBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (speakBtn.classList.contains("is-speaking-line")) {
+      stopVoicePlayback();
+      speakBtn.classList.remove("is-speaking-line");
+      return;
+    }
+    uiSound("soft");
+    document
+      .querySelectorAll(".mission-card-speak")
+      .forEach((b) => b.classList.remove("is-speaking-line"));
+    void replaySpeech("narrator", text, speakBtn);
+  });
+  return speakBtn;
+}
+
 function missionBoardFilterBar(state) {
   const bar = document.createElement("div");
   bar.className = "mission-board-filters";
@@ -3069,7 +3096,40 @@ function renderMissionBoard(state) {
     if (phase === "mission_brief") {
       const brief = document.createElement("div");
       brief.className = "mission-board-brief";
-      brief.textContent = copy || "Stand by for briefing.";
+      const head = document.createElement("div");
+      head.className = "mission-board-brief-head";
+      const heading = document.createElement("h2");
+      heading.textContent = state.mission?.title || "Orders";
+      head.appendChild(heading);
+      const spoken =
+        copy ||
+        buildMissionBriefingSpeech(
+          {
+            type: state.mission?.type,
+            location: state.mission?.location,
+            summary: state.mission?.brief,
+            background: state.mission?.background,
+            main: state.mission?.objectives?.find((o) => o.kind === "main")
+              ?.title,
+            secondaries: (state.mission?.objectives || [])
+              .filter((o) => o.kind === "secondary")
+              .map((o) => o.title),
+          },
+          state.mission?.title || "Mission"
+        );
+      head.appendChild(
+        makeSpeakAloudButton({
+          label: `Read briefing${
+            state.mission?.title ? ` for ${state.mission.title}` : ""
+          } aloud`,
+          text: spoken,
+        })
+      );
+      const body = document.createElement("div");
+      body.className = "mission-board-brief-body";
+      body.textContent = copy || "Stand by for briefing.";
+      brief.appendChild(head);
+      brief.appendChild(body);
       host.appendChild(brief);
     } else if (phase === "mission_type" || phase === "difficulty") {
       for (const c of state.pendingChoices || []) {
@@ -3144,29 +3204,13 @@ function renderMissionBoard(state) {
                 ? `<div class="mission-card-extra">${extraBits.join("")}</div>`
                 : ""
             }`;
-          const speakBtn = document.createElement("button");
-          speakBtn.type = "button";
-          speakBtn.className = "mission-card-speak";
-          speakBtn.title = "Read briefing aloud";
-          speakBtn.setAttribute("aria-label", `Read briefing for ${title}`);
-          speakBtn.innerHTML =
-            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm-2.5-7.2v2.1a6.6 6.6 0 0 1 0 10.2v2.1a8.7 8.7 0 0 0 0-14.4z"/></svg>';
           const briefing = buildMissionBriefingSpeech(offer, title);
-          speakBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (speakBtn.classList.contains("is-speaking-line")) {
-              stopVoicePlayback();
-              speakBtn.classList.remove("is-speaking-line");
-              return;
-            }
-            uiSound("soft");
-            els.missionBoardList
-              ?.querySelectorAll(".mission-card-speak")
-              .forEach((b) => b.classList.remove("is-speaking-line"));
-            void replaySpeech("narrator", briefing, speakBtn);
-          });
-          card.querySelector(".mission-card-title-row")?.appendChild(speakBtn);
+          card.querySelector(".mission-card-title-row")?.appendChild(
+            makeSpeakAloudButton({
+              label: `Read briefing for ${title}`,
+              text: briefing,
+            })
+          );
           const btn = starbaseButton(choices[i]?.text || title);
           card.appendChild(btn);
           card.addEventListener("mouseenter", () => {

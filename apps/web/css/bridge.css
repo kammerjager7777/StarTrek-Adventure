@@ -3414,7 +3414,22 @@ body.mission-board-active .shell {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 0 18px 0 0;
+  overflow: auto;
+}
+.mission-board-brief-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.mission-board-brief-head h2 {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
+.mission-board-brief-body {
   white-space: pre-wrap;
   line-height: 1.5;
-  overflow: auto;
 }

@@ -1276,6 +1276,12 @@ html[data-ui-theme="lcars"] .mission-board-brief {
   border-left: 14px solid var(--lcars-bar);
   color: var(--text);
 }
+html[data-ui-theme="lcars"] .mission-board-brief-head h2 {
+  color: var(--lcars-peach);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 html[data-ui-theme="lcars"] .mission-board-filter-row .lcars-btn.is-locked,
 html[data-ui-theme="lcars"] .mission-board-filter-row .lcars-btn:disabled {
   background: #2a2a2a;
