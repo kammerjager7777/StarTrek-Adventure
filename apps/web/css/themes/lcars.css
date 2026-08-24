@@ -572,6 +572,16 @@ html[data-ui-theme="lcars"] .crew-tab.is-injured {
   border-color: var(--lcars-bar);
 }
 
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-carousel-slide.is-active .crew-tab,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-hailing,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-injured,
+html[data-ui-theme="lcars"] .crew-section.is-collapsed .crew-tab.is-pinned {
+  border: 2px solid var(--lcars-bar-2);
+  box-shadow: none;
+  animation: none;
+}
+
 html[data-ui-theme="lcars"] .crew-injured-slot {
   border: none;
   border-left: 10px solid var(--lcars-bar);

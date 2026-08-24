@@ -431,6 +431,14 @@ body.init-active .shell {
   display: none;
 }
 
+.crew-section.is-collapsed .crew-tab,
+.crew-section.is-collapsed .crew-carousel-slide.is-active .crew-tab,
+.crew-section.is-collapsed .crew-tab.is-hailing,
+.crew-section.is-collapsed .crew-tab.is-injured {
+  border-color: var(--lcars-blue, #9999ff);
+  box-shadow: none;
+}
+
 .panel.left #crew-panel {
   flex: 1 1 auto;
   min-height: 0;
