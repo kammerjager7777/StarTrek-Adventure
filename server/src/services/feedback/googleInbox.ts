@@ -13,7 +13,7 @@ const localDir = path.join(repoRoot, "data", "feedback");
 
 const SCOPES = [
   "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/devstorage.read_write",
 ];
 
 const MAX_MESSAGE = 8000;
@@ -118,10 +118,20 @@ function loadServiceAccount(): ServiceAccount | null {
 
 function googleConfigured(): boolean {
   return Boolean(
-    loadServiceAccount() &&
-      String(process.env.FEEDBACK_SHEET_ID || "").trim() &&
-      String(process.env.FEEDBACK_DRIVE_FOLDER_ID || "").trim()
+    loadServiceAccount() && String(process.env.FEEDBACK_SHEET_ID || "").trim()
   );
+}
+
+function feedbackBucket(): string {
+  return String(process.env.FEEDBACK_GCS_BUCKET || "sta-feedback-3524d3").trim();
+}
+
+function publicBase(): string {
+  return String(
+    process.env.FEEDBACK_PUBLIC_BASE ||
+      process.env.SERVICE_URL ||
+      ""
+  ).replace(/\/$/, "");
 }
 
 function b64urlJson(obj: unknown): string {
@@ -241,48 +251,54 @@ async function appendRow(
 
 async function uploadScreenshot(
   token: string,
-  folderId: string,
   shot: FeedbackScreenshot
 ): Promise<string> {
-  const boundary = `sta_${crypto.randomBytes(12).toString("hex")}`;
-  const meta = JSON.stringify({
-    name: shot.filename,
-    parents: [folderId],
-    mimeType: shot.mime,
-  });
-  const preamble = Buffer.from(
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${shot.mime}\r\n\r\n`
-  );
-  const close = Buffer.from(`\r\n--${boundary}--`);
-  const body = Buffer.concat([preamble, shot.bytes, close]);
+  const bucket = feedbackBucket();
+  const filename = `${crypto.randomUUID()}.${extForMime(shot.mime)}`;
+  const object = `shots/${filename}`;
   const res = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink",
+    `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(
+      bucket
+    )}/o?uploadType=media&name=${encodeURIComponent(object)}`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
+        "Content-Type": shot.mime,
       },
-      body,
+      body: new Uint8Array(shot.bytes),
     }
   );
-  const json = (await res.json()) as { id?: string; webViewLink?: string; error?: { message?: string } };
-  if (!res.ok || !json.id) {
-    throw new Error(json.error?.message || `Drive upload failed (${res.status})`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Screenshot upload failed (${res.status}): ${text.slice(0, 240)}`);
   }
-  await fetch(`https://www.googleapis.com/drive/v3/files/${json.id}/permissions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ role: "reader", type: "anyone" }),
-  }).catch(() => {
-    /* folder share is enough for the owner */
-  });
-  return (
-    json.webViewLink || `https://drive.google.com/file/d/${json.id}/view`
+  const base = publicBase();
+  if (base) return `${base}/api/feedback/shots/${encodeURIComponent(filename)}`;
+  return filename;
+}
+
+export async function readFeedbackShot(objectName: string): Promise<{
+  mime: string;
+  bytes: Buffer;
+} | null> {
+  const filename = String(objectName || "");
+  if (!/^[a-zA-Z0-9._-]+$/.test(filename)) return null;
+  const sa = loadServiceAccount();
+  if (!sa) return null;
+  const token = await accessToken();
+  const bucket = feedbackBucket();
+  const object = `shots/${filename}`;
+  const res = await fetch(
+    `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(
+      bucket
+    )}/o/${encodeURIComponent(object)}?alt=media`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
+  if (!res.ok) return null;
+  const mime = res.headers.get("content-type") || "image/png";
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { mime, bytes: buf };
 }
 
 async function saveLocal(payload: FeedbackPayload): Promise<FeedbackResult> {
@@ -318,20 +334,24 @@ export async function submitFeedback(
   if (!googleConfigured()) {
     if (process.env.NODE_ENV === "production" || process.env.K_SERVICE) {
       throw new Error(
-        "Share a Google Sheet and Drive folder with the feedback service account, then set FEEDBACK_SHEET_ID and FEEDBACK_DRIVE_FOLDER_ID."
+        "Feedback inbox is not configured (need GOOGLE_SA_JSON and FEEDBACK_SHEET_ID)."
       );
     }
     return saveLocal(payload);
   }
 
   const sheetId = String(process.env.FEEDBACK_SHEET_ID || "").trim();
-  const folderId = String(process.env.FEEDBACK_DRIVE_FOLDER_ID || "").trim();
   const tab = String(process.env.FEEDBACK_SHEET_TAB || "Sheet1").trim() || "Sheet1";
   const token = await accessToken();
 
   let shotUrl = "";
   if (payload.screenshot) {
-    shotUrl = await uploadScreenshot(token, folderId, payload.screenshot);
+    try {
+      shotUrl = await uploadScreenshot(token, payload.screenshot);
+    } catch (err) {
+      console.error("Feedback screenshot upload failed:", err);
+      shotUrl = "";
+    }
   }
 
   await ensureHeaderRow(token, sheetId, tab);

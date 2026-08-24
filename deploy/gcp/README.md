@@ -73,24 +73,15 @@ gcloud run deploy sta-bridge \
 
 ## Dev feedback inbox
 
-The bridge **Feedback** button posts to `POST /api/feedback`. Production writes a row to a Google Sheet and stores screenshots in a Drive folder (service account). Local `npm run dev` without these env values saves under `data/feedback/` instead.
+The bridge **Feedback** button posts to `POST /api/feedback`. Production appends a row to a Google Sheet. Screenshots go to a private GCS bucket (`sta-feedback-3524d3`) and are served through `/api/feedback/shots/…` (service accounts have no Drive storage quota). Local `npm run dev` without Google env values saves under `data/feedback/` instead.
 
 | | |
 |--|--|
 | Sheet ID | `FEEDBACK_SHEET_ID` |
-| Drive folder ID | `FEEDBACK_DRIVE_FOLDER_ID` |
+| Screenshot bucket | `FEEDBACK_GCS_BUCKET` |
 | Service account JSON | Secret Manager `GOOGLE_SA_JSON` |
 
-**One-time setup**
-
-APIs, service account `sta-feedback@star-trek-adventure-3524d3.iam.gserviceaccount.com`, and Secret Manager `GOOGLE_SA_JSON` are already created.
-
-1. In your Google Drive, create a Sheet named **STA Dev Feedback** (keep the first tab `Sheet1`) and a folder named **STA Feedback screenshots**.
-2. Share **both** with `sta-feedback@star-trek-adventure-3524d3.iam.gserviceaccount.com` as **Editor**.
-3. Copy IDs from the URLs (`/d/SHEET_ID/` and `/folders/FOLDER_ID`) into `deploy/gcp/project.env` as `FEEDBACK_SHEET_ID` and `FEEDBACK_DRIVE_FOLDER_ID`.
-4. Redeploy.
-
-Until those IDs are set, local `npm run dev` still saves reports under `data/feedback/`. Production will refuse submits rather than writing to the ephemeral container disk.
+Share the Sheet with `sta-feedback@star-trek-adventure-3524d3.iam.gserviceaccount.com` as **Editor**. The Drive folder is unused for screenshots.
 
 The Sheet columns are: Time, From, Message, Screenshot, Theme, Phase, Run, Captain, Ship, URL, User-Agent.
 

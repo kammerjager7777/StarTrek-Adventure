@@ -42,6 +42,7 @@ import {
   decodeScreenshotData,
   extForMime,
   isAllowedImageMime,
+  readFeedbackShot,
   submitFeedback,
 } from "../services/feedback/googleInbox.js";
 
@@ -118,6 +119,23 @@ apiRouter.post("/auth/google", async (req, res) => {
 apiRouter.post("/auth/logout", (_req, res) => {
   clearSessionCookie(res);
   res.json({ ok: true, gate: "/access.html" });
+});
+
+/** Screenshot links from the feedback sheet — unguessable object names. */
+apiRouter.get("/feedback/shots/:file", async (req, res) => {
+  try {
+    const shot = await readFeedbackShot(String(req.params.file || ""));
+    if (!shot) {
+      res.status(404).type("text/plain").send("Not found");
+      return;
+    }
+    res.setHeader("Content-Type", shot.mime);
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.send(shot.bytes);
+  } catch (err) {
+    console.error("Feedback shot fetch failed:", err);
+    res.status(502).type("text/plain").send("Unavailable");
+  }
 });
 
 /**
