@@ -62,7 +62,7 @@ body.init-active .shell {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 10px 16px;
+  padding: 6px 16px;
   background: linear-gradient(90deg, #f7b267 0 28px, transparent 28px),
     var(--panel);
   border-radius: 999px 12px 12px 999px;
@@ -80,6 +80,7 @@ body.init-active .shell {
 .brand h1 {
   margin: 0;
   font-size: 1.55rem;
+  line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

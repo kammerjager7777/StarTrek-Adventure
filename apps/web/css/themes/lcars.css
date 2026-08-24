@@ -258,13 +258,13 @@ html[data-ui-theme="lcars"] .top-bar {
   padding: 0 0 0 0;
   gap: 10px;
   align-items: stretch;
-  min-height: 64px;
+  min-height: 52px;
   /* Left elbow + bar */
   box-shadow: inset 48px 0 0 0 var(--lcars-bar);
   padding-left: 56px;
   padding-right: 8px;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
   position: relative;
 }
 
@@ -297,8 +297,8 @@ html[data-ui-theme="lcars"] .top-bar::after {
 }
 
 html[data-ui-theme="lcars"] .brand {
-  padding: 6px 0 16px;
-  gap: 12px;
+  padding: 0 0 10px;
+  gap: 10px;
 }
 
 html[data-ui-theme="lcars"] .brand h1 {
@@ -306,6 +306,7 @@ html[data-ui-theme="lcars"] .brand h1 {
   font-weight: 900;
   letter-spacing: 0.14em;
   font-size: 1.4rem;
+  line-height: 1;
 }
 
 html[data-ui-theme="lcars"] .brand-mark {
@@ -313,7 +314,7 @@ html[data-ui-theme="lcars"] .brand-mark {
 }
 
 html[data-ui-theme="lcars"] .top-actions {
-  padding: 4px 0 14px;
+  padding: 0 0 10px;
   gap: 6px;
 }
 
