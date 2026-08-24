@@ -1472,11 +1472,7 @@ function renderSkillGrid(total) {
     .map(([k, v]) => {
       const n = Number(v) || 0;
       const band = Math.min(10, Math.floor(n / 10));
-      return `<div class="skill-row" title="${escapeHtml(k)} ${n}/100">
-              <span class="skill-name">${escapeHtml(k)}</span>
-              <span class="skill-bar" aria-hidden="true"><span class="skill-bar-fill" style="width:${n}%"></span></span>
-              <span class="skill-val">${n}<span class="skill-band">b${band}</span></span>
-            </div>`;
+      return `<div class="skill-row" title="${escapeHtml(k)} ${n}/100"><span class="skill-name">${escapeHtml(k)}</span><span class="skill-bar" aria-hidden="true"><span class="skill-bar-fill" style="width:${n}%"></span></span><span class="skill-val">${n}<span class="skill-band">b${band}</span></span></div>`;
     })
     .join("");
   return `<div class="skill-grid">${rows}</div>`;
@@ -1509,19 +1505,11 @@ function renderReadyRoom(ship, universe) {
     ? universe.activeCrises
     : [];
   const stardate = universe?.stardate || ship?.stardate || "—";
-  els.readyRoom.innerHTML = `
-    <div class="ready-room-stardate">Stardate ${escapeHtml(String(stardate))}</div>
-    <div class="systems-label">Ship skills</div>
-    ${skillsHtml}
-    <div class="systems-label">Standing</div>
-    ${
-      repRows
-        ? `<ul class="ready-rep">${repRows}</ul>`
-        : `<p class="ready-room-empty">Neutral / unremarkable</p>`
-    }
-    <div class="ready-room-flags">Flags: ${escapeHtml(flags.join(", ") || "none")}</div>
-    <div class="ready-room-flags">Crises: ${escapeHtml(crises.join(", ") || "none")}</div>
-  `;
+  els.readyRoom.innerHTML = `<div class="ready-room-stardate">Stardate ${escapeHtml(String(stardate))}</div><div class="systems-label">Ship skills</div>${skillsHtml}<div class="systems-label">Standing</div>${
+    repRows
+      ? `<ul class="ready-rep">${repRows}</ul>`
+      : `<p class="ready-room-empty">Neutral / unremarkable</p>`
+  }<div class="ready-room-flags">Flags: ${escapeHtml(flags.join(", ") || "none")}</div><div class="ready-room-flags">Crises: ${escapeHtml(crises.join(", ") || "none")}</div>`;
 }
 
 function renderIntegrityBar(label, value, max, tone, statusText) {
