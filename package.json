@@ -13,7 +13,8 @@
     "test:crew": "tsx scripts/smoke-crew-lifecycle.mts",
     "test:shields": "tsx scripts/smoke-shield-leak.mts",
     "test:skills": "tsx scripts/smoke-skills.mts",
-    "test:universe": "tsx scripts/smoke-universe.mts"
+    "test:universe": "tsx scripts/smoke-universe.mts",
+    "test:advice": "tsx scripts/smoke-advice.mts"
   },
   "engines": {
     "node": ">=20"

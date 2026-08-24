@@ -59,16 +59,30 @@ export async function loadStockShips(): Promise<StockShipTemplate[]> {
 /** Cached skill pack text — avoid re-reading disk every LLM turn */
 let skillPacksCache: string | null = null;
 
+/** Out-of-band consult pack — not part of play-turn / setup prompts. */
+const ADVICE_SKILL_FILE = "crew-advice.md";
+
 export async function loadSkillPacks(): Promise<string> {
   if (skillPacksCache != null) return skillPacksCache;
   const dir = path.join(ROOT, "content/skills");
-  const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".md")).sort();
+  const files = (await fs.readdir(dir))
+    .filter((f) => f.endsWith(".md") && f !== ADVICE_SKILL_FILE)
+    .sort();
   const parts = [];
   for (const f of files) {
     parts.push(await fs.readFile(path.join(dir, f), "utf8"));
   }
   skillPacksCache = parts.join("\n\n---\n\n");
   return skillPacksCache;
+}
+
+let adviceSkillCache: string | null = null;
+
+export async function loadAdviceSkill(): Promise<string> {
+  if (adviceSkillCache != null) return adviceSkillCache;
+  const file = path.join(ROOT, "content/skills", ADVICE_SKILL_FILE);
+  adviceSkillCache = await fs.readFile(file, "utf8");
+  return adviceSkillCache;
 }
 
 /**

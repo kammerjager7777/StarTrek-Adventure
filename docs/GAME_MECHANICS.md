@@ -508,9 +508,15 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - Optional one-time legacy import: set `LEGACY_OWNER_EMAIL` to the account that should claim pre-multiuser flat `data/saves` + `data/profiles`.
 
 ### 16.5 Advice
-- `POST /api/games/:runId/crew/advice` with `{ memberId }` — no dice, no playTurnCount.
-- One advice per officer per play turn (cooldown).
-- Crew card button **Ask for advice**.
+Out-of-band consult (Phase 5). Code is the referee; the LLM only writes the fragment.
+
+- `POST /api/games/:runId/crew/advice` with `{ memberId, question? }` — **no dice**, **no playTurnCount**, not a play turn.
+- One consult per officer per play beat (`adviceCooldowns`, including turn 0).
+- Inactive officers (`injured` / `dead` / `transferred`) cannot advise; the crew-card button is **disabled**.
+- Optional short question on the expanded crew card; omitted question is treated as “what do you recommend?”
+- Prompt snapshot includes mechanical state, `knownIntel`, flags, the officer’s record, **scars**, and **recorded deaths**.
+- LLM returns a short fragment: `narration` + officer `advice` + optional `suggestedOption`. Host applies via `applyAdviceToState` (caches `lastAdvice`, appends one crew line, may add one extra option).
+- Dedicated skill pack: `content/skills/crew-advice.md` (not mixed into play-turn prompts).
 
 ### 16.6 Starbase (campaign hub)
 - After debrief, phase `starbase`: hub summary, refit, recruitment, then next mission or save & stand down.

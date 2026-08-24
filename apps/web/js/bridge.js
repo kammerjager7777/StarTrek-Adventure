@@ -1800,16 +1800,13 @@ function renderCrew(ship, playerName = "") {
               status
             )}</div>
             ${
-              (c.status || "active") === "active"
-                ? `<div class="crew-span"><button type="button" class="lcars-btn secondary crew-advice-btn" data-advice-id="${escapeHtml(
-                    c.id
-                  )}">Ask for advice</button></div>`
-                : c.status === "dead"
-                  ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
-                      c.deathCause || "lost in the line of duty"
-                    )}</div>`
-                  : ""
+              c.status === "dead"
+                ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
+                    c.deathCause || "lost in the line of duty"
+                  )}</div>`
+                : ""
             }
+            ${crewAdviceBlockHtml(c)}
           </div>
         </div>
       </article>`;
@@ -1824,34 +1821,87 @@ function renderCrew(ship, playerName = "") {
   }
 }
 
+function crewAdviceBlockHtml(c) {
+  const active = (c.status || "active") === "active";
+  const last = current?.state?.lastAdvice;
+  const lastNote =
+    last?.memberId === c.id && last.advice
+      ? `<div class="crew-span crew-last-advice"><span class="crew-label">Last consult</span>${escapeHtml(
+          String(last.advice).slice(0, 180)
+        )}</div>`
+      : "";
+  return `${lastNote}<div class="crew-span crew-advice-block">
+              <label class="crew-label" for="advice-q-${escapeHtml(
+                c.id
+              )}">Consult</label>
+              <input
+                id="advice-q-${escapeHtml(c.id)}"
+                type="text"
+                class="crew-advice-q"
+                maxlength="140"
+                placeholder="Optional question"
+                data-advice-id="${escapeHtml(c.id)}"
+                ${active ? "" : "disabled "}
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="lcars-btn secondary crew-advice-btn"
+                data-advice-id="${escapeHtml(c.id)}"
+                ${active ? "" : "disabled "}
+                title="${
+                  active
+                    ? "Ask this officer for advice (does not spend a turn)"
+                    : "Only active officers can advise"
+                }"
+              >Ask for advice</button>
+            </div>`;
+}
+
 function bindCrewAdviceButtons(crew) {
   if (!els.crew) return;
+  els.crew.querySelectorAll(".crew-advice-q").forEach((input) => {
+    input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const id = input.getAttribute("data-advice-id");
+        if (id && !input.disabled) void askCrewAdvice(id, input.value);
+      }
+    });
+  });
   els.crew.querySelectorAll(".crew-advice-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (btn.disabled) return;
       const id = btn.getAttribute("data-advice-id");
-      if (id) void askCrewAdvice(id);
+      const q = els.crew.querySelector(`.crew-advice-q[data-advice-id="${id}"]`);
+      if (id) void askCrewAdvice(id, q?.value);
     });
   });
 }
 
-async function askCrewAdvice(memberId) {
+async function askCrewAdvice(memberId, question) {
   const runId = current?.state?.runId;
   if (!runId || !aiReady) {
     showSoftError("Cannot request advice while offline.");
     return;
   }
   uiSound("soft");
+  const q = String(question || "").trim();
   try {
     const out = await api(`/games/${runId}/crew/advice`, {
       method: "POST",
-      body: JSON.stringify({ memberId }),
+      body: JSON.stringify(q ? { memberId, question: q } : { memberId }),
     });
     if (out.view) render(out.view, { forceTypewriter: false });
     if (out.advice?.ok && out.advice.advice) {
-      // Soft toast via soft error slot would be wrong; log entry already added
       playTrekSfx("comm_chirp");
+      if (voice.enabled) {
+        void replaySpeech(out.advice.memberName || "Officer", out.advice.advice);
+      }
     } else if (out.advice?.error) {
       showSoftError(out.advice.error);
       uiSound("deny");
@@ -2900,10 +2950,17 @@ function renderLog(state, opts = {}) {
 
 function renderOptions(options) {
   els.options.innerHTML = "";
+  const adviceText = current?.state?.lastAdvice?.suggestedOption?.text
+    ? String(current.state.lastAdvice.suggestedOption.text).trim().toLowerCase()
+    : "";
   for (const opt of options || []) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "option-btn";
+    if (adviceText && String(opt.text || "").trim().toLowerCase() === adviceText) {
+      btn.classList.add("is-advice");
+      btn.title = "Suggested by your officer";
+    }
     btn.disabled = actionInFlight || missionBoot.active;
     btn.innerHTML = `<span class="num">${opt.id}.</span> ${escapeHtml(opt.text)}`;
     // Send full choice text so the mission log shows the order, not just "1"

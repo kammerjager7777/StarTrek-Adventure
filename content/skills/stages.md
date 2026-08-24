@@ -40,4 +40,4 @@ Respect destroyed/damaged systems in options and narration.
 ## debrief / starbase
 Casualties/damage implications, objectives completed/failed/missed, condensed narrative of the run.
 After debrief the host moves to **starbase** (campaign hub): ship/crew status, reputation-tiered facility, refit (hull / deep structural / shields / systems), recruitment slate with quality tiers, sickbay heals, transfers, then begin another mission or save & stand down. Code is the referee for budgets and skill deltas — do not invent repair amounts or hire skills.
-**Advice** requests from crew cards are out-of-band (no dice, no play turn).
+**Advice** requests from crew cards are out-of-band (no dice, no play turn). Host returns a short fragment (narration + one officer line + optional extra option) and caches `lastAdvice`.

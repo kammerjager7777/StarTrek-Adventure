@@ -66,6 +66,7 @@ Player action (UI)
 |-----------|------|
 | **Gamemaster** (`gamemaster.ts`) | Phase machine, play turn referee, mission end |
 | **LLM Gamemaster** (`llmGamemaster.ts`) | Play scenes via xAI chat completions |
+| **Crew advice** (`crewAdvice.ts`) | Out-of-band officer consult — no dice, no play turn |
 | **Setup content** | Ships, missions, tutorial beats, greetings |
 | **ViewscreenAgent** | Journey-book stills from locked visual bibles |
 | **Voice identity** | Locked `voiceId` + prompts for Narrator & crew |

@@ -291,6 +291,26 @@ export type CrewLine = {
   line: string;
 };
 
+/** Optional extra order suggested by an officer consult (Phase 5). */
+export type AdviceSuggestedOption = {
+  text: string;
+  risk: OptionRisk;
+};
+
+/**
+ * Last out-of-band crew consult. Run-scoped cache only — not a play turn.
+ * Does not increment playTurnCount and does not store dice.
+ */
+export type LastAdvice = {
+  memberId: string;
+  memberName: string;
+  question?: string;
+  narration: string;
+  advice: string;
+  suggestedOption?: AdviceSuggestedOption | null;
+  atTurn: number;
+};
+
 export type Turn = {
   sceneId: string;
   narration: string;
@@ -396,6 +416,8 @@ export type GameState = {
   universe?: UniverseState | null;
   /** Soft advice cooldowns: crewId → last playTurnCount when advised */
   adviceCooldowns?: Record<string, number> | null;
+  /** Temporary cache of the most recent officer consult (Phase 5). */
+  lastAdvice?: LastAdvice | null;
   /** AI-generated ship offers during ship_select */
   setupShips?: Array<{
     id: string;

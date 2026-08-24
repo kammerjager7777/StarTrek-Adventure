@@ -30,6 +30,8 @@ Schema:
 
 Optional `reputationDeltas` are **suggestions only** (host clamps ±15). Do not invent skill numbers or crew deaths — host applies those.
 
+**Crew advice** is a separate host path (`POST /crew/advice`), not a play scene. Do not emit an advice consult as a normal playing JSON turn.
+
 ## Rules
 - Exactly 3 or 4 options; ids 1..n sequential
 - At least one option must be `high` or `trap`

@@ -1930,6 +1930,10 @@ body.init-active .shell {
   color: var(--lcars-orange);
 }
 
+.option-btn.is-advice {
+  border-color: rgba(125, 211, 252, 0.55);
+}
+
 .command-form {
   display: flex;
   gap: 8px;
@@ -2649,10 +2653,40 @@ body.init-active .shell {
   font-weight: 500;
   opacity: 0.55;
 }
+.crew-advice-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.crew-advice-q {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0b1220;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+}
+.crew-advice-q:focus {
+  outline: none;
+  border-color: var(--lcars-lilac);
+  box-shadow: inset 0 0 0 1px var(--lcars-lilac);
+}
+.crew-advice-q:disabled,
+.crew-advice-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .crew-advice-btn {
-  margin-top: 0.35rem;
+  margin-top: 0.1rem;
   width: 100%;
   font-size: 0.8rem;
+}
+.crew-last-advice {
+  color: var(--lcars-blue);
+  font-size: 0.75rem;
 }
 .crew-kia {
   color: #c44;
