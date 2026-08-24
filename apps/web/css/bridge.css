@@ -3114,36 +3114,35 @@ body.mission-board-active .shell {
 }
 
 .mission-board-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   flex: 1;
   min-height: 0;
   overflow: auto;
-  align-content: start;
-}
-@media (max-width: 1100px) {
-  .mission-board-list {
-    grid-template-columns: 1fr;
-  }
 }
 .mission-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 16px;
+  row-gap: 6px;
+  padding: 14px 16px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 0 18px 0 0;
   text-align: left;
+  align-items: center;
 }
 .mission-card h3 {
   margin: 0;
-  font-size: 1.05rem;
+  grid-column: 1;
+  font-size: 1.15rem;
   letter-spacing: 0.04em;
 }
 .mission-card-meta {
   margin: 0;
+  grid-column: 1;
   color: var(--muted);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
@@ -3151,12 +3150,27 @@ body.mission-board-active .shell {
 }
 .mission-card-summary {
   margin: 0;
-  flex: 1;
-  font-size: 0.9rem;
-  line-height: 1.4;
+  grid-column: 1;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 .mission-card .lcars-btn {
-  margin-top: 6px;
+  grid-column: 2;
+  grid-row: 1 / -1;
+  width: auto;
+  min-width: 220px;
+  align-self: center;
+  margin: 0;
+}
+@media (max-width: 820px) {
+  .mission-card {
+    grid-template-columns: 1fr;
+  }
+  .mission-card .lcars-btn {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+  }
 }
 .mission-board-brief {
   grid-column: 1 / -1;

@@ -2912,39 +2912,26 @@ function renderLogStaticCurrent(state, options) {
   scrollLogToTop();
 }
 
-function showMissionBoardLoading(state) {
-  document.body.classList.remove("starbase-active");
-  document.body.classList.add("mission-board-active");
-  if (els.starbaseOverlay) els.starbaseOverlay.classList.add("hidden");
-  if (els.missionBoardOverlay) els.missionBoardOverlay.classList.remove("hidden");
-  if (els.missionBoardTitle) els.missionBoardTitle.textContent = "Mission board";
-  if (els.missionBoardMeta) {
-    const ship = state?.ship;
-    els.missionBoardMeta.textContent = ship
-      ? `${ship.name} ${ship.registryNumber || ""}`.trim()
-      : "Stand by";
-  }
-  if (els.missionBoardCopy) {
-    els.missionBoardCopy.textContent =
-      "Starfleet Command is compiling assignments…";
-    els.missionBoardCopy.classList.remove("hidden");
-  }
-  if (els.missionBoardList) {
-    els.missionBoardList.innerHTML =
-      `<p class="starbase-empty">Stand by for the assignment list.</p>`;
-  }
-  if (els.missionBoardActions) {
-    els.missionBoardActions.innerHTML = "";
-    els.missionBoardActions.appendChild(
-      starbaseButton("Return to starbase", "secondary")
-    );
-  }
-  document.body.classList.add("starbase-waiting");
-  if (els.hubWaiting) els.hubWaiting.classList.remove("hidden");
-  if (els.hubWaitingDetail) {
-    els.hubWaitingDetail.textContent =
-      "Starfleet Command is compiling assignments…";
-  }
+async function fetchMissionBoard(runId, text, update) {
+  update?.({
+    key: "link",
+    label: "Opening Starfleet channel",
+    pct: 18,
+  });
+  playIncomingTransmission();
+  playIncomingCommTrek();
+  const view = await api(`/games/${runId}/action`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+    timeoutMs: 100_000,
+  });
+  update?.({
+    key: "slate",
+    label: "Compiling mission slate",
+    pct: 88,
+    done: false,
+  });
+  return view;
 }
 
 function isMissionBoardPhase(phase) {
@@ -2990,7 +2977,7 @@ function renderMissionBoard(state) {
 
   const copy = String(state.pendingQuestion || "").trim();
   if (els.missionBoardCopy) {
-    if (phase === "mission_brief" || !copy) {
+    if (phase === "mission_brief" || phase === "mission_offer" || !copy) {
       els.missionBoardCopy.classList.add("hidden");
     } else {
       const short = copy.split("\n").filter(Boolean)[0] || copy;
@@ -3399,7 +3386,13 @@ function setActionBusy(busy, detail = "") {
     );
   }
   if (els.hubWaiting) {
-    els.hubWaiting.classList.toggle("hidden", !busy || missionBoot.active || !onHub);
+    const initOn =
+      initSession.active ||
+      (els.initOverlay && !els.initOverlay.classList.contains("hidden"));
+    els.hubWaiting.classList.toggle(
+      "hidden",
+      !busy || missionBoot.active || !onHub || initOn
+    );
   }
   if (els.hubWaitingDetail && busy && onHub) {
     els.hubWaitingDetail.textContent =
@@ -3658,19 +3651,11 @@ async function sendAction(text) {
   }
 
   try {
-    setActionBusy(
-      true,
-      /choose next mission/i.test(text)
-        ? "Starfleet Command is compiling assignments…"
-        : text
-    );
-    if (startingMission) {
-      paintMissionBootViewscreen("Opening mission channel…");
-    }
     const leavingDock =
       phaseBefore === "starbase" && /choose next mission/i.test(text);
-    if (leavingDock) {
-      showMissionBoardLoading(current.state);
+    setActionBusy(true, text);
+    if (startingMission) {
+      paintMissionBootViewscreen("Opening mission channel…");
     }
     const heavySetup =
       phaseBefore === "tutorial_offer" ||
@@ -3681,11 +3666,31 @@ async function sendAction(text) {
       phaseBefore === "mission_type" ||
       phaseBefore === "difficulty" ||
       phaseBefore === "starbase";
-    let view = await api(`/games/${runId}/action`, {
-      method: "POST",
-      body: JSON.stringify({ text }),
-      timeoutMs: heavySetup ? 100_000 : 90_000,
-    });
+    let view;
+    if (leavingDock) {
+      view = await withInitScreen(
+        {
+          title: "Incoming Communication",
+          subtitle: "Starfleet Command · Assignment packet",
+          status: "INCOMING COMMUNICATION — STAND BY",
+          network: "Subspace Comm Net LCARS",
+          steps: [
+            { key: "link", label: "Opening Starfleet channel", pct: 16 },
+            { key: "packet", label: "Receiving assignment packet", pct: 48 },
+            { key: "slate", label: "Compiling mission slate", pct: 78 },
+            { key: "ready", label: "Board ready", pct: 100 },
+          ],
+          completeLabel: "Assignments received",
+        },
+        (update) => fetchMissionBoard(runId, text, update)
+      );
+    } else {
+      view = await api(`/games/${runId}/action`, {
+        method: "POST",
+        body: JSON.stringify({ text }),
+        timeoutMs: heavySetup ? 100_000 : 90_000,
+      });
+    }
 
     // Ignore stale responses if a newer action started (shouldn't happen with busy lock)
     if (seq !== actionSeq) return;
@@ -3828,6 +3833,7 @@ function showInitOverlay(opts = {}) {
   setInitProgress(0, opts.steps?.[0]?.label || "Stand by…");
   els.initOverlay.classList.remove("hidden");
   document.body.classList.add("init-active");
+  if (els.hubWaiting) els.hubWaiting.classList.add("hidden");
   uiSound("open");
   startProcessingLoop();
 }
