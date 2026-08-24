@@ -98,6 +98,7 @@ const els = {
   phase: document.getElementById("phase-badge"),
   ship: document.getElementById("ship-panel"),
   crew: document.getElementById("crew-panel"),
+  readyRoom: document.getElementById("ready-room-panel"),
   objectives: document.getElementById("objectives-panel"),
   meta: document.getElementById("meta-panel"),
   run: document.getElementById("run-panel"),
@@ -786,6 +787,7 @@ function render(view, opts = {}) {
   ].join("\n");
 
   renderShip(s.ship);
+  renderReadyRoom(s.ship, s.universe);
   renderCrew(s.ship, s.playerName);
   renderObjectives(s.mission, s);
   renderMeta(view.metaCommands, s.phase);
@@ -1464,23 +1466,62 @@ function systemDisplayName(key) {
   return names[key] || key;
 }
 
-function universeStandingHtml(universe) {
-  if (!universe?.factionReputation) return "";
-  const bits = Object.entries(universe.factionReputation)
-    .filter(([, v]) => Math.abs(Number(v)) >= 5)
-    .map(
-      ([k, v]) =>
-        `${k} ${Number(v) > 0 ? "+" : ""}${v}`
-    );
-  const flags = Array.isArray(universe.galacticFlags)
-    ? universe.galacticFlags.slice(0, 3)
+function renderSkillGrid(total) {
+  if (!total || typeof total !== "object") return "";
+  const rows = Object.entries(total)
+    .map(([k, v]) => {
+      const n = Number(v) || 0;
+      const band = Math.min(10, Math.floor(n / 10));
+      return `<div class="skill-row" title="${escapeHtml(k)} ${n}/100">
+              <span class="skill-name">${escapeHtml(k)}</span>
+              <span class="skill-bar" aria-hidden="true"><span class="skill-bar-fill" style="width:${n}%"></span></span>
+              <span class="skill-val">${n}<span class="skill-band">b${band}</span></span>
+            </div>`;
+    })
+    .join("");
+  return `<div class="skill-grid">${rows}</div>`;
+}
+
+function renderReadyRoom(ship, universe) {
+  if (!els.readyRoom) return;
+  if (!ship && !universe) {
+    els.readyRoom.className = "panel-body muted";
+    els.readyRoom.textContent = "—";
+    return;
+  }
+  els.readyRoom.className = "panel-body ready-room-panel";
+  const skillsHtml = ship?.skills?.total
+    ? renderSkillGrid(ship.skills.total)
+    : `<p class="ready-room-empty">Skill matrix offline</p>`;
+  const rep = universe?.factionReputation || {};
+  const repRows = Object.entries(rep)
+    .map(([k, v]) => {
+      const n = Number(v) || 0;
+      const sign = n > 0 ? "+" : "";
+      const tone = n <= -20 ? "is-hostile" : n >= 20 ? "is-allied" : "";
+      return `<li class="${tone}"><span>${escapeHtml(k)}</span><span>${sign}${n}</span></li>`;
+    })
+    .join("");
+  const flags = Array.isArray(universe?.galacticFlags)
+    ? universe.galacticFlags
     : [];
-  if (!bits.length && !flags.length) return "";
-  return `<div class="ship-meta universe-standing" title="${escapeHtml(
-    flags.join(", ") || "standing"
-  )}">${escapeHtml(bits.join(" · ") || "neutral")}${
-    flags.length ? ` · ${escapeHtml(flags.join(", "))}` : ""
-  }</div>`;
+  const crises = Array.isArray(universe?.activeCrises)
+    ? universe.activeCrises
+    : [];
+  const stardate = universe?.stardate || ship?.stardate || "—";
+  els.readyRoom.innerHTML = `
+    <div class="ready-room-stardate">Stardate ${escapeHtml(String(stardate))}</div>
+    <div class="systems-label">Ship skills</div>
+    ${skillsHtml}
+    <div class="systems-label">Standing</div>
+    ${
+      repRows
+        ? `<ul class="ready-rep">${repRows}</ul>`
+        : `<p class="ready-room-empty">Neutral / unremarkable</p>`
+    }
+    <div class="ready-room-flags">Flags: ${escapeHtml(flags.join(", ") || "none")}</div>
+    <div class="ready-room-flags">Crises: ${escapeHtml(crises.join(", ") || "none")}</div>
+  `;
 }
 
 function renderIntegrityBar(label, value, max, tone, statusText) {
@@ -1504,6 +1545,7 @@ function renderShip(ship) {
   if (!ship) {
     els.ship.className = "panel-body muted";
     els.ship.textContent = "No ship selected";
+    renderReadyRoom(null, current?.state?.universe || null);
     return;
   }
   els.ship.className = "panel-body ship-panel";
@@ -1605,7 +1647,6 @@ function renderShip(ship) {
       <div class="ship-meta">Stardate ${escapeHtml(
         current?.state?.universe?.stardate || ship.stardate
       )}</div>
-      ${universeStandingHtml(current?.state?.universe)}
     </div>
     <div class="integrity-bars">
       ${renderIntegrityBar("Hull", hull, maxHull, "hull", "")}
@@ -1615,28 +1656,10 @@ function renderShip(ship) {
       <div class="systems-label">Systems</div>
       ${systems}
     </div>
-    ${
-      ship.skills?.total
-        ? `<div class="ship-skills-block">
-        <div class="systems-label">Ship skills</div>
-        <div class="skill-grid">${Object.entries(ship.skills.total)
-          .map(([k, v]) => {
-            const n = Number(v) || 0;
-            const band = Math.min(10, Math.floor(n / 10));
-            return `<div class="skill-row" title="${escapeHtml(
-              k
-            )} ${n}/100">
-              <span class="skill-name">${escapeHtml(k)}</span>
-              <span class="skill-bar" aria-hidden="true"><span class="skill-bar-fill" style="width:${n}%"></span></span>
-              <span class="skill-val">${n}<span class="skill-band">b${band}</span></span>
-            </div>`;
-          })
-          .join("")}</div>
-      </div>`
-        : ""
-    }
     ${scarGrid}
   `;
+
+  renderReadyRoom(ship, current?.state?.universe);
 
   els.ship.querySelectorAll(".scar-chip").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1730,6 +1753,94 @@ function displayBridgeCrew(crew) {
   });
 }
 
+function crewDutyBadge(c) {
+  const st = c.status || "active";
+  if (st === "dead") return { cls: "is-dead", label: "KIA" };
+  if (st === "injured") return { cls: "is-injured", label: "Injured" };
+  if (st === "transferred") return { cls: "is-transferred", label: "Transferred" };
+  return null;
+}
+
+function officerCardHtml(c, { generating = false, portraitStatus = "none" } = {}) {
+  const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
+  const service = typeof c.serviceTurns === "number" ? c.serviceTurns : 0;
+  const missions = typeof c.missionsServed === "number" ? c.missionsServed : 0;
+  const duty = crewDutyBadge(c);
+  const photo = c.imageUrl
+    ? `<img class="crew-fill-photo" src="${escapeHtml(
+        c.imageUrl
+      )}" alt="${escapeHtml(c.name)}" loading="lazy" draggable="false" />`
+    : `<div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
+        crewInitials(c.name)
+      )}</div>`;
+  return `<article class="crew-tab${generating ? " is-imaging" : ""}${
+    duty ? ` ${duty.cls}` : ""
+  }" data-crew-id="${escapeHtml(c.id)}">
+        <div class="crew-card-face">
+          ${photo}
+          ${
+            generating
+              ? `<div class="crew-imaging-overlay" aria-hidden="true">
+                   <span class="crew-imaging-spinner"></span>
+                   <span class="crew-imaging-label">Imaging</span>
+                 </div>`
+              : ""
+          }
+          <div class="crew-card-badges">
+            ${
+              duty
+                ? `<span class="crew-status-badge ${duty.cls}">${escapeHtml(
+                    duty.label
+                  )}</span>`
+                : ""
+            }
+            <span class="crew-service-badge" title="Service time">${service}t</span>
+          </div>
+          <div class="crew-card-gradient"></div>
+          <div class="crew-card-overlay">
+            <div class="crew-tab-name">${escapeHtml(c.name)}</div>
+            <div class="crew-tab-role">${escapeHtml(c.role)}</div>
+          </div>
+        </div>
+        <div class="crew-tab-details">
+          <div class="crew-detail-grid">
+            <div><span class="crew-label">Species</span>${escapeHtml(
+              c.species || "Unknown"
+            )}</div>
+            <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
+            <div><span class="crew-label">Status</span>${escapeHtml(
+              duty ? duty.label : c.status || "active"
+            )}</div>
+            <div><span class="crew-label">Service</span>${service} turns${
+              missions ? ` · ${missions} missions` : ""
+            }</div>
+            <div class="crew-span"><span class="crew-label">Personality</span>${escapeHtml(
+              c.personality || "—"
+            )}</div>
+            <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
+              c.bio || "No dossier on file."
+            )}</div>
+            <div class="crew-span"><span class="crew-label">Voice</span>${escapeHtml(
+              c.voice
+                ? `${c.voice.voiceName || c.voice.voiceId} · ${c.voice.baselineTone || "locked"}`
+                : "unassigned"
+            )}</div>
+            <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
+              portraitStatus
+            )}</div>
+            ${
+              c.status === "dead"
+                ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
+                    c.deathCause || "lost in the line of duty"
+                  )}</div>`
+                : ""
+            }
+            ${crewAdviceBlockHtml(c)}
+          </div>
+        </div>
+      </article>`;
+}
+
 function renderCrew(ship, playerName = "") {
   if (!ship?.crew?.length && !playerName) {
     els.crew.className = "panel-body crew-panel muted";
@@ -1751,76 +1862,12 @@ function renderCrew(ship, playerName = "") {
       : "") +
     officers
       .map((c) => {
-        const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
         const needsImg = crewNeedsPortrait(c);
         const generating = showGenerating && needsImg;
-        const status = generating
+        const portraitStatus = generating
           ? "generating"
           : c.portraitStatus || (c.imageUrl ? "ready" : "none");
-        const photo = c.imageUrl
-          ? `<img class="crew-fill-photo" src="${escapeHtml(
-              c.imageUrl
-            )}" alt="${escapeHtml(c.name)}" loading="lazy" draggable="false" />`
-          : `<div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
-              crewInitials(c.name)
-            )}</div>`;
-
-        return `<article class="crew-tab${
-          generating ? " is-imaging" : ""
-        }" data-crew-id="${escapeHtml(c.id)}">
-        <div class="crew-card-face">
-          ${photo}
-          ${
-            generating
-              ? `<div class="crew-imaging-overlay" aria-hidden="true">
-                   <span class="crew-imaging-spinner"></span>
-                   <span class="crew-imaging-label">Imaging</span>
-                 </div>`
-              : ""
-          }
-          <div class="crew-card-gradient"></div>
-          <div class="crew-card-overlay">
-            <div class="crew-tab-name">${escapeHtml(c.name)}</div>
-            <div class="crew-tab-role">${escapeHtml(c.role)}</div>
-          </div>
-        </div>
-        <div class="crew-tab-details">
-          <div class="crew-detail-grid">
-            <div><span class="crew-label">Species</span>${escapeHtml(
-              c.species || "Unknown"
-            )}</div>
-            <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
-            <div><span class="crew-label">Status</span>${escapeHtml(
-              c.status || "active"
-            )}</div>
-            <div><span class="crew-label">Service</span>${
-              typeof c.serviceTurns === "number" ? c.serviceTurns : 0
-            } turns</div>
-            <div class="crew-span"><span class="crew-label">Personality</span>${escapeHtml(
-              c.personality || "—"
-            )}</div>
-            <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
-              c.bio || "No dossier on file."
-            )}</div>
-            <div class="crew-span"><span class="crew-label">Voice</span>${escapeHtml(
-              c.voice
-                ? `${c.voice.voiceName || c.voice.voiceId} · ${c.voice.baselineTone || "locked"}`
-                : "unassigned"
-            )}</div>
-            <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
-              status
-            )}</div>
-            ${
-              c.status === "dead"
-                ? `<div class="crew-span crew-kia"><span class="crew-label">KIA</span>${escapeHtml(
-                    c.deathCause || "lost in the line of duty"
-                  )}</div>`
-                : ""
-            }
-            ${crewAdviceBlockHtml(c)}
-          </div>
-        </div>
-      </article>`;
+        return officerCardHtml(c, { generating, portraitStatus });
       })
       .join("");
 
@@ -2221,62 +2268,12 @@ function renderCrewWithoutPortraitKick(ship) {
       : "") +
     officers
       .map((c) => {
-        const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
         const needsImg = crewNeedsPortrait(c);
         const generating = showGenerating && needsImg;
-        const status = generating
+        const portraitStatus = generating
           ? "generating"
           : c.portraitStatus || (c.imageUrl ? "ready" : "none");
-        const photo = c.imageUrl
-          ? `<img class="crew-fill-photo" src="${escapeHtml(
-              c.imageUrl
-            )}" alt="${escapeHtml(c.name)}" loading="lazy" draggable="false" />`
-          : `<div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
-              crewInitials(c.name)
-            )}</div>`;
-
-        return `<article class="crew-tab${
-          generating ? " is-imaging" : ""
-        }" data-crew-id="${escapeHtml(c.id)}">
-        <div class="crew-card-face">
-          ${photo}
-          ${
-            generating
-              ? `<div class="crew-imaging-overlay" aria-hidden="true">
-                   <span class="crew-imaging-spinner"></span>
-                   <span class="crew-imaging-label">Imaging</span>
-                 </div>`
-              : ""
-          }
-          <div class="crew-card-gradient"></div>
-          <div class="crew-card-overlay">
-            <div class="crew-tab-name">${escapeHtml(c.name)}</div>
-            <div class="crew-tab-role">${escapeHtml(c.role)}</div>
-          </div>
-        </div>
-        <div class="crew-tab-details">
-          <div class="crew-detail-grid">
-            <div><span class="crew-label">Species</span>${escapeHtml(
-              c.species || "Unknown"
-            )}</div>
-            <div><span class="crew-label">Loyalty</span>${loyalty}%</div>
-            <div class="crew-span"><span class="crew-label">Personality</span>${escapeHtml(
-              c.personality || "—"
-            )}</div>
-            <div class="crew-span"><span class="crew-label">Dossier</span>${escapeHtml(
-              c.bio || "No dossier on file."
-            )}</div>
-            <div class="crew-span"><span class="crew-label">Voice</span>${escapeHtml(
-              c.voice
-                ? `${c.voice.voiceName || c.voice.voiceId} · ${c.voice.baselineTone || "locked"}`
-                : "unassigned"
-            )}</div>
-            <div class="crew-span crew-portrait-status"><span class="crew-label">Portrait</span>${escapeHtml(
-              status
-            )}</div>
-          </div>
-        </div>
-      </article>`;
+        return officerCardHtml(c, { generating, portraitStatus });
       })
       .join("");
   bindCrewCardExpandHandlers(officers);

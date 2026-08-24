@@ -17,7 +17,8 @@
     "test:advice": "tsx scripts/smoke-advice.mts",
     "test:voices": "tsx scripts/smoke-voice-gender.mts",
     "test:starbase": "tsx scripts/smoke-starbase.mts",
-    "test:skillpacks": "tsx scripts/smoke-skill-packs.mts"
+    "test:skillpacks": "tsx scripts/smoke-skill-packs.mts",
+    "test:phase8": "tsx scripts/smoke-phase8.mts"
   },
   "engines": {
     "node": ">=20"

@@ -566,6 +566,50 @@ html[data-ui-theme="lcars"] .crew-tab-role {
   font-size: 0.68rem;
 }
 
+html[data-ui-theme="lcars"] .ready-room-section .panel-title {
+  background: var(--lcars-bar-3);
+}
+
+html[data-ui-theme="lcars"] .ready-room-stardate {
+  color: var(--lcars-lilac);
+}
+
+html[data-ui-theme="lcars"] .skill-bar {
+  background: #111;
+  border-radius: 0 6px 0 0;
+}
+
+html[data-ui-theme="lcars"] .skill-bar-fill {
+  background: var(--lcars-bar);
+  border-radius: 0;
+}
+
+html[data-ui-theme="lcars"] .skill-name {
+  color: var(--lcars-peach);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+}
+
+html[data-ui-theme="lcars"] .crew-status-badge.is-injured {
+  background: var(--lcars-bar);
+  color: #000;
+  border-radius: 0 8px 0 8px;
+}
+
+html[data-ui-theme="lcars"] .crew-status-badge.is-dead {
+  background: var(--lcars-pink);
+  color: #000;
+  border-radius: 0 8px 0 8px;
+}
+
+html[data-ui-theme="lcars"] .crew-service-badge {
+  background: #000;
+  color: var(--lcars-lilac);
+  border-color: var(--lcars-bar-3);
+  border-radius: 0 8px 0 8px;
+}
+
 html[data-ui-theme="lcars"] .crew-label {
   color: var(--lcars-bar);
   letter-spacing: 0.1em;

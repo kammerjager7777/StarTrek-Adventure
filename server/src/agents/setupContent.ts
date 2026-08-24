@@ -17,6 +17,7 @@ import type {
 import {
   DEFAULT_SYSTEMS,
   baselineSkillsForRole,
+  formatUniverseBrief,
   inferCrewGender,
   normalizeRegistryNumber,
   sanitizeBridgeCrew,
@@ -646,21 +647,7 @@ export async function generateDifficultyPrompt(
 }
 
 function universeBriefing(state: GameState): string {
-  const u = state.universe;
-  if (!u) return "No prior galactic standing (new campaign).";
-  const standing = Object.entries(u.factionReputation || {})
-    .filter(([, v]) => Math.abs(Number(v)) >= 5)
-    .map(([k, v]) => `${k} ${Number(v) > 0 ? "+" : ""}${v}`)
-    .join(", ");
-  const flags = (u.galacticFlags || []).join(", ") || "none";
-  const crises = (u.activeCrises || []).join(", ") || "none";
-  return [
-    `Stardate ${u.stardate}.`,
-    `Faction standing: ${standing || "neutral / unremarkable"}.`,
-    `Galactic flags: ${flags}.`,
-    `Active crises: ${crises}.`,
-    "Shape missions from this standing: high negative Klingon/Romulan/Cardassian → more hostile encounters and fewer friendly ports; high Federation → more diplomatic/support assignments; borg_threat/borg_hostility → assimilation or cube stakes when type allows.",
-  ].join(" ");
+  return formatUniverseBrief(state.universe);
 }
 
 export async function generateMissionOffers(

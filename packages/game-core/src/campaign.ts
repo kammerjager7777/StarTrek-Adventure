@@ -475,6 +475,36 @@ export function tickUniverse(
   return next;
 }
 
+/** Standing-aware copy for mission offers and the Ready Room. */
+export function formatUniverseBrief(
+  u: UniverseState | null | undefined
+): string {
+  if (!u) return "No prior galactic standing (new campaign).";
+  const standing = Object.entries(u.factionReputation || {})
+    .filter(([, v]) => Math.abs(Number(v)) >= 5)
+    .map(([k, v]) => `${k} ${Number(v) > 0 ? "+" : ""}${v}`)
+    .join(", ");
+  const flags = (u.galacticFlags || []).join(", ") || "none";
+  const crises = (u.activeCrises || []).join(", ") || "none";
+  const hostile =
+    (u.factionReputation?.klingon || 0) <= -20 ||
+    (u.factionReputation?.romulan || 0) <= -20 ||
+    (u.factionReputation?.cardassian || 0) <= -20 ||
+    (u.galacticFlags || []).some((f) => /hostility/.test(f));
+  const friendlyFed = (u.factionReputation?.federation || 0) >= 20;
+  return [
+    `Stardate ${u.stardate}.`,
+    `Faction standing: ${standing || "neutral / unremarkable"}.`,
+    `Galactic flags: ${flags}.`,
+    `Active crises: ${crises}.`,
+    hostile
+      ? "Shape missions from this standing: more hostile encounters and fewer friendly ports among offended powers."
+      : friendlyFed
+        ? "High Federation standing: prefer diplomatic / relief assignments."
+        : "Shape missions from this standing.",
+  ].join(" ");
+}
+
 export function reputationDeltaFromFlags(
   flags: string[],
   outcome: "success" | "failed" | "abandoned"

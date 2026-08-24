@@ -377,6 +377,25 @@ body.init-active .shell {
   max-height: none;
 }
 
+.panel.left .ready-room-section {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 36%;
+}
+
+.panel.left .ready-room-section .panel-title {
+  flex: 0 0 auto;
+}
+
+.panel.left #ready-room-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .panel.left .crew-section {
   flex: 1 1 auto;
   min-height: 0; /* allow shrink so overflow can scroll */
@@ -668,6 +687,61 @@ body.init-active .shell {
   );
   pointer-events: none;
   z-index: 1;
+}
+
+.crew-card-badges {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.crew-status-badge,
+.crew-service-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 3px;
+  line-height: 1.4;
+  text-shadow: none;
+}
+
+.crew-status-badge.is-injured {
+  background: #b45309;
+  color: #fff7ed;
+}
+
+.crew-status-badge.is-dead {
+  background: #991b1b;
+  color: #fecaca;
+}
+
+.crew-status-badge.is-transferred {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.crew-service-badge {
+  background: rgba(2, 6, 23, 0.72);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.crew-tab.is-dead .crew-fill-photo {
+  filter: grayscale(0.85) brightness(0.72);
+}
+
+.crew-tab.is-injured .crew-fill-photo {
+  filter: saturate(0.7);
 }
 
 .crew-card-overlay {
@@ -2601,6 +2675,52 @@ body.init-active .shell {
 .universe-standing {
   font-size: 0.72rem;
   letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.ready-room-panel {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.ready-room-stardate {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.ready-room-empty {
+  margin: 0.2rem 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ready-rep {
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+}
+
+.ready-rep li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+  text-transform: capitalize;
+}
+
+.ready-rep li.is-hostile span:last-child {
+  color: #fca5a5;
+}
+
+.ready-rep li.is-allied span:last-child {
+  color: #86efac;
+}
+
+.ready-room-flags {
+  font-size: 0.7rem;
   color: var(--muted);
 }
 

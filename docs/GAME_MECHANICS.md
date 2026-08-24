@@ -484,7 +484,7 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - UI shows skill bars plus a 10-point band (`b0`–`b10`) for later badge work.
 - New officers (custom-ship roster and starbase recruits) get **role-appropriate** `baselineSkillsForRole` from the host. The LLM must not emit skill scores.
 
-### 16.2 Crew lifecycle
+### 16.2 Crew death & lifecycle
 - Status: `active` | `injured` | `dead` | `transferred`.
 - Mechanical play turns (numbered options and free-text **orders**, not questions) call `tickCrewService`: `serviceTurns += 1` for **active** crew; injured officers count down `injuryTurnsRemaining` then return to active.
 - After significant hull damage or boarding/internal hits, the referee rolls `canCrewDie` (higher chance if life support is damaged/destroyed). A miss may still **injure**.
@@ -493,7 +493,7 @@ Phase 0 types in `packages/game-core/src/types.ts` are the canonical contract (`
 - On debrief, living crew gain `missionsServed` and a small loyalty bump on success (`updateProfileFromRun`).
 - Replacement officers are hired at starbase (`hireRecruit`) with role baseline skills.
 
-### 16.3 Universe
+### 16.3 Universe ticks & reputation
 - New profiles get `emptyUniverse(stardateForEra(ship.era))` — Federation standing starts at **+5**, others **0**.
 - `tickUniverse` every **5** mission play turns and on debrief: advance stardate, mild reputation drift toward 0, chance of a galactic crisis, hostility flags at low standing (Klingon/Romulan/Cardassian ≤ −40, Borg ≤ −20).
 - `lastTickTurn` is **per mission** (reset to 0 when play starts) so a new assignment still ticks.
@@ -567,6 +567,15 @@ Phase 7. Packs in `content/skills/` keep the narrator aligned with the referee:
 | `crew-advice.md` | Short, in-character consult; no dice. |
 
 Setup prompts load `setup-content.md`. Play turns load a compact concatenation (advice pack excluded).
+
+### 16.8 Bridge UI (Phase 8)
+Viewscreen and SFX are unchanged. Campaign state is visible on the bridge and hub:
+
+- **Captain's Ready Room** (left column) — ship skill bars (0–100, band `b0`–`b10`) and faction reputation summary (standing, flags, crises).
+- **Crew cards** — overlay **Injured / KIA / Transferred** badge plus service time (`Nt`). Expanded dossier still lists status, service, missions, and Ask for advice.
+- **Starbase hub** — Campaign log card lists recent missions (stardate, title, outcome, casualties). Standing and yard/personnel stay on the hub.
+
+`npm run test:phase8` covers the campaign checklist (baselines, death/scar/flag, skill DC, advice not a turn, universe ticks, standing-aware briefs, profile save/load, mid-mission `activeRunId`).
 
 ---
 

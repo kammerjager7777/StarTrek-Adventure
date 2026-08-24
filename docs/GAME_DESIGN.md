@@ -90,15 +90,28 @@ Natural **20** = critical success. Action modifiers can raise DCs further.
 
 Decisions set **flags** (trap choices, critical failures, diplomatic fallout, `red_alert_active`, etc.) that color later scenes and can drive UI/audio (e.g. red-alert bed).
 
-Campaigns persist **ship skills**, **living crew**, **faction reputation**, and a **campaign log** of missions. Officers can be injured or lost; replacements are hired at starbase. Ask an officer for advice on the crew card (does not spend a turn).
+## Campaign progression (player-facing)
+
+Your ship and crew persist between missions.
+
+- **Skills** — Seven ship scores (tactical, science, diplomacy, piloting, engineering, medical, command). Officers add to the total; the Ready Room shows the bars. Strong skills make related orders easier on the dice.
+- **Crew** — Officers serve, can be **Injured** or **KIA**, and accrue service time on their cards. Ask a living officer for advice without spending a turn. Hire replacements at starbase.
+- **Standing** — Faction reputation and galactic flags shift over time and after missions. Hostile powers yield harsher assignment lists; high Federation standing favors relief and diplomacy.
+- **Starbase** — Home when you are not flying a mission. Refit, recruit, read the **campaign log**, then choose the next assignment.
+- **Continue** — History resumes a mid-mission beat, or puts you back on the dock with the same ship, living crew, skills, and universe.
+
+Campaigns persist **ship skills**, **living crew**, **faction reputation**, and a **campaign log** of missions.
 
 ## Bridge presentation (product)
 
 - **Themes:** Classic or LCARS  
+- **Ready Room:** Skill bars and faction standing  
+- **Crew cards:** Injured / KIA badges and service time; Ask for advice  
 - **Viewscreen:** Journey-book images; Incoming Communication at mission start  
 - **Voice:** Auto-play Narrator + crew; per-line replay  
 - **Audio:** TNG bridge ambient + TrekCore SFX (orders, combat, narrator cues)  
 - **History:** Resume / delete prior runs  
+- **Starbase hub:** Campaign log, yard, personnel  
 
 ## Related
 

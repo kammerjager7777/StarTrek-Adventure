@@ -14,17 +14,18 @@ Full rules: **[GAME_MECHANICS.md](./GAME_MECHANICS.md)**.
 StarTrek-Adventure/
 ├── apps/web/                 Bridge UI (vanilla ES modules)
 │   ├── js/
-│   │   ├── bridge.js         UI state, turns, TTS, panels
+│   │   ├── bridge.js         UI state, turns, TTS, panels, Ready Room
 │   │   ├── trekSfx.js        TrekCore SFX + narrator sfx[]
 │   │   ├── lcarsFx.js        LCARS panel beeps
 │   │   └── bridgeAmbient.js  TNG bridge bed loop
 │   └── assets/sfx/           Ogg assets (+ README)
 ├── server/
-│   ├── src/agents/           gamemaster, llmGamemaster, setup, viewscreen
+│   ├── src/agents/           gamemaster, llmGamemaster, setup, crewAdvice, viewscreen
 │   ├── src/tools/            Mechanical tool registry
+│   ├── src/store/            saveStore + profileStore (per-account)
 │   ├── src/services/         xAI TTS, portraits, Imagine
 │   └── src/api/              HTTP routes
-├── packages/game-core/       Shared types + pure rules
+├── packages/game-core/       Shared types + pure rules (campaign.ts, advice.ts)
 ├── content/skills/           Markdown skill packs loaded into prompts
 ├── data/users/{emailSlug}/   Per-account isolation
 │   ├── saves/                GameState JSON per run
@@ -59,8 +60,8 @@ Player action (UI)
   → PublicGameView to client
   → bridge.js render
       ├─ typewriter + options
-      ├─ ship/crew/objectives panels
-      ├─ starbase overlay when phase === starbase
+      ├─ ship / Ready Room (skills + standing) / crew cards
+      ├─ starbase overlay when phase === starbase (includes campaign log)
       ├─ playStateDeltaSfx + playNarratorSfx(turn.sfx)
       ├─ autoSpeakBeat (Grok TTS)
       └─ viewscreen playlist (Imagine frames)
@@ -104,10 +105,17 @@ Player action (UI)
 | `give_hint` | Blocked on hardcore |
 | `change_difficulty` / `restart_mission` / `new_mission` | Meta flow |
 | `toolApplyCrewDeath` | KIA: skills, scar, `crew_loss_<role>` flag; last living officer → injury |
-| `toolSetCrewStatus` | `active` / `injured` / `dead` / `transferred` |
+| `toolSetCrewStatus` | `active` / `injured` / `dead` / `transferred` (last living officer cannot be KIA) |
 | `toolTickCrewService` | Service clocks + injury recovery each mechanical beat |
+| Starbase refit / hire / heal / transfer | Pure helpers in `campaign.ts`; gamemaster routes hub orders |
 
-Pure rules live in `packages/game-core/src/rules.ts` (dice, combat, recharge, constraints).
+Pure rules live in `packages/game-core/src/rules.ts` (dice, combat, recharge, constraints) and `campaign.ts` (skills, crew, universe, starbase).
+
+### Phases (campaign)
+
+Setup (`ask_name` → ship) commissions a vessel, then **starbase** is home. **Choose next mission** opens the mission board (`mission_type` / `difficulty` / `mission_offer` / `mission_brief`). **playing** is the only phase that burns `playTurnCount` and dice. **debrief** writes the campaign log and returns to **starbase**. **post_mission** is stand-down (no `activeRunId`).
+
+Advice (`POST /api/games/:id/crew/advice`) is not a phase and not a play turn.
 
 ## Client audio
 
@@ -132,14 +140,16 @@ LLM scenes may include `sfx: string[]` (0–4 cues). Server normalizes aliases �
 
 ## Persistence
 
-Durable campaigns are **profile-centric** (Phase 1), scoped per account:
+Durable campaigns are **profile-centric** (Phase 1), scoped per account. Implementation: `server/src/store/profileStore.ts` + `saveStore.ts`.
 
 | What | Path | API |
 |------|------|-----|
 | Campaign profile | `data/users/{slug}/profiles/{id}.json` | `GET/POST /api/profiles`, `GET/DELETE /api/profiles/:id`, `POST /api/profiles/:id/continue` |
 | Mid-mission run | `data/users/{slug}/saves/{runId}.json` | `GET /api/games`, `POST /api/games/:id/action` |
 
-`updateProfileFromRun` merges ship, living crew, skills, and universe into the profile on debrief (and appends `campaignLog`). It also stores `lastMissionType` / `lastDifficulty`.
+`createCampaignProfile` / `createProfileFromShip` stamp captain, ship, **role-baseline skills**, empty universe (Federation +5), and empty `campaignLog`.
+
+`updateProfileFromRun` merges ship, living crew, skills, and universe into the profile on debrief (and appends `campaignLog`). It also stores `lastMissionType` / `lastDifficulty`. Mid-mission saves keep `activeRunId`.
 
 **Continue your story** (`POST /api/profiles/:id/continue`):
 

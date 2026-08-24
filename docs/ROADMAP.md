@@ -20,7 +20,8 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Classic + LCARS themes  
 - [x] Mission log typewriter, options bar, Engage, soft errors  
 - [x] Ship panel (hull, shields, systems, scars)  
-- [x] Crew cards + expand hail  
+- [x] Captain’s Ready Room (skill bars + reputation)  
+- [x] Crew cards + expand hail (Injured / KIA badges, service time)  
 - [x] Objectives panel with success/failure presentation  
 - [x] Collapsible viewscreen + mission history strip  
 - [x] Run history modal (resume / delete)  
@@ -46,6 +47,21 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Red-alert looping bed from crisis state  
 - [x] Narrator-authored `sfx[]` on play scenes  
 
+### Campaign layer
+
+- [x] Profile-centric saves (captain / ship / universe)  
+- [x] Per-account data isolation (IAP email / ownerEmail + user dirs)  
+- [x] Multi-dimensional ship + crew skills with dice modifiers  
+- [x] Crew injury / death / service time (KIA badge + Ready Room skills)  
+- [x] Loyalty + service progression (basic)  
+- [x] Universe stardate + faction reputation ticks  
+- [x] “Ask for advice” on crew cards  
+- [x] Starbase hub after debrief (skills, crew status, reputation, campaign log)  
+- [x] Richer recruitment / refit economy (quality tiers, sickbay, transfers, facility tier)  
+- [x] Continue your story → resume mission, or reload the starbase hub  
+- [x] LLM skill packs aligned with the referee  
+- [x] Captain’s Ready Room (skill bars + standing)  
+
 ### Docs
 
 - [x] [GAME_MECHANICS.md](./GAME_MECHANICS.md)  
@@ -57,19 +73,10 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 
 ### Continuity & campaigns
 
-- [x] Profile-centric saves (captain / ship / universe)  
-- [x] Multi-dimensional ship + crew skills with dice modifiers  
-- [x] Crew injury / death / service time  
-- [x] Universe stardate + faction reputation ticks  
-- [x] “Ask for advice” on crew cards  
-- [x] Starbase hub after debrief (skills, crew status, reputation, campaign log)  
-- [x] Richer recruitment / refit economy (quality tiers, sickbay, transfers, facility tier)  
-- [x] Continue your story → resume mission, or reload the starbase hub 
 - [ ] Multi-mission story arcs with long callbacks  
 
 ### Crew & ship identity
 
-- [x] Loyalty + service progression (basic)  
 - [ ] Deeper crew builder (player-authored rosters)  
 - [ ] “Remember when…” callbacks from scars and flags (LLM-side polish)  
 
@@ -82,7 +89,6 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 
 ### Platform
 
-- [x] Per-account data isolation (IAP email / ownerEmail + user dirs)  
 - [ ] Automated playtests in CI  
 - [ ] Accessibility pass (keyboard, reduced motion, captions)  
 
