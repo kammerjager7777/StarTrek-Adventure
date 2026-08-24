@@ -1898,7 +1898,7 @@ function setCrewRosterExpanded(expanded, { persist = true, index = 0 } = {}) {
     if (chev) chev.textContent = expanded ? "▾" : "▸";
   }
   if (expanded) {
-    applyCrewCarousel(index, { hail: persist });
+    applyCrewCarousel(index, { hail: persist, force: persist });
   } else {
     const track = els.crew?.querySelector(".crew-carousel-track");
     if (track) track.style.transform = "none";
@@ -1981,7 +1981,7 @@ function bindCrewCarousel(officers) {
   });
 }
 
-function applyCrewCarousel(index, { hail = false } = {}) {
+function applyCrewCarousel(index, { hail = false, force = false } = {}) {
   const root = els.crew?.querySelector(".crew-carousel");
   const track = root?.querySelector(".crew-carousel-track");
   const slides = root?.querySelectorAll(".crew-carousel-slide") || [];
@@ -2010,7 +2010,7 @@ function applyCrewCarousel(index, { hail = false } = {}) {
   });
   if (hail && activeTab) {
     const officers = displayBridgeCrew(current?.state?.ship?.crew || []);
-    void onCrewCardExpand(activeTab, officers);
+    void onCrewCardExpand(activeTab, officers, { force });
   }
 }
 
@@ -2137,16 +2137,13 @@ function bindCrewCardExpandHandlers(crew) {
     });
     tab.addEventListener("click", (e) => {
       if (e.target.closest("button, input, label, a")) return;
-      if (!isCrewRosterExpanded()) {
-        const id = tab.getAttribute("data-crew-id");
-        const i = (crew || []).findIndex((c) => c.id === id);
-        if (id) crewCarouselId = id;
-        crewCarouselIndex = i >= 0 ? i : 0;
-        uiSound("open");
-        setCrewRosterExpanded(true, { index: crewCarouselIndex });
-        return;
-      }
-      void onCrewCardExpand(tab, crew, { force: true });
+      if (isCrewRosterExpanded()) return;
+      const id = tab.getAttribute("data-crew-id");
+      const i = (crew || []).findIndex((c) => c.id === id);
+      if (id) crewCarouselId = id;
+      crewCarouselIndex = i >= 0 ? i : 0;
+      uiSound("open");
+      setCrewRosterExpanded(true, { index: crewCarouselIndex });
     });
   });
 }
