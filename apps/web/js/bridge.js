@@ -1657,7 +1657,8 @@ let portraitsGenerating = false;
 /** Visible officer in the crew carousel (survives portrait re-renders). */
 let crewCarouselId = null;
 let crewCarouselIndex = 0;
-let crewCarouselWheelLock = 0;
+let crewWheelGestureLock = false;
+let crewWheelSettleTimer = null;
 let crewHailSeq = 0;
 let crewHailQuietUntil = 0;
 
@@ -1940,7 +1941,7 @@ function bindCrewCarousel(officers) {
     (e) => {
       if (!isCrewRosterExpanded()) return;
       if (e.target.closest("input, textarea, button")) return;
-      if (Math.abs(e.deltaY) < 10) return;
+      if (Math.abs(e.deltaY) < 8) return;
       const details = root.querySelector(
         ".crew-carousel-slide.is-active .crew-tab-details"
       );
@@ -1951,10 +1952,14 @@ function bindCrewCarousel(officers) {
         if (e.deltaY > 0 && !atBottom) return;
         if (e.deltaY < 0 && !atTop) return;
       }
-      const now = Date.now();
-      if (now - crewCarouselWheelLock < 320) return;
-      crewCarouselWheelLock = now;
       e.preventDefault();
+      if (crewWheelSettleTimer) clearTimeout(crewWheelSettleTimer);
+      crewWheelSettleTimer = setTimeout(() => {
+        crewWheelGestureLock = false;
+        crewWheelSettleTimer = null;
+      }, 500);
+      if (crewWheelGestureLock) return;
+      crewWheelGestureLock = true;
       applyCrewCarousel(crewCarouselIndex + (e.deltaY > 0 ? 1 : -1), {
         hail: true,
       });
