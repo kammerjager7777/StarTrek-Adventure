@@ -298,7 +298,7 @@ html[data-ui-theme="lcars"] .top-bar::after {
 
 html[data-ui-theme="lcars"] .brand {
   padding: 4px 0 14px;
-  gap: 10px;
+  gap: 8px;
 }
 
 html[data-ui-theme="lcars"] .brand h1 {
@@ -308,20 +308,11 @@ html[data-ui-theme="lcars"] .brand h1 {
   font-size: 1.05rem;
 }
 
-html[data-ui-theme="lcars"] .brand .sub {
-  color: var(--lcars-lilac);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-html[data-ui-theme="lcars"] .pip {
-  background: var(--lcars-bar-3);
-  box-shadow: none;
-  border-radius: 2px;
-  width: 12px;
-  height: 12px;
+html[data-ui-theme="lcars"] .brand-mark {
+  width: 18px;
+  height: 18px;
+  color: var(--lcars-peach);
+  filter: none;
 }
 
 html[data-ui-theme="lcars"] .top-actions {

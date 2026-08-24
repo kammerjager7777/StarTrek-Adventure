@@ -71,8 +71,8 @@ body.init-active .shell {
 
 .brand {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: nowrap;
   min-width: 0;
 }
@@ -84,18 +84,13 @@ body.init-active .shell {
   text-transform: uppercase;
 }
 
-.brand .sub {
-  color: var(--muted);
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.pip {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--lcars-blue);
-  box-shadow: 0 0 12px var(--lcars-blue);
+.brand-mark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: block;
+  color: var(--lcars-blue);
+  filter: drop-shadow(0 0 8px var(--lcars-blue));
 }
 
 .top-actions {
@@ -2732,9 +2727,9 @@ body.red-alert .top-bar {
   border-color: #ef4444;
   animation: red-alert-bar 1.2s ease-in-out infinite;
 }
-body.red-alert .brand .pip {
-  background: #ef4444;
-  box-shadow: 0 0 10px #ef4444;
+body.red-alert .brand-mark {
+  color: #ef4444;
+  filter: drop-shadow(0 0 10px #ef4444);
   animation: red-alert-pip 0.7s steps(2, end) infinite;
 }
 body.red-alert .log-panel {
