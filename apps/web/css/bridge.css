@@ -382,8 +382,58 @@ body.init-active .shell {
   min-height: 0; /* allow shrink so overflow can scroll */
 }
 
-.panel.left .crew-section .panel-title {
+.panel.left .crew-section .crew-toggle {
   flex: 0 0 auto;
+  margin: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.panel.left .crew-section.is-collapsed .crew-toggle {
+  border-radius: 8px;
+}
+
+.crew-section.is-collapsed .crew-dots {
+  display: none;
+}
+
+.crew-section.is-collapsed .crew-carousel {
+  gap: 0;
+}
+
+.crew-section.is-collapsed .crew-carousel-track {
+  transform: none !important;
+  gap: 5px;
+  transition: none;
+  height: 100%;
+}
+
+.crew-section.is-collapsed .crew-carousel-slide {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.crew-section.is-collapsed .crew-tab-details {
+  display: none;
+}
+
+.crew-section.is-collapsed .crew-card-face {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.crew-section.is-collapsed .crew-duty-stamp-word {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  padding: 2px 8px;
+  transform: none;
+}
+
+.crew-section.is-collapsed .crew-duty-stamp-note {
+  display: none;
 }
 
 .panel.left #crew-panel {

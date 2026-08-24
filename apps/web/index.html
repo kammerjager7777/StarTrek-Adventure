@@ -203,8 +203,23 @@
             <div id="ship-panel" class="panel-body muted">No ship selected</div>
           </section>
 
-          <section class="panel-section crew-section">
-            <h2 class="panel-title">Crew</h2>
+          <section
+            class="panel-section crew-section is-expanded"
+            id="crew-section"
+            data-panel="crew"
+          >
+            <button
+              type="button"
+              class="panel-collapse-toggle crew-toggle"
+              id="crew-toggle"
+              aria-expanded="true"
+              aria-controls="crew-panel"
+              title="Show all crew or focus one officer"
+            >
+              <span class="collapse-chevron" aria-hidden="true">▾</span>
+              <span class="collapse-label">Crew</span>
+              <span class="collapse-summary" id="crew-collapse-summary"></span>
+            </button>
             <div id="crew-panel" class="panel-body crew-panel muted">—</div>
           </section>
         </aside>

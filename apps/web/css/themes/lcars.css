@@ -597,6 +597,23 @@ html[data-ui-theme="lcars"] .crew-duty-stamp-note {
   color: #ffcc99;
 }
 
+html[data-ui-theme="lcars"] .panel.left .crew-toggle {
+  border: none;
+  border-radius: 0 18px 0 0;
+  background: var(--lcars-bar);
+  color: #000;
+  padding: 6px 10px 6px 12px;
+}
+
+html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-label,
+html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-chevron {
+  color: #000;
+}
+
+html[data-ui-theme="lcars"] .panel.left .crew-toggle .collapse-summary {
+  color: #1a1a1a;
+}
+
 html[data-ui-theme="lcars"] .crew-tab-name {
   color: var(--lcars-peach);
   letter-spacing: 0.08em;

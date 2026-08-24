@@ -98,6 +98,9 @@ const els = {
   phase: document.getElementById("phase-badge"),
   ship: document.getElementById("ship-panel"),
   crew: document.getElementById("crew-panel"),
+  crewSection: document.getElementById("crew-section"),
+  crewToggle: document.getElementById("crew-toggle"),
+  crewCollapseSummary: document.getElementById("crew-collapse-summary"),
   readyRoom: document.getElementById("ready-room-panel"),
   objectives: document.getElementById("objectives-panel"),
   meta: document.getElementById("meta-panel"),
@@ -1855,6 +1858,49 @@ function paintCrewCarousel(officers, { showGenerating = false, pendingCount = 0 
   bindCrewCardExpandHandlers(officers);
   bindCrewAdviceButtons(officers);
   bindCrewCarousel(officers);
+  updateCrewCollapseSummary(officers);
+  syncCrewRosterLayout();
+}
+
+function isCrewRosterExpanded() {
+  return Boolean(
+    els.crewSection && els.crewSection.classList.contains("is-expanded")
+  );
+}
+
+function updateCrewCollapseSummary(officers) {
+  if (!els.crewCollapseSummary) return;
+  const n = (officers || []).length;
+  els.crewCollapseSummary.textContent = n
+    ? `${n} officer${n === 1 ? "" : "s"}`
+    : "";
+}
+
+function setCrewRosterExpanded(expanded, { persist = true, index = 0 } = {}) {
+  if (!els.crewSection) return;
+  els.crewSection.classList.toggle("is-expanded", expanded);
+  els.crewSection.classList.toggle("is-collapsed", !expanded);
+  if (els.crewToggle) {
+    els.crewToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    const chev = els.crewToggle.querySelector(".collapse-chevron");
+    if (chev) chev.textContent = expanded ? "▾" : "▸";
+  }
+  if (expanded) {
+    applyCrewCarousel(index, { hail: persist });
+  } else {
+    const track = els.crew?.querySelector(".crew-carousel-track");
+    if (track) track.style.transform = "none";
+  }
+  if (persist) savePanelExpandedPrefs();
+}
+
+function syncCrewRosterLayout() {
+  if (isCrewRosterExpanded()) {
+    applyCrewCarousel(crewCarouselIndex);
+  } else {
+    const track = els.crew?.querySelector(".crew-carousel-track");
+    if (track) track.style.transform = "none";
+  }
 }
 
 function bindCrewCarousel(officers) {
@@ -1862,14 +1908,17 @@ function bindCrewCarousel(officers) {
   if (!root || !officers.length) return;
   const saved = officers.findIndex((c) => c.id === crewCarouselId);
   const start = saved >= 0 ? saved : 0;
-  applyCrewCarousel(start);
+  if (isCrewRosterExpanded()) applyCrewCarousel(start);
+  else syncCrewRosterLayout();
 
   root.querySelectorAll(".crew-dot").forEach((dot) => {
     dot.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       const i = Number(dot.getAttribute("data-crew-index"));
-      if (!Number.isNaN(i)) applyCrewCarousel(i, { hail: true });
+      if (!Number.isNaN(i) && isCrewRosterExpanded()) {
+        applyCrewCarousel(i, { hail: true });
+      }
     });
   });
 
@@ -1877,6 +1926,7 @@ function bindCrewCarousel(officers) {
   viewport?.addEventListener(
     "wheel",
     (e) => {
+      if (!isCrewRosterExpanded()) return;
       if (e.target.closest("input, textarea, button")) return;
       if (Math.abs(e.deltaY) < 10) return;
       const details = root.querySelector(
@@ -1901,6 +1951,7 @@ function bindCrewCarousel(officers) {
   );
 
   root.addEventListener("keydown", (e) => {
+    if (!isCrewRosterExpanded()) return;
     if (e.target.closest("input, textarea")) return;
     if (e.key === "ArrowDown" || e.key === "PageDown") {
       e.preventDefault();
@@ -1924,6 +1975,10 @@ function applyCrewCarousel(index, { hail = false } = {}) {
   const slides = root?.querySelectorAll(".crew-carousel-slide") || [];
   const n = slides.length;
   if (!track || !n) return;
+  if (!isCrewRosterExpanded()) {
+    track.style.transform = "none";
+    return;
+  }
   crewCarouselIndex = ((index % n) + n) % n;
   crewCarouselId = slides[crewCarouselIndex].getAttribute("data-crew-id");
   track.style.transform = `translateY(-${crewCarouselIndex * 100}%)`;
@@ -2062,7 +2117,16 @@ function bindCrewCardExpandHandlers(crew) {
   if (!els.crew) return;
   els.crew.querySelectorAll(".crew-tab[data-crew-id]").forEach((tab) => {
     tab.addEventListener("mouseenter", () => {
+      if (!isCrewRosterExpanded()) return;
       void onCrewCardExpand(tab, crew);
+    });
+    tab.addEventListener("click", (e) => {
+      if (e.target.closest("button, input, label, a")) return;
+      if (isCrewRosterExpanded()) return;
+      const id = tab.getAttribute("data-crew-id");
+      const i = (crew || []).findIndex((c) => c.id === id);
+      uiSound("open");
+      setCrewRosterExpanded(true, { index: i >= 0 ? i : 0 });
     });
   });
 }
@@ -3501,7 +3565,7 @@ function loadPanelExpandedPrefs() {
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
     // Default: viewscreen collapsed until mission-start Incoming Communication
-    if (!raw) return { viewscreen: false, history: false, run: false };
+    if (!raw) return { viewscreen: false, history: false, run: false, crew: true };
     const parsed = JSON.parse(raw);
     return {
       // Only open if the user explicitly expanded it
@@ -3509,9 +3573,11 @@ function loadPanelExpandedPrefs() {
       // History is always collapsed unless the user explicitly expanded it
       history: parsed.history === true,
       run: parsed.run === true,
+      // Crew roster defaults to focused carousel unless the user stacked it
+      crew: parsed.crew !== false,
     };
   } catch {
-    return { viewscreen: false, history: false, run: false };
+    return { viewscreen: false, history: false, run: false, crew: true };
   }
 }
 
@@ -3523,6 +3589,7 @@ function savePanelExpandedPrefs() {
         viewscreen: isPanelExpanded(els.viewscreenPanel),
         history: isPanelExpanded(els.logHistoryPanel),
         run: isPanelExpanded(els.runSection),
+        crew: isCrewRosterExpanded(),
       })
     );
   } catch {
@@ -3575,6 +3642,7 @@ function initCollapsiblePanels() {
   setPanelExpanded(els.runSection, els.runToggle, Boolean(prefs.run), {
     persist: false,
   });
+  setCrewRosterExpanded(prefs.crew !== false, { persist: false, index: 0 });
   // Clear stale open state from older builds once
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
@@ -3586,6 +3654,8 @@ function initCollapsiblePanels() {
           JSON.stringify({
             viewscreen: parsed.viewscreen === true,
             history: parsed.history === true,
+            run: parsed.run === true,
+            crew: parsed.crew !== false,
           })
         );
       }
@@ -3607,6 +3677,13 @@ function initCollapsiblePanels() {
   if (els.runToggle) {
     els.runToggle.addEventListener("click", () => {
       togglePanel(els.runSection, els.runToggle);
+    });
+  }
+  if (els.crewToggle) {
+    els.crewToggle.addEventListener("click", () => {
+      const next = !isCrewRosterExpanded();
+      uiSound(next ? "open" : "close");
+      setCrewRosterExpanded(next, { index: 0 });
     });
   }
 }
