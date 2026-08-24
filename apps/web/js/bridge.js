@@ -1738,20 +1738,6 @@ function renderCrew(ship, playerName = "") {
           <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
         </div>`
       : "") +
-    (playerName
-      ? `<article class="crew-tab crew-tab-player">
-        <div class="crew-card-face crew-card-player-face">
-          <div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
-            crewInitials(playerName)
-          )}</div>
-          <div class="crew-card-gradient"></div>
-          <div class="crew-card-overlay">
-            <div class="crew-tab-name">${escapeHtml(playerName)}</div>
-            <div class="crew-tab-role">Captain (you)</div>
-          </div>
-        </div>
-      </article>`
-      : "") +
     officers
       .map((c) => {
         const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
@@ -2168,20 +2154,6 @@ function renderCrewWithoutPortraitKick(ship) {
           <span class="crew-imaging-spinner" aria-hidden="true"></span>
           <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
         </div>`
-      : "") +
-    (playerName
-      ? `<article class="crew-tab crew-tab-player">
-        <div class="crew-card-face crew-card-player-face">
-          <div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
-            crewInitials(playerName)
-          )}</div>
-          <div class="crew-card-gradient"></div>
-          <div class="crew-card-overlay">
-            <div class="crew-tab-name">${escapeHtml(playerName)}</div>
-            <div class="crew-tab-role">Captain (you)</div>
-          </div>
-        </div>
-      </article>`
       : "") +
     officers
       .map((c) => {
