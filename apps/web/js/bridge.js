@@ -1750,7 +1750,7 @@ function officerCardHtml(c, { generating = false } = {}) {
       )}</div>`;
   return `<article class="crew-tab${generating ? " is-imaging" : ""}${
     duty ? ` ${duty.cls}` : ""
-  }" data-crew-id="${escapeHtml(c.id)}" aria-expanded="false">
+  }" data-crew-id="${escapeHtml(c.id)}">
         <div class="crew-card-face">
           ${photo}
           ${
@@ -1878,7 +1878,7 @@ function bindCrewCarousel(officers) {
       e.preventDefault();
       e.stopPropagation();
       const i = Number(dot.getAttribute("data-crew-index"));
-      if (!Number.isNaN(i)) applyCrewCarousel(i);
+      if (!Number.isNaN(i)) applyCrewCarousel(i, { hail: true });
     });
   });
 
@@ -1888,11 +1888,13 @@ function bindCrewCarousel(officers) {
     (e) => {
       if (e.target.closest("input, textarea, button")) return;
       if (Math.abs(e.deltaY) < 10) return;
-      const slide = root.querySelector(".crew-carousel-slide.is-active");
-      if (slide && slide.scrollHeight > slide.clientHeight + 8) {
-        const atTop = slide.scrollTop <= 4;
+      const details = root.querySelector(
+        ".crew-carousel-slide.is-active .crew-tab-details"
+      );
+      if (details && details.scrollHeight > details.clientHeight + 8) {
+        const atTop = details.scrollTop <= 4;
         const atBottom =
-          slide.scrollTop + slide.clientHeight >= slide.scrollHeight - 4;
+          details.scrollTop + details.clientHeight >= details.scrollHeight - 4;
         if (e.deltaY > 0 && !atBottom) return;
         if (e.deltaY < 0 && !atTop) return;
       }
@@ -1900,7 +1902,9 @@ function bindCrewCarousel(officers) {
       if (now - crewCarouselWheelLock < 320) return;
       crewCarouselWheelLock = now;
       e.preventDefault();
-      applyCrewCarousel(crewCarouselIndex + (e.deltaY > 0 ? 1 : -1));
+      applyCrewCarousel(crewCarouselIndex + (e.deltaY > 0 ? 1 : -1), {
+        hail: true,
+      });
     },
     { passive: false }
   );
@@ -1909,21 +1913,21 @@ function bindCrewCarousel(officers) {
     if (e.target.closest("input, textarea")) return;
     if (e.key === "ArrowDown" || e.key === "PageDown") {
       e.preventDefault();
-      applyCrewCarousel(crewCarouselIndex + 1);
+      applyCrewCarousel(crewCarouselIndex + 1, { hail: true });
     } else if (e.key === "ArrowUp" || e.key === "PageUp") {
       e.preventDefault();
-      applyCrewCarousel(crewCarouselIndex - 1);
+      applyCrewCarousel(crewCarouselIndex - 1, { hail: true });
     } else if (e.key === "Home") {
       e.preventDefault();
-      applyCrewCarousel(0);
+      applyCrewCarousel(0, { hail: true });
     } else if (e.key === "End") {
       e.preventDefault();
-      applyCrewCarousel(officers.length - 1);
+      applyCrewCarousel(officers.length - 1, { hail: true });
     }
   });
 }
 
-function applyCrewCarousel(index) {
+function applyCrewCarousel(index, { hail = false } = {}) {
   const root = els.crew?.querySelector(".crew-carousel");
   const track = root?.querySelector(".crew-carousel-track");
   const slides = root?.querySelectorAll(".crew-carousel-slide") || [];
@@ -1938,15 +1942,18 @@ function applyCrewCarousel(index) {
     dot.setAttribute("aria-selected", on ? "true" : "false");
     dot.tabIndex = on ? 0 : -1;
   });
+  let activeTab = null;
   slides.forEach((slide, i) => {
     const on = i === crewCarouselIndex;
     slide.classList.toggle("is-active", on);
     slide.setAttribute("aria-hidden", on ? "false" : "true");
     const tab = slide.querySelector(".crew-tab");
-    if (!tab) return;
-    tab.classList.remove("is-pinned", "is-hailing", "is-held-shut");
-    tab.setAttribute("aria-expanded", "false");
+    if (on && tab) activeTab = tab;
   });
+  if (hail && activeTab) {
+    const officers = displayBridgeCrew(current?.state?.ship?.crew || []);
+    void onCrewCardExpand(activeTab, officers);
+  }
 }
 
 function crewAdviceBlockHtml(c) {
@@ -2057,35 +2064,7 @@ function bindCrewCardExpandHandlers(crew) {
   if (!els.crew) return;
   els.crew.querySelectorAll(".crew-tab[data-crew-id]").forEach((tab) => {
     tab.addEventListener("mouseenter", () => {
-      if (tab.classList.contains("is-held-shut")) return;
       void onCrewCardExpand(tab, crew);
-    });
-    tab.addEventListener("mouseleave", () => {
-      tab.classList.remove("is-held-shut");
-    });
-    // Keyboard / touch: focus also counts as expand
-    tab.tabIndex = 0;
-    tab.addEventListener("focus", () => {
-      if (tab.classList.contains("is-held-shut")) return;
-      void onCrewCardExpand(tab, crew);
-    });
-    tab.addEventListener("click", (e) => {
-      if (e.target.closest("button, input, label, a")) return;
-      const pinned = tab.classList.toggle("is-pinned");
-      tab.setAttribute("aria-expanded", pinned ? "true" : "false");
-      if (pinned) {
-        tab.classList.remove("is-held-shut");
-        void onCrewCardExpand(tab, crew);
-      } else {
-        tab.classList.add("is-held-shut");
-        tab.blur();
-      }
-    });
-    tab.addEventListener("keydown", (e) => {
-      if (e.target !== tab) return;
-      if (e.key !== "Enter" && e.key !== " ") return;
-      e.preventDefault();
-      tab.click();
     });
   });
 }

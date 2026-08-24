@@ -106,7 +106,7 @@ Campaigns persist **ship skills**, **living crew**, **faction reputation**, and 
 
 - **Themes:** Classic or LCARS  
 - **Ready Room:** Skill bars and faction standing (right rail, under Objectives)  
-- **Crew cards:** Injured / KIA badges and service time; Ask for advice  
+- **Crew cards:** Always-open dossier (Injured / KIA, service, Ask for advice); dots switch officers  
 - **Scars:** Lasting damage record on the starbase vessel card (not the in-mission panel)  
 - **Viewscreen:** Journey-book images; Incoming Communication at mission start  
 - **Voice:** Auto-play Narrator + crew; per-line replay  

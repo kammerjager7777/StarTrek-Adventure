@@ -568,11 +568,12 @@ body.init-active .shell {
 .crew-carousel-slide {
   flex: 0 0 100%;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
 .crew-carousel-slide .crew-tab {
+  height: 100%;
   min-height: 0;
 }
 
@@ -617,22 +618,20 @@ body.init-active .shell {
 }
 
 .crew-tab {
-  --crew-face-h: 240px;
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   background: #0a0f1a;
-  flex: 0 0 auto;
-  height: auto;
+  min-height: 0;
+  height: 100%;
   transition: border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
-.crew-tab:hover:not(.is-held-shut),
-.crew-tab:focus-within:not(.is-held-shut),
-.crew-tab.is-hailing:not(.is-held-shut),
-.crew-tab.is-pinned {
+.crew-carousel-slide.is-active .crew-tab,
+.crew-tab.is-hailing {
   border-color: var(--lcars-peach);
   box-shadow: 0 0 0 1px rgba(247, 157, 101, 0.28);
 }
@@ -648,12 +647,12 @@ body.init-active .shell {
   position: relative;
   display: block;
   width: 100%;
-  height: var(--crew-face-h, 240px);
+  flex: 1 1 42%;
+  min-height: 120px;
   margin: 0;
   padding: 0;
   overflow: hidden;
   background: #0b1220;
-  flex: 0 0 auto;
 }
 
 /*
@@ -878,44 +877,18 @@ body.init-active .shell {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Dossier sits under the portrait and animates open */
 .crew-tab-details {
-  display: grid;
-  grid-template-rows: 0fr;
+  display: block;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 58%;
+  overflow: auto;
+  overscroll-behavior: contain;
   background: #0c1220;
-  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .crew-tab-details > .crew-detail-grid {
   min-height: 0;
-  overflow: hidden;
-}
-
-.crew-tab:hover:not(.is-held-shut) .crew-tab-details,
-.crew-tab:focus-within:not(.is-held-shut) .crew-tab-details,
-.crew-tab.is-hailing:not(.is-held-shut) .crew-tab-details,
-.crew-tab.is-pinned .crew-tab-details {
-  grid-template-rows: 1fr;
-}
-
-.crew-tab.is-held-shut,
-.crew-tab.is-held-shut:hover,
-.crew-tab.is-held-shut:focus-within,
-.crew-tab.is-held-shut.is-hailing {
-  box-shadow: none;
-}
-
-.crew-tab.is-held-shut .crew-tab-details,
-.crew-tab.is-held-shut:hover .crew-tab-details,
-.crew-tab.is-held-shut:focus-within .crew-tab-details,
-.crew-tab.is-held-shut.is-hailing .crew-tab-details {
-  grid-template-rows: 0fr;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .crew-tab-details {
-    transition: none;
-  }
 }
 
 .crew-detail-grid {
