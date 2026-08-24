@@ -2137,27 +2137,31 @@ function bindCrewCardExpandHandlers(crew) {
     });
     tab.addEventListener("click", (e) => {
       if (e.target.closest("button, input, label, a")) return;
-      if (isCrewRosterExpanded()) return;
-      const id = tab.getAttribute("data-crew-id");
-      const i = (crew || []).findIndex((c) => c.id === id);
-      if (id) crewCarouselId = id;
-      crewCarouselIndex = i >= 0 ? i : 0;
-      uiSound("open");
-      setCrewRosterExpanded(true, { index: crewCarouselIndex });
+      if (!isCrewRosterExpanded()) {
+        const id = tab.getAttribute("data-crew-id");
+        const i = (crew || []).findIndex((c) => c.id === id);
+        if (id) crewCarouselId = id;
+        crewCarouselIndex = i >= 0 ? i : 0;
+        uiSound("open");
+        setCrewRosterExpanded(true, { index: crewCarouselIndex });
+        return;
+      }
+      void onCrewCardExpand(tab, crew, { force: true });
     });
   });
 }
 
-async function onCrewCardExpand(tab, crewList) {
+async function onCrewCardExpand(tab, crewList, { force = false } = {}) {
   const id = tab.getAttribute("data-crew-id");
   if (!id) return;
   if (crewCarouselId && id !== crewCarouselId) return;
-  // Avoid re-fire while this card is already hailing
-  if (tab.classList.contains("is-hailing")) return;
+  if (!force && tab.classList.contains("is-hailing")) return;
   const now = Date.now();
-  const last = crewHailCooldown.get(id) || 0;
-  // 12s cooldown per officer
-  if (now - last < 12_000) return;
+  if (!force) {
+    const last = crewHailCooldown.get(id) || 0;
+    // Hover spam guard — clicks pass { force: true } and always replay
+    if (now - last < 12_000) return;
+  }
 
   const member = (crewList || []).find((c) => c.id === id);
   if (!member) return;
