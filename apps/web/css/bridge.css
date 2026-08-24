@@ -394,6 +394,8 @@ body.init-active .shell {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  padding-right: 18px;
+  box-sizing: border-box;
 }
 
 .panel.left .crew-section {
@@ -2705,7 +2707,7 @@ body.init-active .shell {
 .ready-rep {
   list-style: none;
   margin: 0 0 0.2rem;
-  padding: 0;
+  padding: 0 2px 0 0;
 }
 
 .ready-rep li {
@@ -2715,6 +2717,13 @@ body.init-active .shell {
   padding: 0;
   line-height: 1.3;
   text-transform: capitalize;
+}
+
+.ready-rep li span:last-child {
+  flex: 0 0 auto;
+  min-width: 2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .ready-rep li.is-hostile span:last-child {

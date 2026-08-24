@@ -570,6 +570,10 @@ html[data-ui-theme="lcars"] .ready-room-section .panel-title {
   background: var(--lcars-bar-3);
 }
 
+html[data-ui-theme="lcars"] .panel.left #ready-room-panel {
+  padding-right: 18px;
+}
+
 html[data-ui-theme="lcars"] .ready-room-stardate {
   color: var(--lcars-lilac);
 }
