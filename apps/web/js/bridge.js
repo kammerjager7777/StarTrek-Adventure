@@ -2934,6 +2934,45 @@ async function fetchMissionBoard(runId, text, update) {
   return view;
 }
 
+function missionBoardFilterBar(state) {
+  const bar = document.createElement("div");
+  bar.className = "mission-board-filters";
+  const typeRow = document.createElement("div");
+  typeRow.className = "mission-board-filter-row";
+  const typeLabel = document.createElement("span");
+  typeLabel.className = "mission-card-label";
+  typeLabel.textContent = "Type";
+  typeRow.appendChild(typeLabel);
+  const types = [
+    ["Science", "science"],
+    ["Exploration", "exploration"],
+    ["Search & Rescue", "search_rescue"],
+    ["Battle", "battle"],
+    ["Expanded", "expanded"],
+  ];
+  for (const [label, id] of types) {
+    const on = state.missionType === id;
+    typeRow.appendChild(
+      starbaseButton(`Type: ${label}`, on ? "" : "secondary")
+    );
+  }
+  const diffRow = document.createElement("div");
+  diffRow.className = "mission-board-filter-row";
+  const diffLabel = document.createElement("span");
+  diffLabel.className = "mission-card-label";
+  diffLabel.textContent = "Risk";
+  diffRow.appendChild(diffLabel);
+  for (const d of ["Easy", "Medium", "Hard", "Hardcore"]) {
+    const on = String(state.difficulty || "").toLowerCase() === d.toLowerCase();
+    diffRow.appendChild(
+      starbaseButton(`Difficulty: ${d}`, on ? "" : "secondary")
+    );
+  }
+  bar.appendChild(typeRow);
+  bar.appendChild(diffRow);
+  return bar;
+}
+
 function isMissionBoardPhase(phase) {
   return (
     phase === "mission_type" ||
@@ -2994,7 +3033,24 @@ function renderMissionBoard(state) {
       brief.className = "mission-board-brief";
       brief.textContent = copy || "Stand by for briefing.";
       host.appendChild(brief);
+    } else if (phase === "mission_type" || phase === "difficulty") {
+      for (const c of state.pendingChoices || []) {
+        const card = document.createElement("article");
+        card.className = "mission-card";
+        const parts = String(c.text || "").split("—");
+        const title = (parts.shift() || c.text || "").trim();
+        const detail = parts.join("—").trim();
+        card.innerHTML = `<h3>${escapeHtml(title)}</h3>
+          ${
+            detail
+              ? `<p class="mission-card-summary">${escapeHtml(detail)}</p>`
+              : ""
+          }`;
+        card.appendChild(starbaseButton(c.text));
+        host.appendChild(card);
+      }
     } else if (phase === "mission_offer") {
+      host.appendChild(missionBoardFilterBar(state));
       const offers = Array.isArray(state.missionOffers) ? state.missionOffers : [];
       const choices = state.pendingChoices || [];
       if (offers.length) {
@@ -3694,8 +3750,11 @@ async function sendAction(text) {
   }
 
   try {
-    const leavingDock =
-      phaseBefore === "starbase" && /choose next mission/i.test(text);
+    const compilingMissions =
+      phaseBefore === "difficulty" ||
+      (phaseBefore === "mission_type" && /expanded/i.test(text)) ||
+      (phaseBefore === "mission_offer" &&
+        (/more/i.test(text) || /^type:/i.test(text) || /^difficulty:/i.test(text)));
     setActionBusy(true, text);
     if (startingMission) {
       paintMissionBootViewscreen("Opening mission channel…");
@@ -3710,7 +3769,7 @@ async function sendAction(text) {
       phaseBefore === "difficulty" ||
       phaseBefore === "starbase";
     let view;
-    if (leavingDock) {
+    if (compilingMissions) {
       view = await withInitScreen(
         {
           title: "Incoming Communication",

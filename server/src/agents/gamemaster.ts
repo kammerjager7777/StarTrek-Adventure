@@ -34,10 +34,8 @@ import {
   fallbackMissionOffers,
   formatShipChoices,
   generateCustomShip,
-  generateDifficultyPrompt,
   generateMissionBrief,
   generateMissionOffers,
-  generateMissionTypePrompt,
   generateOpeningGreeting,
   generateShipOffers,
   generateTutorialBeat,
@@ -309,11 +307,12 @@ export async function advanceSetup(
         5: "expanded",
       };
       const choice = parseChoice(input, next.pendingChoices);
-      if (!choice || !map[choice]) {
+      const fromText = parseMissionTypeInput(input);
+      if ((!choice || !map[choice]) && !fromText) {
         next.pendingQuestion = "Select a mission type by number.";
         return next;
       }
-      next.missionType = map[choice];
+      next.missionType = (choice && map[choice] ? map[choice] : fromText)!;
       if (next.missionType === "expanded") {
         next.difficulty = "hardcore";
         next = await offerMissions(next);
@@ -338,11 +337,12 @@ export async function advanceSetup(
         4: "hardcore",
       };
       const choice = parseChoice(input, next.pendingChoices);
-      if (!choice || !map[choice]) {
+      const fromText = parseDifficultyInput(input);
+      if ((!choice || !map[choice]) && !fromText) {
         next.pendingQuestion = "Select difficulty 1–4.";
         return next;
       }
-      next.difficulty = map[choice];
+      next.difficulty = (choice && map[choice] ? map[choice] : fromText)!;
       next = await offerMissions(next);
       return logPlayerChoice(next, input, state.pendingChoices);
     }
@@ -356,6 +356,31 @@ export async function advanceSetup(
         );
       }
       if (/more/i.test(input)) {
+        next = await offerMissions(next, true);
+        return logPlayerChoice(next, input, state.pendingChoices);
+      }
+      const typeChange = input.match(
+        /^type:\s*(.+)$/i
+      );
+      if (typeChange) {
+        const nextType = parseMissionTypeInput(typeChange[1]);
+        if (!nextType) {
+          next.pendingQuestion = "Unknown assignment type.";
+          return next;
+        }
+        next.missionType = nextType;
+        if (nextType === "expanded") next.difficulty = "hardcore";
+        next = await offerMissions(next, true);
+        return logPlayerChoice(next, input, state.pendingChoices);
+      }
+      const diffChange = input.match(/^difficulty:\s*(.+)$/i);
+      if (diffChange) {
+        const nextDiff = parseDifficultyInput(diffChange[1]);
+        if (!nextDiff) {
+          next.pendingQuestion = "Unknown difficulty.";
+          return next;
+        }
+        next.difficulty = nextDiff;
         next = await offerMissions(next, true);
         return logPlayerChoice(next, input, state.pendingChoices);
       }
@@ -781,10 +806,6 @@ async function dockAtStarbase(
 export async function beginNextCampaignMission(
   state: GameState
 ): Promise<GameState> {
-  const missionType = state.missionType || "exploration";
-  const difficulty =
-    state.difficulty ||
-    (missionType === "expanded" ? "hardcore" : "medium");
   const next: GameState = {
     ...state,
     mission: null,
@@ -792,10 +813,8 @@ export async function beginNextCampaignMission(
     debrief: null,
     missionOffers: null,
     status: "active",
-    missionType,
-    difficulty,
   };
-  return offerMissions(next);
+  return goMissionType(next);
 }
 
 async function leaveStarbaseForMission(
@@ -978,28 +997,57 @@ async function goShipSelect(state: GameState): Promise<GameState> {
   };
 }
 
+const MISSION_TYPE_CHOICES = [
+  "Science — technology and problem-solving",
+  "Exploration — discovery and diplomacy",
+  "Search & Rescue — find and save those in peril",
+  "Battle — starship combat and strategy",
+  "Expanded — complex multi-skill Hardcore scenario",
+];
+
+const DIFFICULTY_CHOICES = [
+  "Easy — clearer paths, gentler consequences",
+  "Medium — standard Starfleet risk",
+  "Hard — costly mistakes",
+  "Hardcore — brutal options and traps",
+];
+
+function parseMissionTypeInput(input: string): MissionType | null {
+  const t = input.toLowerCase();
+  if (/science/.test(t)) return "science";
+  if (/search/.test(t)) return "search_rescue";
+  if (/battle|combat/.test(t)) return "battle";
+  if (/expanded|hardcore scenario/.test(t)) return "expanded";
+  if (/explor/.test(t)) return "exploration";
+  return null;
+}
+
+function parseDifficultyInput(input: string): Difficulty | null {
+  const t = input.toLowerCase();
+  if (/\beasy\b/.test(t)) return "easy";
+  if (/\bhardcore\b/.test(t)) return "hardcore";
+  if (/\bhard\b/.test(t)) return "hard";
+  if (/\bmedium\b/.test(t)) return "medium";
+  return null;
+}
+
 async function goMissionType(state: GameState): Promise<GameState> {
-  const { narration, choices } = await setupCall("mission type prompt", () =>
-    generateMissionTypePrompt(state)
-  );
   return {
     ...state,
     phase: "mission_type",
-    pendingQuestion: narration,
-    pendingChoices: numbered(choices),
+    pendingQuestion:
+      "Select an assignment type, Captain. Starfleet will then compile a matching slate.",
+    pendingChoices: numbered(MISSION_TYPE_CHOICES),
     turn: null,
   };
 }
 
 async function goDifficulty(state: GameState): Promise<GameState> {
-  const { narration, choices } = await setupCall("difficulty prompt", () =>
-    generateDifficultyPrompt(state)
-  );
   return {
     ...state,
     phase: "difficulty",
-    pendingQuestion: narration,
-    pendingChoices: numbered(choices),
+    pendingQuestion: "Select difficulty for this assignment.",
+    pendingChoices: numbered(DIFFICULTY_CHOICES),
     turn: null,
   };
 }

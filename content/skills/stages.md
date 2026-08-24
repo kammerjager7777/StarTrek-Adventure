@@ -18,7 +18,7 @@ Offer stock ships from different eras (host provides the list). Allow choosing a
 Collect: ship name, class (suggest diverse classes), then invent era-correct stardate, capabilities, and crew. Crew must match the stardate era.
 
 ## mission_type / difficulty
-Usually skipped. The hub reuses the last assignment type and difficulty (default exploration / medium). If the host is still in these phases, present numbered choices only.
+The mission board asks the captain to pick type (science, exploration, search & rescue, battle, expanded) and difficulty before compiling a slate. Expanded is hardcore. Code owns the choice lists.
 
 ## mission_offer
 **Mission board** (not the bridge, not the starbase yard). Invent 3 missions matching type + difficulty + universe standing. Player may request more, pick one, or **Return to starbase**.
