@@ -149,6 +149,8 @@ const els = {
   missionBoardCopy: document.getElementById("mission-board-copy"),
   missionBoardList: document.getElementById("mission-board-list"),
   missionBoardActions: document.getElementById("mission-board-actions"),
+  hubWaiting: document.getElementById("hub-waiting"),
+  hubWaitingDetail: document.getElementById("hub-waiting-detail"),
   btnVoice: document.getElementById("btn-voice"),
   btnVoiceMenu: document.getElementById("btn-voice-menu"),
   voiceMenu: document.getElementById("voice-menu"),
@@ -2910,6 +2912,41 @@ function renderLogStaticCurrent(state, options) {
   scrollLogToTop();
 }
 
+function showMissionBoardLoading(state) {
+  document.body.classList.remove("starbase-active");
+  document.body.classList.add("mission-board-active");
+  if (els.starbaseOverlay) els.starbaseOverlay.classList.add("hidden");
+  if (els.missionBoardOverlay) els.missionBoardOverlay.classList.remove("hidden");
+  if (els.missionBoardTitle) els.missionBoardTitle.textContent = "Mission board";
+  if (els.missionBoardMeta) {
+    const ship = state?.ship;
+    els.missionBoardMeta.textContent = ship
+      ? `${ship.name} ${ship.registryNumber || ""}`.trim()
+      : "Stand by";
+  }
+  if (els.missionBoardCopy) {
+    els.missionBoardCopy.textContent =
+      "Starfleet Command is compiling assignments…";
+    els.missionBoardCopy.classList.remove("hidden");
+  }
+  if (els.missionBoardList) {
+    els.missionBoardList.innerHTML =
+      `<p class="starbase-empty">Stand by for the assignment list.</p>`;
+  }
+  if (els.missionBoardActions) {
+    els.missionBoardActions.innerHTML = "";
+    els.missionBoardActions.appendChild(
+      starbaseButton("Return to starbase", "secondary")
+    );
+  }
+  document.body.classList.add("starbase-waiting");
+  if (els.hubWaiting) els.hubWaiting.classList.remove("hidden");
+  if (els.hubWaitingDetail) {
+    els.hubWaitingDetail.textContent =
+      "Starfleet Command is compiling assignments…";
+  }
+}
+
 function isMissionBoardPhase(phase) {
   return (
     phase === "mission_type" ||
@@ -3351,9 +3388,22 @@ function setActionBusy(busy, detail = "") {
       btn.disabled = hideOpts;
     });
   }
+  const onHub =
+    document.body.classList.contains("starbase-active") ||
+    document.body.classList.contains("mission-board-active");
   if (els.waitingBanner) {
-    // Mission boot uses the viewscreen poster; skip the small waiting banner
-    els.waitingBanner.classList.toggle("hidden", !busy || missionBoot.active);
+    // Mission boot uses the viewscreen poster; hub uses the full-screen stand-by
+    els.waitingBanner.classList.toggle(
+      "hidden",
+      !busy || missionBoot.active || onHub
+    );
+  }
+  if (els.hubWaiting) {
+    els.hubWaiting.classList.toggle("hidden", !busy || missionBoot.active || !onHub);
+  }
+  if (els.hubWaitingDetail && busy && onHub) {
+    els.hubWaitingDetail.textContent =
+      detail || "Starfleet Command is compiling assignments…";
   }
   if (els.waitingDetail) {
     if (busy && !missionBoot.active) {
@@ -3608,11 +3658,20 @@ async function sendAction(text) {
   }
 
   try {
-    setActionBusy(true, text);
+    setActionBusy(
+      true,
+      /choose next mission/i.test(text)
+        ? "Starfleet Command is compiling assignments…"
+        : text
+    );
     if (startingMission) {
       paintMissionBootViewscreen("Opening mission channel…");
     }
-    // Client abort: ship generation is the slow path; still never wait forever
+    const leavingDock =
+      phaseBefore === "starbase" && /choose next mission/i.test(text);
+    if (leavingDock) {
+      showMissionBoardLoading(current.state);
+    }
     const heavySetup =
       phaseBefore === "tutorial_offer" ||
       phaseBefore === "tutorial" ||
@@ -3620,7 +3679,8 @@ async function sendAction(text) {
       phaseBefore === "ship_custom" ||
       phaseBefore === "mission_offer" ||
       phaseBefore === "mission_type" ||
-      phaseBefore === "difficulty";
+      phaseBefore === "difficulty" ||
+      phaseBefore === "starbase";
     let view = await api(`/games/${runId}/action`, {
       method: "POST",
       body: JSON.stringify({ text }),
@@ -3698,6 +3758,10 @@ async function sendAction(text) {
       showSoftError(reason, detail);
     }
     console.warn("Action failed:", reason, detail || err);
+    if (current?.state) {
+      renderStarbaseScreen(current.state);
+      renderMissionBoard(current.state);
+    }
   } finally {
     if (seq === actionSeq) {
       setActionBusy(false);

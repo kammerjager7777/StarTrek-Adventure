@@ -31,6 +31,7 @@ import {
   type MechanicalResults,
 } from "./llmGamemaster.js";
 import {
+  fallbackMissionOffers,
   formatShipChoices,
   generateCustomShip,
   generateDifficultyPrompt,
@@ -1007,9 +1008,21 @@ async function offerMissions(
   state: GameState,
   reshuffle = false
 ): Promise<GameState> {
-  const { narration, offers } = await setupCall("mission offers", () =>
-    generateMissionOffers(state, reshuffle)
-  );
+  let narration = "";
+  let offers: SetupMissionOffer[] = [];
+  try {
+    const generated = await setupCall("mission offers", () =>
+      generateMissionOffers(state, reshuffle)
+    );
+    narration = generated.narration;
+    offers = generated.offers;
+  } catch {
+    offers = fallbackMissionOffers(state);
+    narration =
+      "Starfleet has posted standing assignments while a full briefing packet is compiled.\n\n" +
+      offers.map((o, i) => `${i + 1}. ${o.title}\n   ${o.summary}`).join("\n\n") +
+      `\n\nSelect 1–3, or type "more" for different missions.`;
+  }
   return {
     ...state,
     phase: "mission_offer",

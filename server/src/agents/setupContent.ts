@@ -696,7 +696,8 @@ Return {
 }
 Exactly 3 missions. Stakes scale with difficulty. Expanded type should be multi-faceted crises.
 Honor current faction standing and galactic flags in locations and antagonists.`,
-    }
+    },
+    { timeoutMs: 22_000, maxTokens: 1800, maxAttempts: 1 }
   );
 
   const narration = String(obj.narration || "").trim();
@@ -727,6 +728,152 @@ Honor current faction standing and galactic flags in locations and antagonists.`
     };
   }
   return { narration, offers };
+}
+
+/** Always-available slate if the narrator cannot compile assignments. */
+export function fallbackMissionOffers(
+  state: GameState,
+  type: MissionType = state.missionType || "exploration"
+): SetupMissionOffer[] {
+  const loc = state.ship?.stardate ? "nearby space" : "unexplored space";
+  const templates: Record<MissionType, Array<Omit<SetupMissionOffer, "id" | "type">>> = {
+    science: [
+      {
+        title: "Anomalous Sensor Ghost",
+        summary: "A subspace echo is scrambling long-range scans. Map it without losing the ship.",
+        location: "Uncharted nebula",
+        background: "Starfleet Science requests a controlled survey of a drifting sensor ghost.",
+        main: "Identify the source of the sensor ghost and file a complete survey",
+        secondaries: ["Protect the sensor array", "Avoid triggering a cascade"],
+      },
+      {
+        title: "Silent Probe",
+        summary: "A Federation probe has gone mute. Recover its data core.",
+        location: "Outer system debris",
+        background: "A science probe ceased telemetry after a radiation burst.",
+        main: "Recover the probe's data core intact",
+        secondaries: ["Diagnose the radiation source", "Keep the away team safe"],
+      },
+      {
+        title: "Temporal Jitter",
+        summary: "Clocks on a research outpost are skipping. Determine why.",
+        location: "Research outpost K-12",
+        background: "The outpost reports micro-skips in local timekeeping.",
+        main: "Stabilize the outpost chronometers and report the cause",
+        secondaries: ["Evacuate civilians if needed", "Preserve research logs"],
+      },
+    ],
+    exploration: [
+      {
+        title: "Uncharted Approach",
+        summary: "A new system lies off the standard lanes. Make first contact with caution.",
+        location: loc,
+        background: "Starfleet has authorized a first look at an unlisted system.",
+        main: "Survey the system and establish peaceful contact if life is present",
+        secondaries: ["Chart navigational hazards", "Uphold the Prime Directive"],
+      },
+      {
+        title: "The Quiet World",
+        summary: "A garden world shows ruins but no life signs. Learn what happened.",
+        location: "Unlisted M-class world",
+        background: "Long-range scans found cities without biosigns.",
+        main: "Determine the fate of the world's people",
+        secondaries: ["Do not disturb burial sites", "Return with a full planetary survey"],
+      },
+      {
+        title: "Convoy Escort",
+        summary: "A civilian convoy needs an escort through contested space.",
+        location: "Trade corridor",
+        background: "Merchants requested Starfleet protection after raider sightings.",
+        main: "See the convoy safely to the next starbase",
+        secondaries: ["Avoid open war if possible", "Aid any stricken vessel"],
+      },
+    ],
+    search_rescue: [
+      {
+        title: "Missing Courier",
+        summary: "A Starfleet courier vanished on a routine run. Find the crew.",
+        location: "Along the last known heading",
+        background: "The courier's last ping was a truncated distress call.",
+        main: "Locate the courier and recover her crew",
+        secondaries: ["Preserve the diplomatic pouch", "Treat the injured"],
+      },
+      {
+        title: "Station Blackout",
+        summary: "A listening post has gone dark. Restore contact or evacuate survivors.",
+        location: "Border listening post",
+        background: "No reply for two duty shifts.",
+        main: "Restore the post or extract survivors",
+        secondaries: ["Secure classified logs", "Identify what silenced the station"],
+      },
+      {
+        title: "Lifeboat Drift",
+        summary: "Escape pods are tumbling near a gravity well. Get them aboard.",
+        location: "Gravity well approach",
+        background: "Automated beacons mark three pods on decaying orbits.",
+        main: "Recover all pods before they are lost",
+        secondaries: ["Keep the ship off the gravity well", "Triage survivors"],
+      },
+    ],
+    battle: [
+      {
+        title: "Raider Screen",
+        summary: "Pirates are hitting a colony's orbital approaches. Drive them off.",
+        location: "Colony orbital lanes",
+        background: "The colony governor requested immediate protection.",
+        main: "Defeat or drive off the raiders",
+        secondaries: ["Protect civilian traffic", "Minimize hull damage"],
+      },
+      {
+        title: "Border Skirmish",
+        summary: "An unidentified warship is testing the border. Hold the line.",
+        location: "Treaty border",
+        background: "Sensors show a warship on a probing course.",
+        main: "Prevent a border violation without starting a war",
+        secondaries: ["Identify the aggressor", "Keep shields up"],
+      },
+      {
+        title: "Convoy Ambush",
+        summary: "A supply convoy is under fire. Intervene.",
+        location: "Supply route",
+        background: "Distress calls report coordinated attacks.",
+        main: "Relieve the convoy and neutralize the ambush",
+        secondaries: ["Save the freighters", "Capture a raider if possible"],
+      },
+    ],
+    expanded: [
+      {
+        title: "The Cascading Crisis",
+        summary: "A colony, a damaged ally, and a hostile ship all demand attention.",
+        location: "Disputed sector",
+        background: "Multiple Starfleet priorities have collided in one sector.",
+        main: "Resolve the primary crisis without abandoning the others",
+        secondaries: ["Protect civilians", "Preserve the alliance", "Survive the hostile"],
+      },
+      {
+        title: "Shadow of the Cube",
+        summary: "Borg transponder chatter on the edge of known space.",
+        location: "Fringe of explored space",
+        background: "A fragmented Borg signature has Starfleet on edge.",
+        main: "Investigate the signature and prevent assimilation of local traffic",
+        secondaries: ["Warn nearby ships", "Do not lose the vessel"],
+      },
+      {
+        title: "Broken Treaty",
+        summary: "A treaty world is under pressure from two powers at once.",
+        location: "Treaty world",
+        background: "Diplomacy and force are both on the table.",
+        main: "Keep the treaty world from falling into open war",
+        secondaries: ["Evacuate noncombatants if talks fail", "Avoid a massacre"],
+      },
+    ],
+  };
+  const list = templates[type] || templates.exploration;
+  return list.map((m) => ({
+    ...m,
+    id: randomUUID(),
+    type,
+  }));
 }
 
 export function missionFromOffer(
