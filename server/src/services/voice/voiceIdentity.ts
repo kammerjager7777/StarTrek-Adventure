@@ -10,6 +10,11 @@ import type {
   VoiceEmotion,
   VoiceIdentity,
 } from "../../../../packages/game-core/src/index.js";
+import {
+  inferCrewGender,
+  sexFieldIsBlank,
+  type CrewGender,
+} from "../../../../packages/game-core/src/index.js";
 
 /** Bump to force re-lock of stored voices (e.g. after diversity / delivery fix). */
 export const VOICE_PROFILE_VERSION = 3;
@@ -83,14 +88,10 @@ function pickVoice(key: VoiceKey): { voiceId: string; voiceName: string; feel: s
   return { voiceId: v.id, voiceName: v.name, feel: v.feel };
 }
 
-function isFeminine(sex?: string): boolean {
-  const s = (sex || "").toLowerCase();
-  return s === "female" || s === "f" || s === "woman";
-}
-
-function isMasculine(sex?: string): boolean {
-  const s = (sex || "").toLowerCase();
-  return s === "male" || s === "m" || s === "man";
+function catalogGender(voiceId: string): CrewGender {
+  const hit = Object.values(VOICES).find((v) => v.id === voiceId);
+  if (hit?.gender === "female" || hit?.gender === "male") return hit.gender;
+  return "any";
 }
 
 function hashString(s: string): number {
@@ -259,15 +260,15 @@ function roleVoiceHints(role: string): {
   };
 }
 
-function genderPool(sex?: string): VoiceKey[] {
-  if (isFeminine(sex)) return [...FEMALE_POOL];
-  if (isMasculine(sex)) return [...MALE_POOL];
+function genderPool(gender: CrewGender): VoiceKey[] {
+  if (gender === "female") return [...FEMALE_POOL];
+  if (gender === "male") return [...MALE_POOL];
   return [...FEMALE_POOL, ...MALE_POOL];
 }
 
 /**
  * Pick a unique voice key: prefer role/species matches, never narrator's voice,
- * stay in gender pool when possible, avoid already-used ids on this ship.
+ * stay in gender pool when gender is known, avoid already-used ids on this ship.
  */
 function selectVoiceKey(
   member: { name: string; role?: string; species?: string; sex?: string },
@@ -276,7 +277,8 @@ function selectVoiceKey(
 ): VoiceKey {
   const species = speciesVoiceHints(member.species);
   const role = roleVoiceHints(member.role || "Bridge Officer");
-  const pool = genderPool(member.sex);
+  const gender = inferCrewGender(member);
+  const pool = genderPool(gender);
   const reserved = new Set([narratorVoiceId, VOICES[NARRATOR_VOICE].id]);
 
   // Prefer role/species matches that also match gender
@@ -289,10 +291,13 @@ function selectVoiceKey(
     (k) => !reserved.has(VOICES[k].id)
   );
 
-  // Last resort if a full bridge exhausted one gender: other voices except narrator
-  const overflow = [...MALE_POOL, ...FEMALE_POOL].filter(
-    (k) => !reserved.has(VOICES[k].id) && !genderCandidates.includes(k)
-  );
+  // Only overflow to the other gender when presentation is unknown
+  const overflow =
+    gender === "any"
+      ? [...MALE_POOL, ...FEMALE_POOL].filter(
+          (k) => !reserved.has(VOICES[k].id) && !genderCandidates.includes(k)
+        )
+      : [];
 
   const tiers = [genderCandidates, overflow];
   const seed = hashString(`${member.name}|${member.role}|${member.species}`);
@@ -312,6 +317,7 @@ function selectVoiceKey(
 
 function needsVoiceRebuild(
   voice: VoiceIdentity | undefined,
+  member: CrewMember,
   narratorVoiceId: string,
   usedVoiceIds: Set<string>
 ): boolean {
@@ -324,6 +330,9 @@ function needsVoiceRebuild(
     return true;
   }
   if (usedVoiceIds.has(voice.voiceId)) return true;
+  const gender = inferCrewGender(member);
+  const vg = catalogGender(voice.voiceId);
+  if (gender !== "any" && vg !== "any" && gender !== vg) return true;
   return false;
 }
 
@@ -345,6 +354,10 @@ export function buildCrewVoiceIdentity(
   const role = roleVoiceHints(member.role || "Bridge Officer");
   const personality = member.personality || "Dedicated Starfleet officer";
   const bio = member.bio || `${member.name} serves as ${member.role}.`;
+  const genderTag =
+    inferCrewGender(member) === "any"
+      ? member.sex || "unspecified"
+      : inferCrewGender(member);
 
   const voicePrompt = [
     `VOICE LOCK for ${member.name}, ${member.role} (${member.species || "Humanoid"}).`,
@@ -369,7 +382,7 @@ export function buildCrewVoiceIdentity(
     tags: [
       member.role,
       member.species || "Human",
-      member.sex || "unspecified",
+      genderTag,
       voice.voiceId,
       `v${VOICE_PROFILE_VERSION}`,
     ].filter(Boolean),
@@ -406,7 +419,8 @@ export function buildNarratorVoiceIdentity(): VoiceIdentity {
 
 /**
  * Ensure every crew member has a distinct locked voice (≠ narrator).
- * Re-locks when profile version is stale or collisions exist.
+ * Re-locks when profile version is stale, collisions exist, or the
+ * locked voice does not match the officer's inferred gender.
  */
 export function ensureCrewVoices(
   crew: CrewMember[],
@@ -415,16 +429,19 @@ export function ensureCrewVoices(
   const narratorId = narratorVoiceId || VOICES[NARRATOR_VOICE].id;
   const used = new Set<string>([narratorId]);
   return crew.map((c) => {
-    if (!needsVoiceRebuild(c.voice, narratorId, used)) {
-      used.add(c.voice!.voiceId);
-      return c;
+    const inferred = inferCrewGender(c);
+    const withSex =
+      inferred !== "any" && sexFieldIsBlank(c.sex) ? { ...c, sex: inferred } : c;
+    if (!needsVoiceRebuild(withSex.voice, withSex, narratorId, used)) {
+      used.add(withSex.voice!.voiceId);
+      return withSex;
     }
-    const voice = buildCrewVoiceIdentity(c, {
+    const voice = buildCrewVoiceIdentity(withSex, {
       usedVoiceIds: used,
       narratorVoiceId: narratorId,
     });
     used.add(voice.voiceId);
-    return { ...c, voice };
+    return { ...withSex, voice };
   });
 }
 

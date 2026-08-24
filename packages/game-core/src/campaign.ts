@@ -629,30 +629,28 @@ export function appendCampaignLog(
 
 // ── Starbase refit / recruitment (pure) ─────────────────────────────
 
-const FIRST_NAMES = [
+const FEMALE_FIRST_NAMES = [
   "Aria",
-  "Brennan",
-  "Chen",
-  "Dax",
-  "Ellis",
   "Farah",
-  "Garek",
-  "Hale",
   "Imani",
-  "Joran",
   "Kira",
   "Lira",
-  "Marek",
   "Nomi",
-  "Orin",
-  "Pavel",
-  "Quinn",
-  "Renn",
-  "Soran",
   "Talia",
-  "Voss",
   "Wren",
 ];
+const MALE_FIRST_NAMES = [
+  "Brennan",
+  "Garek",
+  "Joran",
+  "Marek",
+  "Orin",
+  "Pavel",
+  "Renn",
+  "Soran",
+  "Voss",
+];
+const UNISEX_FIRST_NAMES = ["Chen", "Dax", "Ellis", "Hale", "Quinn"];
 const SURNAMES = [
   "Voss",
   "Okoye",
@@ -846,7 +844,20 @@ export function generateRecruitCandidate(
   const quality =
     opts?.quality ||
     rollRecruitQuality(typeof opts?.fedRep === "number" ? opts.fedRep : 0, rng);
-  const name = `${pick(FIRST_NAMES, rng)} ${pick(SURNAMES, rng)}`;
+  const roll = rng();
+  let sex: "female" | "male";
+  let first: string;
+  if (roll < 0.46) {
+    sex = "female";
+    first = pick(FEMALE_FIRST_NAMES, rng);
+  } else if (roll < 0.92) {
+    sex = "male";
+    first = pick(MALE_FIRST_NAMES, rng);
+  } else {
+    sex = rng() < 0.5 ? "female" : "male";
+    first = pick(UNISEX_FIRST_NAMES, rng);
+  }
+  const name = `${first} ${pick(SURNAMES, rng)}`;
   const species = pick(SPECIES, rng);
   const skills = baselineSkillsForRole(role);
   const bias = QUALITY_SKILL_BIAS[quality];
@@ -901,6 +912,7 @@ export function generateRecruitCandidate(
       rank,
       quality,
       species,
+      sex,
       personality: `${species} ${QUALITY_LABEL[quality]} — ${flavor}`,
       bio: `Starfleet ${QUALITY_LABEL[quality]} transfer. Specialty: ${role}. Prior missions: ${missionsPrior}.`,
       skills,

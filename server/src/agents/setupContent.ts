@@ -16,8 +16,10 @@ import type {
 } from "../../../packages/game-core/src/index.js";
 import {
   DEFAULT_SYSTEMS,
+  inferCrewGender,
   normalizeRegistryNumber,
   sanitizeBridgeCrew,
+  sexFieldIsBlank,
 } from "../../../packages/game-core/src/index.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { ensureCrewVoices } from "../services/voice/voiceIdentity.js";
@@ -291,14 +293,15 @@ Return compact JSON only:
     "capabilities": ["…","…","…"],
     "shipVisualPrompt": "short exterior image lock, no text",
     "crew": [
-      {"name":"…","role":"First Officer","species":"…","personality":"short"},
-      {"name":"…","role":"…","species":"…","personality":"short"},
-      {"name":"…","role":"…","species":"…","personality":"short"},
-      {"name":"…","role":"…","species":"…","personality":"short"}
+      {"name":"…","role":"First Officer","species":"…","sex":"female|male","personality":"short"},
+      {"name":"…","role":"…","species":"…","sex":"female|male","personality":"short"},
+      {"name":"…","role":"…","species":"…","sex":"female|male","personality":"short"},
+      {"name":"…","role":"…","species":"…","sex":"female|male","personality":"short"}
     ]
   }]
 }
 Rules: exactly 4 ships; exactly 4 crew each; unique registryNumbers; no imagePrompt/bio/height fields; keep JSON under ~6k characters.
+Each crew sex MUST be "female" or "male" and MUST match the name (T'Lara/Lwaxana/Hoshi = female; Hiroshi/Malcolm/Sarek = male).
 The PLAYER is the ship's Captain — never generate a crew member with role Captain, CO, or Commanding Officer. Start with First Officer / XO, then typical bridge posts (tactical, science, helm, engineering, medical, ops). Do not put rank in the name field.`,
     },
     { timeoutMs: 90_000, maxTokens: 3500, maxAttempts: 2 }
@@ -338,11 +341,17 @@ The PLAYER is the ship's Captain — never generate a crew member with role Capt
         const personality = m.personality
           ? String(m.personality)
           : "Dedicated Starfleet officer";
+        const sexRaw = m.sex ? String(m.sex) : undefined;
+        const inferred = inferCrewGender({ name, sex: sexRaw, personality });
         return {
           name,
           role,
           species,
-          sex: m.sex ? String(m.sex) : undefined,
+          sex: !sexFieldIsBlank(sexRaw)
+            ? sexRaw
+            : inferred !== "any"
+              ? inferred
+              : undefined,
           personality,
           bio: m.bio
             ? String(m.bio)
@@ -392,12 +401,22 @@ export function shipOfferToShip(offer: SetupShipOffer): Ship {
   ]).map((c) => {
     const personality = c.personality || "Dedicated Starfleet officer";
     const bio = c.bio || `${c.name} serves as ${c.role}.`;
+    const inferred = inferCrewGender({
+      name: c.name,
+      sex: c.sex,
+      personality,
+      bio,
+    });
     return {
       id: randomUUID(),
       name: c.name,
       role: c.role,
       species: c.species,
-      sex: c.sex,
+      sex: !sexFieldIsBlank(c.sex)
+        ? c.sex
+        : inferred !== "any"
+          ? inferred
+          : c.sex,
       height: c.height,
       skinTone: c.skinTone,
       hair: c.hair,
@@ -516,7 +535,12 @@ The PLAYER is the Captain — do NOT include a Captain/CO on the roster. Use XO 
             name,
             role: String(m.role || "Bridge Officer"),
             species: String(m.species || "Human"),
-            sex: m.sex ? String(m.sex) : undefined,
+            sex: (() => {
+              const sexRaw = m.sex ? String(m.sex) : undefined;
+              const inferred = inferCrewGender({ name, sex: sexRaw });
+              if (!sexFieldIsBlank(sexRaw)) return sexRaw;
+              return inferred !== "any" ? inferred : undefined;
+            })(),
             height: m.height ? String(m.height) : undefined,
             skinTone: m.skinTone ? String(m.skinTone) : undefined,
             hair: m.hair ? String(m.hair) : undefined,

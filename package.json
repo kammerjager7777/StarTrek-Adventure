@@ -14,7 +14,8 @@
     "test:shields": "tsx scripts/smoke-shield-leak.mts",
     "test:skills": "tsx scripts/smoke-skills.mts",
     "test:universe": "tsx scripts/smoke-universe.mts",
-    "test:advice": "tsx scripts/smoke-advice.mts"
+    "test:advice": "tsx scripts/smoke-advice.mts",
+    "test:voices": "tsx scripts/smoke-voice-gender.mts"
   },
   "engines": {
     "node": ">=20"
