@@ -16,6 +16,7 @@ Each ship needs:
 - name, **registryNumber** (e.g. NCC-#### / NX-##), class, era, stardate
 - description, capabilities[]
 - 4 bridge crew with: name, role, species, sex, height, skinTone, hair, eyes, build, clothing, scarsMarks, personality
+- The **player is the Captain** — never include a Captain / CO / Commanding Officer on the roster (XO + department heads only; no rank in the name)
 - Keep payloads lean when the host requests slim mode (omit huge bio/image fields if instructed)
 - shipVisualPrompt for exterior consistency when requested
 

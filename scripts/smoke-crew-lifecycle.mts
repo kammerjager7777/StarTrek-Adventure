@@ -9,6 +9,9 @@ import {
   computeShipSkills,
   hireRecruit,
   initStarbaseSession,
+  isCommandingCaptainRole,
+  sanitizeBridgeCrew,
+  stripOfficerRankPrefix,
   tickCrewService,
 } from "../packages/game-core/src/campaign.ts";
 import type { GameState, Ship } from "../packages/game-core/src/types.ts";
@@ -240,6 +243,31 @@ assert(
     typeof hire.hired.skills.tactical === "number" &&
     typeof hire.hired.serviceTurns === "number",
   "hired officer has baseline skills and service clock"
+);
+
+assert(isCommandingCaptainRole("Captain"), "Captain is the player seat");
+assert(isCommandingCaptainRole("Commanding Officer"), "CO is the player seat");
+assert(!isCommandingCaptainRole("First Officer"), "XO is not the player seat");
+assert(
+  stripOfficerRankPrefix("Captain Hiroshi Tan") === "Hiroshi Tan",
+  "strip Captain from NPC names"
+);
+const demoted = sanitizeBridgeCrew([
+  {
+    id: "cap",
+    name: "Captain Hiroshi Tan",
+    role: "Captain",
+    status: "active",
+  },
+  { id: "tac", name: "Vethar", role: "Tactical", status: "active" },
+]);
+assert(
+  demoted[0].role === "First Officer" && demoted[0].name === "Hiroshi Tan",
+  "NPC captain becomes First Officer without rank in name"
+);
+assert(
+  !demoted.some((c) => isCommandingCaptainRole(c.role)),
+  "sanitized roster has no commanding captain"
 );
 
 if (failed) {

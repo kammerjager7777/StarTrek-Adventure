@@ -775,7 +775,7 @@ function render(view, opts = {}) {
   ].join("\n");
 
   renderShip(s.ship);
-  renderCrew(s.ship);
+  renderCrew(s.ship, s.playerName);
   renderObjectives(s.mission, s);
   renderMeta(view.metaCommands, s.phase);
   // Options appear after typewriter finishes (unless no narration)
@@ -1683,14 +1683,51 @@ function crewNeedsPortrait(c) {
   return !c.imageUrl && c.portraitStatus !== "ready";
 }
 
-function renderCrew(ship) {
-  if (!ship?.crew?.length) {
+function isCommandingCaptainRole(role) {
+  const r = String(role || "").trim().toLowerCase();
+  if (!r) return false;
+  if (/engineer|security|of\s/.test(r)) return false;
+  return /^(the\s+)?(captain|co|c\.o\.|commanding officer|commanding|cmdg\.?\s*officer)$/i.test(
+    r
+  );
+}
+
+function stripOfficerRankPrefix(name) {
+  return String(name || "")
+    .replace(
+      /^(captain|cmdr\.?|commander|lt\.?\s*cmdr\.?|lt\.?\s*j\.g\.?|lieutenant|ensign|ens\.?)\s+/i,
+      ""
+    )
+    .trim();
+}
+
+function displayBridgeCrew(crew) {
+  const list = (crew || []).map((c) => ({
+    ...c,
+    name: stripOfficerRankPrefix(c.name) || c.name,
+  }));
+  let hasXo = list.some((c) =>
+    /first officer|\bxo\b|executive/i.test(String(c.role || ""))
+  );
+  return list.map((c) => {
+    if (!isCommandingCaptainRole(c.role || "")) return c;
+    if (!hasXo) {
+      hasXo = true;
+      return { ...c, role: "First Officer" };
+    }
+    return { ...c, role: "Command Officer" };
+  });
+}
+
+function renderCrew(ship, playerName = "") {
+  if (!ship?.crew?.length && !playerName) {
     els.crew.className = "panel-body crew-panel muted";
     els.crew.textContent = "—";
     return;
   }
 
-  const pendingCount = ship.crew.filter(crewNeedsPortrait).length;
+  const officers = displayBridgeCrew(ship?.crew || []);
+  const pendingCount = officers.filter(crewNeedsPortrait).length;
   const showGenerating = portraitsGenerating && pendingCount > 0;
 
   els.crew.className = "panel-body crew-panel";
@@ -1701,7 +1738,21 @@ function renderCrew(ship) {
           <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
         </div>`
       : "") +
-    ship.crew
+    (playerName
+      ? `<article class="crew-tab crew-tab-player">
+        <div class="crew-card-face crew-card-player-face">
+          <div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
+            crewInitials(playerName)
+          )}</div>
+          <div class="crew-card-gradient"></div>
+          <div class="crew-card-overlay">
+            <div class="crew-tab-name">${escapeHtml(playerName)}</div>
+            <div class="crew-tab-role">Captain (you)</div>
+          </div>
+        </div>
+      </article>`
+      : "") +
+    officers
       .map((c) => {
         const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
         const needsImg = crewNeedsPortrait(c);
@@ -1779,8 +1830,8 @@ function renderCrew(ship) {
       })
       .join("");
 
-  bindCrewCardExpandHandlers(ship.crew);
-  bindCrewAdviceButtons(ship.crew);
+  bindCrewCardExpandHandlers(officers);
+  bindCrewAdviceButtons(officers);
   // Image crew once a ship is assigned (ship select init, mission boot, or playing)
   if (current?.state?.ship?.crew?.length) {
     maybeRequestPortraits();
@@ -2101,12 +2152,14 @@ async function initializeCrewAfterShipSelect(view) {
 
 /** Render crew UI without kicking another portrait request */
 function renderCrewWithoutPortraitKick(ship) {
-  if (!ship?.crew?.length) {
+  const playerName = current?.state?.playerName || "";
+  const officers = displayBridgeCrew(ship?.crew || []);
+  if (!officers.length && !playerName) {
     els.crew.className = "panel-body crew-panel muted";
     els.crew.textContent = "—";
     return;
   }
-  const pendingCount = ship.crew.filter(crewNeedsPortrait).length;
+  const pendingCount = officers.filter(crewNeedsPortrait).length;
   const showGenerating = portraitsGenerating && pendingCount > 0;
   els.crew.className = "panel-body crew-panel";
   els.crew.innerHTML =
@@ -2116,7 +2169,21 @@ function renderCrewWithoutPortraitKick(ship) {
           <span>Imaging crew… <span class="crew-imaging-count">${pendingCount} remaining</span></span>
         </div>`
       : "") +
-    ship.crew
+    (playerName
+      ? `<article class="crew-tab crew-tab-player">
+        <div class="crew-card-face crew-card-player-face">
+          <div class="crew-fill-photo placeholder" aria-hidden="true">${escapeHtml(
+            crewInitials(playerName)
+          )}</div>
+          <div class="crew-card-gradient"></div>
+          <div class="crew-card-overlay">
+            <div class="crew-tab-name">${escapeHtml(playerName)}</div>
+            <div class="crew-tab-role">Captain (you)</div>
+          </div>
+        </div>
+      </article>`
+      : "") +
+    officers
       .map((c) => {
         const loyalty = typeof c.loyalty === "number" ? c.loyalty : 50;
         const needsImg = crewNeedsPortrait(c);
@@ -2176,7 +2243,8 @@ function renderCrewWithoutPortraitKick(ship) {
       </article>`;
       })
       .join("");
-  bindCrewCardExpandHandlers(ship.crew);
+  bindCrewCardExpandHandlers(officers);
+  bindCrewAdviceButtons(officers);
 }
 
 /** True when the player is accepting the mission brief to begin play */
@@ -2268,7 +2336,7 @@ function holdOpeningForMissionBoot(view) {
   const s = view.state;
   updatePhaseBadge(s);
   renderShip(s.ship);
-  renderCrew(s.ship); // kicks portrait gen now that boot is active
+  renderCrew(s.ship, s.playerName); // kicks portrait gen now that boot is active
   renderObjectives(s.mission, s);
   renderMeta(view.metaCommands, s.phase);
   renderOptions([]);

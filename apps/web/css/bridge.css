@@ -685,6 +685,19 @@ body.init-active .shell {
   min-width: 0;
 }
 
+.crew-tab-player .crew-card-player-face {
+  background: linear-gradient(160deg, #1e293b 0%, #0f172a 70%);
+}
+.crew-tab-player .crew-tab-role {
+  color: var(--lcars-peach);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.crew-tab-player .crew-fill-photo.placeholder {
+  background: #1e3a4c;
+  color: #7dd3fc;
+}
+
 .crew-tab-name {
   font-weight: 800;
   font-size: 0.84rem;

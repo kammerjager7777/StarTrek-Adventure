@@ -17,6 +17,7 @@ import type {
 import {
   DEFAULT_SYSTEMS,
   normalizeRegistryNumber,
+  sanitizeBridgeCrew,
 } from "../../../packages/game-core/src/index.js";
 import { logError, logLlm } from "../debug/sessionDebugLog.js";
 import { ensureCrewVoices } from "../services/voice/voiceIdentity.js";
@@ -290,14 +291,15 @@ Return compact JSON only:
     "capabilities": ["…","…","…"],
     "shipVisualPrompt": "short exterior image lock, no text",
     "crew": [
-      {"name":"…","role":"Captain or XO","species":"…","personality":"short"},
+      {"name":"…","role":"First Officer","species":"…","personality":"short"},
       {"name":"…","role":"…","species":"…","personality":"short"},
       {"name":"…","role":"…","species":"…","personality":"short"},
       {"name":"…","role":"…","species":"…","personality":"short"}
     ]
   }]
 }
-Rules: exactly 4 ships; exactly 4 crew each; unique registryNumbers; no imagePrompt/bio/height fields; keep JSON under ~6k characters.`,
+Rules: exactly 4 ships; exactly 4 crew each; unique registryNumbers; no imagePrompt/bio/height fields; keep JSON under ~6k characters.
+The PLAYER is the ship's Captain — never generate a crew member with role Captain, CO, or Commanding Officer. Start with First Officer / XO, then typical bridge posts (tactical, science, helm, engineering, medical, ops). Do not put rank in the name field.`,
     },
     { timeoutMs: 90_000, maxTokens: 3500, maxAttempts: 2 }
   );
@@ -417,7 +419,7 @@ export function shipOfferToShip(offer: SetupShipOffer): Ship {
   });
 
   // Assign distinct locked voices (never the Narrator voice)
-  const crewed = ensureCrewVoices(crew);
+  const crewed = ensureCrewVoices(sanitizeBridgeCrew(crew));
 
   const registryNumber = normalizeRegistryNumber(
     offer.registryNumber,
@@ -481,7 +483,8 @@ Return {
   crew: [4-6 officers with name, role, species, sex, height, skinTone, hair, eyes, build, clothing, scarsMarks, personality, bio, imagePrompt]
 }
 registryNumber is required (e.g. "NCC-74205") — era-appropriate unique Starfleet hull number.
-Era/stardate should match the class era. Crew must fit that stardate period.`,
+Era/stardate should match the class era. Crew must fit that stardate period.
+The PLAYER is the Captain — do NOT include a Captain/CO on the roster. Use XO plus department heads. Names without rank prefixes.`,
     }
   );
 

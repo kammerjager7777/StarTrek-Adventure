@@ -1094,12 +1094,15 @@ async function ensureCampaignAttached(state: GameState): Promise<GameState> {
     computeShipSkills,
     emptyUniverse,
     normalizeCrewMember,
+    sanitizeBridgeCrew,
     stardateForEra,
   } = await import("../../../packages/game-core/src/index.js");
   const { normalizeShip } = await import("../../../packages/game-core/src/index.js");
   let ship = normalizeShip(state.ship);
   const stardate = ship.stardate || stardateForEra(ship.era);
-  const crew = (ship.crew || []).map((c) => normalizeCrewMember(c, stardate));
+  const crew = sanitizeBridgeCrew(ship.crew || []).map((c) =>
+    normalizeCrewMember(c, stardate)
+  );
   const skills = computeShipSkills({ ...ship, crew }, crew);
   ship = { ...ship, crew, skills, stardate };
 

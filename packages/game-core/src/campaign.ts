@@ -156,6 +156,48 @@ export function baselineShipSkills(className: string, era: string): SkillVector 
   return s;
 }
 
+/** True when this roster slot is the commanding captain — that seat is the player. */
+export function isCommandingCaptainRole(role: string): boolean {
+  const r = String(role || "").trim().toLowerCase();
+  if (!r) return false;
+  if (/engineer|security|of\s/.test(r)) return false;
+  return /^(the\s+)?(captain|co|c\.o\.|commanding officer|commanding|cmdg\.?\s*officer)$/i.test(
+    r
+  );
+}
+
+export function stripOfficerRankPrefix(name: string): string {
+  return String(name || "")
+    .replace(
+      /^(captain|cmdr\.?|commander|lt\.?\s*cmdr\.?|lt\.?\s*j\.g\.?|lieutenant|ensign|ens\.?)\s+/i,
+      ""
+    )
+    .trim();
+}
+
+/**
+ * The player occupies the captain's chair. NPC "Captain" slots become XO
+ * (or Command Officer if an XO already exists). Rank "Captain" is demoted.
+ */
+export function sanitizeBridgeCrew(crew: CrewMember[]): CrewMember[] {
+  const list = (crew || []).map((c) => {
+    const name = stripOfficerRankPrefix(c.name) || c.name;
+    const rank = /captain/i.test(String(c.rank || "")) ? "Cmdr." : c.rank;
+    return { ...c, name, rank };
+  });
+  let hasXo = list.some((c) =>
+    /first officer|\bxo\b|executive/i.test(String(c.role || ""))
+  );
+  return list.map((c) => {
+    if (!isCommandingCaptainRole(c.role || "")) return c;
+    if (!hasXo) {
+      hasXo = true;
+      return { ...c, role: "First Officer" };
+    }
+    return { ...c, role: "Command Officer" };
+  });
+}
+
 export function normalizeCrewMember(
   c: CrewMember,
   stardate = "00000.0"
@@ -183,7 +225,7 @@ export function computeShipSkills(
 ): ShipSkills {
   const s = ship ? normalizeShip(ship) : null;
   const base = baselineShipSkills(s?.className || "", s?.era || "");
-  const list = (crew || s?.crew || []).map((c) =>
+  const list = sanitizeBridgeCrew(crew || s?.crew || []).map((c) =>
     normalizeCrewMember(c, s?.stardate)
   );
   const fromCrew = emptySkillVector(0);
@@ -554,7 +596,9 @@ export function createCampaignProfile(input: {
   const now = new Date().toISOString();
   const ship = normalizeShip(input.ship);
   const stardate = ship.stardate || stardateForEra(ship.era);
-  const crew = (ship.crew || []).map((c) => normalizeCrewMember(c, stardate));
+  const crew = sanitizeBridgeCrew(ship.crew || []).map((c) =>
+    normalizeCrewMember(c, stardate)
+  );
   const withCrew = { ...ship, crew, stardate };
   const skills = computeShipSkills(withCrew, crew);
   return {
@@ -798,6 +842,7 @@ export function generateRecruitCandidate(
   }
 ): CrewMember {
   const rng = opts?.rng || Math.random;
+  if (isCommandingCaptainRole(role)) role = "First Officer";
   const quality =
     opts?.quality ||
     rollRecruitQuality(typeof opts?.fedRep === "number" ? opts.fedRep : 0, rng);
