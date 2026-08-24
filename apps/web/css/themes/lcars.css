@@ -1197,3 +1197,28 @@ html[data-ui-theme="lcars"] .starbase-primary .lcars-btn {
 html[data-ui-theme="lcars"] .starbase-primary .lcars-btn.secondary {
   border-radius: 28px 0 28px 0;
 }
+
+html[data-ui-theme="lcars"] .mission-card {
+  background: #000;
+  border: none;
+  box-shadow: inset 10px 0 0 0 var(--lcars-bar);
+  border-radius: 0 22px 0 0;
+}
+html[data-ui-theme="lcars"] .mission-card:nth-child(2) {
+  box-shadow: inset 10px 0 0 0 var(--lcars-bar-2);
+}
+html[data-ui-theme="lcars"] .mission-card:nth-child(3) {
+  box-shadow: inset 10px 0 0 0 var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .mission-card h3 {
+  color: var(--lcars-peach);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+html[data-ui-theme="lcars"] .mission-board-brief {
+  background: #000;
+  border: none;
+  border-left: 14px solid var(--lcars-bar);
+  color: var(--text);
+}

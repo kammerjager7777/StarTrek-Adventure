@@ -427,6 +427,39 @@
       </div>
     </div>
 
+    <!-- Mission board — assignment list (not the in-mission bridge) -->
+    <div
+      id="mission-board-overlay"
+      class="starbase-overlay mission-board-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mission-board-title"
+    >
+      <div class="starbase-screen">
+        <aside class="starbase-rail" aria-hidden="true">
+          <div class="starbase-rail-block is-ops">OPS</div>
+          <div class="starbase-rail-block is-dock">TASK</div>
+          <div class="starbase-rail-block is-yard">BOARD</div>
+          <div class="starbase-rail-block is-log">LIST</div>
+          <div class="starbase-rail-cap"></div>
+        </aside>
+        <div class="starbase-main">
+          <header class="starbase-head">
+            <div class="starbase-head-copy">
+              <div class="starbase-kicker">Starfleet operations</div>
+              <h1 id="mission-board-title" class="starbase-title">Mission board</h1>
+            </div>
+            <p id="mission-board-meta" class="starbase-meta"></p>
+          </header>
+          <p id="mission-board-copy" class="starbase-notice hidden" role="status"></p>
+          <div id="mission-board-list" class="mission-board-list"></div>
+          <footer class="starbase-foot">
+            <div id="mission-board-actions" class="starbase-primary"></div>
+          </footer>
+        </div>
+      </div>
+    </div>
+
     <!-- Outside .shell so body.init-active shell dimming does not darken this screen -->
     <div
       id="init-overlay"

@@ -51,10 +51,10 @@ Player action (UI)
       │    ├─ llmGamemaster → JSON scene (narration, options, sfx, …)
       │    ├─ applySceneSideEffects + endMission clamps
       │    └─ save GameState
-      └─ starbase (campaign hub)
+      └─ starbase (campaign hub — default when not playing)
            ├─ refit / hire / heal / transfer (game-core referee)
            ├─ view campaign log (no play turn)
-           ├─ choose next mission → mission_offer + universe
+           ├─ choose next mission → mission board (`mission_offer`)
            └─ save & stand down → profile, clear activeRunId
   → PublicGameView to client
   → bridge.js render

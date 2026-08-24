@@ -22,16 +22,12 @@ You command a Starfleet starship. An AI Gamemaster — **Narrator** — narrates
 
 1. **Start** — Player name; optional tutorial  
 2. **Ship selection** — Era-diverse stock ships, or custom ship  
-3. **Custom ship (optional)** — name, class, stardate, capabilities, era-correct crew  
-4. **Mission type** — Science, Exploration, Search & Rescue, Battle, Expanded  
-5. **Difficulty** — easy \| medium \| hard \| hardcore  
-6. **Mission offer** — Several missions; player may request more  
-7. **Mission brief** — Background, main + secondary objectives, ship status  
-8. **Playing** — Captain’s log, crew dialogue, 3–4 options (or free-text), challenges  
-9. **End** — Debrief: damage, objectives, narrative recap  
-10. **Starbase (campaign hub)** — After debrief you dock: skill summary, crew status, reputation, campaign log. Refit (limited), recruit, choose the next mission, or save & stand down.
+3. **Starbase (campaign hub)** — Home whenever you are not in a mission. Refit, recruit, campaign log, then **Choose next mission**  
+4. **Mission board** — List of assignments (and briefing). Return to starbase, or accept to begin  
+5. **Playing** — Captain’s log, crew dialogue, 3–4 options (or free-text), challenges  
+6. **End** — Debrief, then back to the starbase hub 
 
-**Continue your story** (History) resumes an in-progress mission, or — if you saved at starbase / stood down — returns you to the **starbase hub** with the same ship, crew, and galaxy. Choose next mission from the dock. You do not re-pick a captain or vessel.
+**Continue your story** (History) resumes an in-progress mission, or returns you to the **starbase hub**. The dock is home until you accept a mission from the board. You do not re-pick a captain or vessel.
 
 ## How a play turn feels
 

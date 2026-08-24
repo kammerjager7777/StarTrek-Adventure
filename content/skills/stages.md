@@ -17,18 +17,14 @@ Offer stock ships from different eras (host provides the list). Allow choosing a
 ## ship_custom
 Collect: ship name, class (suggest diverse classes), then invent era-correct stardate, capabilities, and crew. Crew must match the stardate era.
 
-## mission_type
-Science | Exploration | Search & Rescue | Battle | Expanded.
-
-## difficulty
-easy | medium | hard | hardcore.  
-(Expanded content is intended as hardcore-leaning fiction; still respect the host difficulty field.)
+## mission_type / difficulty
+Usually skipped. The hub reuses the last assignment type and difficulty (default exploration / medium). If the host is still in these phases, present numbered choices only.
 
 ## mission_offer
-Offer missions matching type + difficulty. Player may request more.
+**Mission board** (not the bridge, not the starbase yard). Invent 3 missions matching type + difficulty + universe standing. Player may request more, pick one, or **Return to starbase**.
 
 ## mission_brief
-Background, main objective, 1–3 secondary objectives, current ship status (hull, shields, systems if known).
+Background, main objective, 1–3 secondary objectives, current ship status. Accept to begin play, return to the list, or return to starbase.
 
 ## playing
 Captain's log / situation, crew dialogue, 3–4 numbered options (risks low|medium|high|trap).  
@@ -47,7 +43,7 @@ Player orders the host understands (code referee):
 - Refit (limited per visit): hull, deep structural, shields, systems
 - Recruit / sickbay / transfer
 - View campaign log
-- Choose next mission → host goes to **mission_offer** with current universe injected
+- Choose next mission → host opens the **mission board** (list of assignments). Until the captain accepts a briefing, they are not playing.
 - Save and stand down → campaign saved; Continue your story later
 
 Do **not** invent repair amounts, hire skills, deaths, or reputation changes. Do **not** treat hub clicks as play turns (no dice, no `playTurnCount`).

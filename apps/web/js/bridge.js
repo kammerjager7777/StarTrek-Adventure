@@ -143,6 +143,12 @@ const els = {
   starbasePeople: document.getElementById("starbase-people"),
   starbaseLog: document.getElementById("starbase-log"),
   starbasePrimary: document.getElementById("starbase-primary"),
+  missionBoardOverlay: document.getElementById("mission-board-overlay"),
+  missionBoardTitle: document.getElementById("mission-board-title"),
+  missionBoardMeta: document.getElementById("mission-board-meta"),
+  missionBoardCopy: document.getElementById("mission-board-copy"),
+  missionBoardList: document.getElementById("mission-board-list"),
+  missionBoardActions: document.getElementById("mission-board-actions"),
   btnVoice: document.getElementById("btn-voice"),
   btnVoiceMenu: document.getElementById("btn-voice-menu"),
   voiceMenu: document.getElementById("voice-menu"),
@@ -757,6 +763,7 @@ function render(view, opts = {}) {
   updatePhaseBadge(s);
   updateRedAlertUi(s);
   renderStarbaseScreen(s);
+  renderMissionBoard(s);
   // Model badge is header-hidden (debug); keep Run panel as the debug surface
   if (els.narratorBadge) {
     const mode = view.narrator || "unknown";
@@ -2061,7 +2068,10 @@ function justAcquiredShip(phaseBefore, view) {
   if (phaseBefore === "ship_select" && view.state.phase !== "ship_custom") {
     return true;
   }
-  if (phaseBefore === "ship_custom" && view.state.phase === "mission_type") {
+  if (
+    phaseBefore === "ship_custom" &&
+    (view.state.phase === "starbase" || view.state.phase === "mission_type")
+  ) {
     return true;
   }
   return false;
@@ -2900,8 +2910,119 @@ function renderLogStaticCurrent(state, options) {
   scrollLogToTop();
 }
 
+function isMissionBoardPhase(phase) {
+  return (
+    phase === "mission_type" ||
+    phase === "difficulty" ||
+    phase === "mission_offer" ||
+    phase === "mission_brief"
+  );
+}
+
+function renderMissionBoard(state) {
+  const overlay = els.missionBoardOverlay;
+  if (!overlay) return;
+  const open = isMissionBoardPhase(state?.phase);
+  document.body.classList.toggle("mission-board-active", open);
+  overlay.classList.toggle("hidden", !open);
+  if (!open) return;
+
+  const ship = state.ship;
+  const u = state.universe;
+  const phase = state.phase;
+  if (els.missionBoardTitle) {
+    els.missionBoardTitle.textContent =
+      phase === "mission_brief"
+        ? "Mission briefing"
+        : phase === "mission_type"
+          ? "Assignment type"
+          : phase === "difficulty"
+            ? "Difficulty"
+            : "Mission board";
+  }
+  if (els.missionBoardMeta) {
+    els.missionBoardMeta.textContent = [
+      ship ? `${ship.name} ${ship.registryNumber || ""}`.trim() : "No ship",
+      state.missionType ? String(state.missionType).replace("_", " ") : "",
+      state.difficulty || "",
+      `Stardate ${u?.stardate || ship?.stardate || "—"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  const copy = String(state.pendingQuestion || "").trim();
+  if (els.missionBoardCopy) {
+    if (phase === "mission_brief" || !copy) {
+      els.missionBoardCopy.classList.add("hidden");
+    } else {
+      const short = copy.split("\n").filter(Boolean)[0] || copy;
+      els.missionBoardCopy.textContent = short;
+      els.missionBoardCopy.classList.remove("hidden");
+    }
+  }
+
+  const host = els.missionBoardList;
+  if (host) {
+    host.innerHTML = "";
+    if (phase === "mission_brief") {
+      const brief = document.createElement("div");
+      brief.className = "mission-board-brief";
+      brief.textContent = copy || "Stand by for briefing.";
+      host.appendChild(brief);
+    } else if (phase === "mission_offer") {
+      const offers = Array.isArray(state.missionOffers) ? state.missionOffers : [];
+      const choices = state.pendingChoices || [];
+      if (offers.length) {
+        offers.forEach((offer, i) => {
+          const card = document.createElement("article");
+          card.className = "mission-card";
+          const title = offer.title || choices[i]?.text || `Mission ${i + 1}`;
+          card.innerHTML = `<p class="mission-card-meta">${escapeHtml(
+            [offer.type, offer.location].filter(Boolean).join(" · ")
+          )}</p>
+            <h3>${escapeHtml(title)}</h3>
+            <p class="mission-card-summary">${escapeHtml(
+              offer.summary || offer.background || ""
+            )}</p>`;
+          const btn = starbaseButton(choices[i]?.text || title);
+          card.appendChild(btn);
+          host.appendChild(card);
+        });
+      } else {
+        for (const c of choices) {
+          host.appendChild(starbaseButton(c.text));
+        }
+      }
+    } else {
+      for (const c of state.pendingChoices || []) {
+        host.appendChild(starbaseButton(c.text));
+      }
+    }
+  }
+
+  if (els.missionBoardActions) {
+    els.missionBoardActions.innerHTML = "";
+    const extras = [];
+    if (phase === "mission_offer") extras.push("More assignments");
+    if (phase === "mission_brief") {
+      for (const c of state.pendingChoices || []) extras.push(c.text);
+    }
+    extras.push("Return to starbase");
+    for (const label of extras) {
+      const extra = /return to starbase/i.test(label)
+        ? "secondary"
+        : /more/i.test(label)
+          ? "secondary"
+          : "";
+      els.missionBoardActions.appendChild(starbaseButton(label, extra));
+    }
+  }
+}
+
 function renderLog(state, opts = {}) {
   if (state?.phase === "starbase") return;
+  if (isMissionBoardPhase(state?.phase)) return;
   const { forceTypewriter = false } = opts;
   const options = state.pendingChoices || state.turn?.options || [];
   const key = narrationKey(state);
@@ -3209,7 +3330,9 @@ function setActionBusy(busy, detail = "") {
   actionInFlight = busy;
   document.body.classList.toggle(
     "starbase-waiting",
-    Boolean(busy) && document.body.classList.contains("starbase-active")
+    Boolean(busy) &&
+      (document.body.classList.contains("starbase-active") ||
+        document.body.classList.contains("mission-board-active"))
   );
   const lockInput = busy || !aiReady || missionBoot.active;
   if (els.input) els.input.disabled = lockInput;

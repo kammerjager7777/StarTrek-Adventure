@@ -48,11 +48,11 @@ During **playing**:
 | `ask_name` | Captain name |
 | `tutorial_offer` / `tutorial` | Optional training drill |
 | `ship_select` / `ship_custom` | Choose or define a vessel + crew |
-| `mission_type` | Science, Exploration, Search & Rescue, Battle, Expanded |
-| `difficulty` | easy / medium / hard / hardcore |
-| `mission_offer` | Pick among generated missions (or “more”) |
-| `mission_brief` | Briefing; accept to begin |
-| `playing` | Core mission loop |
+| `mission_type` | (legacy) assignment type — now usually skipped; last type is reused |
+| `difficulty` | (legacy) difficulty — last difficulty is reused |
+| `mission_offer` | **Mission board** page: pick among generated missions (or “more”) |
+| `mission_brief` | Briefing on the mission board; accept to begin play |
+| `playing` | Core mission loop (bridge) |
 | `debrief` | Success/failure wrap-up (immediately opens the hub) |
 | `starbase` | Campaign hub — refit, recruit, campaign log, next mission, stand down |
 | `post_mission` | Terminal after **Save and stand down**; Continue starts a new run |
@@ -546,7 +546,8 @@ Hub orders (`starbaseHubChoices`): Review status, Refit (hull / deep / shields /
   - Sickbay: clear injured officers (`medicalBudget`)
   - Transfer: free a billet (`transferBudget`; cannot transfer last active officer)
 - Session state on `GameState.starbase` (`StarbaseSession`); cleared when leaving for a new mission.
-- **Choose next mission** keeps current type/difficulty and opens `mission_offer` with **universe injected** (standing-aware offers).
+- You stay on the **starbase hub whenever you are not playing a mission** (after commissioning a ship, after debrief, after Continue, after standing down).
+- **Choose next mission** leaves the hub for the **mission board** (`mission_offer`): a list of standing-aware assignments (reuses last type/difficulty, default exploration / medium). **Return to starbase** comes back to the dock without starting play.
 - **Save and stand down** writes the profile and clears `activeRunId`. The ship stays docked.
 - **Continue your story** / resume (History or refresh): if a live run is mid-mission, resume that beat. If you were at starbase (or stood down), **load the starbase hub** with ship, crew, skills, universe, and campaign log. **Choose next mission** is how you leave the dock for `mission_offer`.
 

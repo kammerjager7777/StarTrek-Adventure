@@ -33,13 +33,12 @@ Check AI link: `GET http://127.0.0.1:3000/api/ai/status`
 
 1. Enter your captain name  
 2. Optional tutorial  
-3. Pick a ship (or custom) — crew portraits / voices may initialize  
-4. Choose mission type + difficulty  
-5. Accept a mission and **Begin**  
-6. Each turn: pick a **numbered option**, or type a free-text **order** / **question**  
-7. After debrief you dock at **starbase**: refit, recruit, read the campaign log, choose the next mission, or save & stand down  
-8. **Continue your story** in History resumes a mission, or returns you to starbase if that is where you left 
-9. Meta commands (examples): `mission status`, `hint`, `recap`, `divert power to shields`, `change difficulty hard`, `restart`, `new mission`  
+3. Pick a ship (or custom) — you then dock at **starbase**  
+4. **Choose next mission** opens the mission board; accept a briefing to begin play  
+5. Each turn: pick a **numbered option**, or type a free-text **order** / **question**  
+6. After debrief you return to **starbase** (home while not in a mission)  
+7. **Continue your story** resumes a mission in progress, or returns you to starbase  
+8. Meta commands (examples): `mission status`, `hint`, `recap`, `divert power to shields`, `change difficulty hard`, `restart`, `new mission`  
 
 **Voice ▾ menu:** auto-TTS, speed, **Bridge ambient**, **LCARS SFX** (TrekCore combat/UI sounds).  
 **Themes:** Classic or LCARS.

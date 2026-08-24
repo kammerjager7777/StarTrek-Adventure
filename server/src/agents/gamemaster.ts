@@ -98,6 +98,12 @@ export function resolveChoiceLabel(
   return trimmed;
 }
 
+function wantsReturnToDock(input: string): boolean {
+  return /return to (starbase|dock|hub)|back to (the )?(starbase|dock|hub)/i.test(
+    input
+  );
+}
+
 function logPlayerChoice(
   state: GameState,
   input: string,
@@ -199,7 +205,10 @@ export async function advanceSetup(
       if (choice && choice >= 1 && choice <= ships.length) {
         next.ship = shipOfferToShip(ships[choice - 1]);
         next.setupShips = null;
-        next = await goMissionType(next);
+        next = await dockAtStarbase(
+          next,
+          "Ship commissioned. Choose your next mission when ready."
+        );
       } else if (choice === ships.length + 1 || /custom/i.test(input)) {
         next.phase = "ship_custom";
         next.setupNotes = [];
@@ -254,7 +263,10 @@ export async function advanceSetup(
         next.ship = await setupCall("custom ship", () =>
           generateCustomShip(next, next.setupNotes[0], className)
         );
-        next = await goMissionType(next);
+        next = await dockAtStarbase(
+          next,
+          "Ship commissioned. Choose your next mission when ready."
+        );
         return logPlayerChoice(next, input, state.pendingChoices);
       }
       // Free-typed class after selecting "Other"
@@ -271,13 +283,23 @@ export async function advanceSetup(
         next.ship = await setupCall("custom ship", () =>
           generateCustomShip(next, next.setupNotes[0], className)
         );
-        next = await goMissionType(next);
+        next = await dockAtStarbase(
+          next,
+          "Ship commissioned. Choose your next mission when ready."
+        );
         return logPlayerChoice(next, className, state.pendingChoices);
       }
       return next;
     }
 
     case "mission_type": {
+      if (wantsReturnToDock(input)) {
+        return logPlayerChoice(
+          await hydrateStarbase(next, "Returned to dock."),
+          input,
+          state.pendingChoices
+        );
+      }
       const map: Record<number, MissionType> = {
         1: "science",
         2: "exploration",
@@ -301,6 +323,13 @@ export async function advanceSetup(
     }
 
     case "difficulty": {
+      if (wantsReturnToDock(input)) {
+        return logPlayerChoice(
+          await hydrateStarbase(next, "Returned to dock."),
+          input,
+          state.pendingChoices
+        );
+      }
       const map: Record<number, Difficulty> = {
         1: "easy",
         2: "medium",
@@ -318,6 +347,13 @@ export async function advanceSetup(
     }
 
     case "mission_offer": {
+      if (wantsReturnToDock(input)) {
+        return logPlayerChoice(
+          await hydrateStarbase(next, "Returned to dock."),
+          input,
+          state.pendingChoices
+        );
+      }
       if (/more/i.test(input)) {
         next = await offerMissions(next, true);
         return logPlayerChoice(next, input, state.pendingChoices);
@@ -339,6 +375,13 @@ export async function advanceSetup(
     }
 
     case "mission_brief": {
+      if (wantsReturnToDock(input)) {
+        return logPlayerChoice(
+          await hydrateStarbase(next, "Returned to dock."),
+          input,
+          state.pendingChoices
+        );
+      }
       const choice = parseChoice(input, next.pendingChoices);
       if (choice === 2) {
         next = await offerMissions(next);
@@ -715,24 +758,42 @@ export async function hydrateStarbase(
   return composeStarbaseState(state, notice ?? null);
 }
 
+async function dockAtStarbase(
+  state: GameState,
+  notice: string
+): Promise<GameState> {
+  const next = await ensureCampaignAttached({
+    ...state,
+    mission: null,
+    missionOffers: null,
+    debrief: null,
+    phase: "starbase",
+    status: "active",
+  });
+  return hydrateStarbase(next, notice);
+}
+
 /**
- * After the hub, pick the next assignment. Keep type/difficulty when known
- * and jump to mission_offer with universe still on state (Phase 6).
+ * After the hub, open the mission board. Keep the dockyard visit;
+ * only startPlaying clears it. Default type/difficulty so the board is a list.
  */
 export async function beginNextCampaignMission(
   state: GameState
 ): Promise<GameState> {
-  let next: GameState = {
+  const missionType = state.missionType || "exploration";
+  const difficulty =
+    state.difficulty ||
+    (missionType === "expanded" ? "hardcore" : "medium");
+  const next: GameState = {
     ...state,
     mission: null,
     turn: null,
     debrief: null,
     missionOffers: null,
-    starbase: null,
     status: "active",
+    missionType,
+    difficulty,
   };
-  if (!next.missionType) return goMissionType(next);
-  if (!next.difficulty) return goDifficulty(next);
   return offerMissions(next);
 }
 
@@ -747,7 +808,6 @@ async function leaveStarbaseForMission(
     turn: null,
     debrief: null,
     missionOffers: null,
-    starbase: null,
     status: "active",
   };
   try {
@@ -1014,6 +1074,7 @@ async function startPlaying(state: GameState): Promise<GameState> {
   let next: GameState = {
     ...state,
     phase: "playing",
+    starbase: null,
   };
 
   // Ensure campaign profile + skills + universe for this captain
