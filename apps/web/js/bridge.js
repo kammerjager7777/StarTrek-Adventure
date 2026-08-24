@@ -1658,6 +1658,8 @@ let portraitsGenerating = false;
 let crewCarouselId = null;
 let crewCarouselIndex = 0;
 let crewCarouselWheelLock = 0;
+let crewHailSeq = 0;
+let crewHailQuietUntil = 0;
 
 /** Viewscreen journey-book rotation */
 let viewscreenRotateTimer = null;
@@ -1878,6 +1880,16 @@ function updateCrewCollapseSummary(officers) {
 
 function setCrewRosterExpanded(expanded, { persist = true, index = 0 } = {}) {
   if (!els.crewSection) return;
+  if (expanded) {
+    const slides = els.crew?.querySelectorAll(".crew-carousel-slide") || [];
+    const n = slides.length;
+    const i = n ? ((index % n) + n) % n : 0;
+    crewCarouselIndex = i;
+    const id = slides[i]?.getAttribute("data-crew-id");
+    if (id) crewCarouselId = id;
+    crewHailQuietUntil = Date.now() + 450;
+    crewHailSeq += 1;
+  }
   els.crewSection.classList.toggle("is-expanded", expanded);
   els.crewSection.classList.toggle("is-collapsed", !expanded);
   if (els.crewToggle) {
@@ -2118,6 +2130,9 @@ function bindCrewCardExpandHandlers(crew) {
   els.crew.querySelectorAll(".crew-tab[data-crew-id]").forEach((tab) => {
     tab.addEventListener("mouseenter", () => {
       if (!isCrewRosterExpanded()) return;
+      if (Date.now() < crewHailQuietUntil) return;
+      const id = tab.getAttribute("data-crew-id");
+      if (id && crewCarouselId && id !== crewCarouselId) return;
       void onCrewCardExpand(tab, crew);
     });
     tab.addEventListener("click", (e) => {
@@ -2125,8 +2140,10 @@ function bindCrewCardExpandHandlers(crew) {
       if (isCrewRosterExpanded()) return;
       const id = tab.getAttribute("data-crew-id");
       const i = (crew || []).findIndex((c) => c.id === id);
+      if (id) crewCarouselId = id;
+      crewCarouselIndex = i >= 0 ? i : 0;
       uiSound("open");
-      setCrewRosterExpanded(true, { index: i >= 0 ? i : 0 });
+      setCrewRosterExpanded(true, { index: crewCarouselIndex });
     });
   });
 }
@@ -2134,13 +2151,13 @@ function bindCrewCardExpandHandlers(crew) {
 async function onCrewCardExpand(tab, crewList) {
   const id = tab.getAttribute("data-crew-id");
   if (!id) return;
+  if (crewCarouselId && id !== crewCarouselId) return;
   // Avoid re-fire while this card is already hailing
   if (tab.classList.contains("is-hailing")) return;
   const now = Date.now();
   const last = crewHailCooldown.get(id) || 0;
   // 12s cooldown per officer
   if (now - last < 12_000) return;
-  crewHailCooldown.set(id, now);
 
   const member = (crewList || []).find((c) => c.id === id);
   if (!member) return;
@@ -2149,16 +2166,20 @@ async function onCrewCardExpand(tab, crewList) {
   // Need an active run for TTS
   if (!current?.state?.runId || !aiReady) return;
 
+  crewHailCooldown.set(id, now);
+  const seq = ++crewHailSeq;
   tab.classList.add("is-hailing");
   try {
     // Incoming transmission cue (LCARS theme + SFX on) + TrekCore hail beep
     playTrekSfx("hail_beep");
     await playIncomingTransmission();
+    if (seq !== crewHailSeq) return;
+    if (crewCarouselId && id !== crewCarouselId) return;
     // Spoken greeting in that officer's locked voice
     const line = buildCrewGreeting(member);
     await replaySpeech(member.name, line, tab);
   } finally {
-    tab.classList.remove("is-hailing");
+    if (seq === crewHailSeq) tab.classList.remove("is-hailing");
   }
 }
 
