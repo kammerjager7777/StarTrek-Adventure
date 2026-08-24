@@ -522,9 +522,10 @@ body.init-active .shell {
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.crew-tab:hover,
-.crew-tab:focus-within,
-.crew-tab.is-hailing {
+.crew-tab:hover:not(.is-held-shut),
+.crew-tab:focus-within:not(.is-held-shut),
+.crew-tab.is-hailing:not(.is-held-shut),
+.crew-tab.is-pinned {
   /* Grow only via face + details, not a conflicting height:auto on the shell */
   height: auto;
   border-color: var(--lcars-peach);
@@ -551,9 +552,10 @@ body.init-active .shell {
   transition: height 0.2s ease;
 }
 
-.crew-tab:hover .crew-card-face,
-.crew-tab:focus-within .crew-card-face,
-.crew-tab.is-hailing .crew-card-face {
+.crew-tab:hover:not(.is-held-shut) .crew-card-face,
+.crew-tab:focus-within:not(.is-held-shut) .crew-card-face,
+.crew-tab.is-hailing:not(.is-held-shut) .crew-card-face,
+.crew-tab.is-pinned .crew-card-face {
   height: 160px;
 }
 
@@ -785,10 +787,29 @@ body.init-active .shell {
   background: #0c1220;
 }
 
-.crew-tab:hover .crew-tab-details,
-.crew-tab:focus-within .crew-tab-details,
-.crew-tab.is-hailing .crew-tab-details {
+.crew-tab:hover:not(.is-held-shut) .crew-tab-details,
+.crew-tab:focus-within:not(.is-held-shut) .crew-tab-details,
+.crew-tab.is-hailing:not(.is-held-shut) .crew-tab-details,
+.crew-tab.is-pinned .crew-tab-details {
   display: block;
+}
+
+.crew-tab.is-held-shut,
+.crew-tab.is-held-shut:hover,
+.crew-tab.is-held-shut:focus-within,
+.crew-tab.is-held-shut.is-hailing {
+  height: 80px;
+  box-shadow: none;
+}
+
+.crew-tab.is-held-shut .crew-card-face,
+.crew-tab.is-held-shut.is-hailing .crew-card-face {
+  height: 80px;
+}
+
+.crew-tab.is-held-shut .crew-tab-details,
+.crew-tab.is-held-shut.is-hailing .crew-tab-details {
+  display: none;
 }
 
 .crew-detail-grid {

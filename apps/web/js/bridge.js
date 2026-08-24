@@ -1734,7 +1734,7 @@ function officerCardHtml(c, { generating = false } = {}) {
       )}</div>`;
   return `<article class="crew-tab${generating ? " is-imaging" : ""}${
     duty ? ` ${duty.cls}` : ""
-  }" data-crew-id="${escapeHtml(c.id)}">
+  }" data-crew-id="${escapeHtml(c.id)}" aria-expanded="false">
         <div class="crew-card-face">
           ${photo}
           ${
@@ -1935,12 +1935,35 @@ function bindCrewCardExpandHandlers(crew) {
   if (!els.crew) return;
   els.crew.querySelectorAll(".crew-tab[data-crew-id]").forEach((tab) => {
     tab.addEventListener("mouseenter", () => {
+      if (tab.classList.contains("is-held-shut")) return;
       void onCrewCardExpand(tab, crew);
+    });
+    tab.addEventListener("mouseleave", () => {
+      tab.classList.remove("is-held-shut");
     });
     // Keyboard / touch: focus also counts as expand
     tab.tabIndex = 0;
     tab.addEventListener("focus", () => {
+      if (tab.classList.contains("is-held-shut")) return;
       void onCrewCardExpand(tab, crew);
+    });
+    tab.addEventListener("click", (e) => {
+      if (e.target.closest("button, input, label, a")) return;
+      const pinned = tab.classList.toggle("is-pinned");
+      tab.setAttribute("aria-expanded", pinned ? "true" : "false");
+      if (pinned) {
+        tab.classList.remove("is-held-shut");
+        void onCrewCardExpand(tab, crew);
+      } else {
+        tab.classList.add("is-held-shut");
+        tab.blur();
+      }
+    });
+    tab.addEventListener("keydown", (e) => {
+      if (e.target !== tab) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      tab.click();
     });
   });
 }

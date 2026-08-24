@@ -546,9 +546,12 @@ html[data-ui-theme="lcars"] .crew-card {
   background: #050505;
 }
 
-html[data-ui-theme="lcars"] .crew-tab.is-hailing {
+html[data-ui-theme="lcars"] .crew-tab.is-hailing,
+html[data-ui-theme="lcars"] .crew-tab.is-pinned {
   border-color: var(--lcars-bar);
   box-shadow: 0 0 0 2px var(--lcars-bar-3);
+}
+html[data-ui-theme="lcars"] .crew-tab.is-hailing {
   animation: lcars-wait-pulse 0.9s ease-in-out infinite;
 }
 
