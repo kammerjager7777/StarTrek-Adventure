@@ -10,20 +10,14 @@ Private Cloud Run deployment for **Star Trek Adventure**.
 | **Region** | `us-central1` |
 | **Service** | `sta-bridge` |
 | **URL** | `https://sta-bridge-ledmkjy2mq-uc.a.run.app` |
-| **Allowed users** | `mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, `npgibbs@gmail.com` |
+| **Allowed users** | Any Google account (`ALLOWED_USERS=*`) |
 | **Secrets** | `XAI_API_KEY` in Secret Manager |
 
 The HTML access page is public. Game APIs require a Google account on the allow-list.
 
-- Unauthenticated visitors → LCARS **Restricted access** page  
-- Allowed Gmail → sign in and play  
-- Any other Google account → LCARS **Access denied** (contact Michael)  
-
-Allowed Google accounts:
-
-- `mrarcam00@gmail.com`
-- `michaelstephens2011@gmail.com`
-- `npgibbs@gmail.com`
+- Unauthenticated visitors → LCARS **Sign in** page  
+- Any Google account → sign in and play (saves are private to that account)  
+- Set `ALLOWED_USERS` to a comma-separated list to lock it back to specific Gmail addresses
 
 ## Access the app (browser)
 
@@ -31,7 +25,7 @@ Open:
 
 **https://sta-bridge-ledmkjy2mq-uc.a.run.app**
 
-Sign in with an **allowed Gmail** above.
+Sign in with any **Google account**.
 
 Alternate URL (same service):  
 https://sta-bridge-1036417382463.us-central1.run.app
@@ -87,9 +81,11 @@ The Sheet columns are: Time, From, Message, Screenshot, Theme, Phase, Run, Capta
 
 ## Access gate
 
-Unauthenticated `GET /` serves the LCARS login page. APIs return `401 login_required` or `403 access_denied`.
+Unauthenticated `GET /` serves the LCARS login page. APIs return `401 login_required` until Google Sign-In succeeds.
 
-To add another trusted user later, append their Gmail to `ALLOWED_USERS` in `deploy/gcp/project.env` and redeploy. Also add them as an OAuth test user if the consent screen is still in Testing.
+Production is open to any Google account (`ALLOWED_USERS=*`). To restrict it again, set `ALLOWED_USERS` to a comma-separated list in `deploy/gcp/project.env` and redeploy.
+
+If Google itself shows “app is in testing / access blocked”, publish the OAuth consent screen (External → In production). Sign-in scopes are only email/profile/openid.
 
 ## Data note
 

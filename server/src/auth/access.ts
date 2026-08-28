@@ -12,6 +12,7 @@ const DEFAULT_ALLOWED = [
 
 export function parseAllowedEmails(): string[] {
   const raw = process.env.ALLOWED_USERS || process.env.ALLOWED_USER || "";
+  if (isPublicSignInRaw(raw)) return [];
   const listed = raw
     .split(/[,\s]+/)
     .map((e) => normalizeEmail(e))
@@ -20,9 +21,28 @@ export function parseAllowedEmails(): string[] {
   return DEFAULT_ALLOWED.map((e) => normalizeEmail(e));
 }
 
+/** `ALLOWED_USERS=*` / `all` / `public`, or ALLOW_PUBLIC_SIGNIN=1 — any Google account. */
+export function isPublicSignIn(): boolean {
+  if (/^(1|true|yes)$/i.test(String(process.env.ALLOW_PUBLIC_SIGNIN || "").trim())) {
+    return true;
+  }
+  return isPublicSignInRaw(
+    process.env.ALLOWED_USERS || process.env.ALLOWED_USER || ""
+  );
+}
+
+function isPublicSignInRaw(raw: string): boolean {
+  const token = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[,\s]+/g, "");
+  return token === "*" || token === "all" || token === "public";
+}
+
 export function isEmailAllowed(email: string | null | undefined): boolean {
   const n = normalizeEmail(email || "");
   if (!n.includes("@")) return false;
+  if (isPublicSignIn()) return true;
   return parseAllowedEmails().includes(n);
 }
 
@@ -64,6 +84,7 @@ export function accessPayload(user: AuthUser | null) {
   return {
     authenticated: Boolean(user),
     allowed,
+    publicSignIn: isPublicSignIn(),
     email: user?.email || null,
     source: user?.source || null,
     gateEnabled: gateEnabled(),

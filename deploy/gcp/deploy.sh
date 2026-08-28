@@ -122,5 +122,5 @@ gcloud run deploy "$SERVICE" \
 URL="$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')"
 echo ""
 echo "Deployed: $URL"
-echo "Sign-in is the LCARS access page. Allowed: $ALLOWED_USERS"
+echo "Sign-in is the LCARS access page. ALLOWED_USERS=$ALLOWED_USERS"
 echo ""

@@ -89,10 +89,9 @@ Events include user input, narrator output, tool calls (dice, integrity, flags),
 
 ## Production (GCP)
 
-Private Cloud Run with an **app-level Google allow-list** (LCARS sign-in page; not IAP). Details: **[deploy/gcp/README.md](deploy/gcp/README.md)**.
+Cloud Run with an LCARS **Google Sign-In** page (not IAP). Any Google account can play; saves stay private to that account. Details: **[deploy/gcp/README.md](deploy/gcp/README.md)**.
 
 **Open:** https://sta-bridge-ledmkjy2mq-uc.a.run.app  
-Sign in with an allowed Gmail (`mrarcam00@gmail.com`, `michaelstephens2011@gmail.com`, or `npgibbs@gmail.com`).
 
 ```bash
 # Optional local proxy
@@ -103,7 +102,7 @@ Sign in with an allowed Gmail (`mrarcam00@gmail.com`, `michaelstephens2011@gmail
 |--|--|
 | Project | `star-trek-adventure-3524d3` |
 | Region | `us-central1` |
-| Access | Google Sign-In; allow-listed Gmail only |
+| Access | Google Sign-In; any Google account |
 
 ## License / IP
 

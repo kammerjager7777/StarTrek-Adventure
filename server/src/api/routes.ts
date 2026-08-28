@@ -85,7 +85,8 @@ apiRouter.get("/access", (req, res) => {
   res.json({
     ...payload,
     googleClientId: googleClientId() || null,
-    allowedEmails: local ? parseAllowedEmails() : undefined,
+    allowedEmails:
+      local && !payload.publicSignIn ? parseAllowedEmails() : undefined,
   });
 });
 

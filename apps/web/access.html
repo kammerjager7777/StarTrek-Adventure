@@ -24,13 +24,13 @@
           <div class="access-logo">
             <img src="/assets/ufp-logo.png?v=3" alt="" width="220" height="174" />
           </div>
-          <p class="access-kicker">Starfleet LCARS · Restricted channel</p>
+          <p class="access-kicker">Starfleet LCARS · Secure channel</p>
 
           <div id="state-login" class="access-state">
-            <h1 class="access-title">Restricted access</h1>
+            <h1 class="access-title">Sign in</h1>
             <p class="access-copy">
-              You must sign in with an authorized Google account before using
-              this starship. Unauthorized personnel cannot reach the bridge.
+              Sign in with a Google account to reach the bridge. Your captains,
+              missions, and saves stay private to that account.
             </p>
             <div class="access-actions">
               <button type="button" class="access-btn" id="btn-signin">
@@ -50,7 +50,7 @@
               />
               <button type="submit" class="access-btn lilac">Continue</button>
             </form>
-            <p class="access-note">Federation use only · Session monitored</p>
+            <p class="access-note">Session monitored · Saves are per account</p>
           </div>
 
           <div id="state-denied" class="access-state hidden">
@@ -101,6 +101,7 @@
           "michaelstephens2011@gmail.com",
           "npgibbs@gmail.com",
         ];
+        var publicSignIn = false;
         var clientId = "";
         var gisReady = false;
         var params = new URLSearchParams(location.search);
@@ -139,6 +140,7 @@
         }
 
         function isAllowed(email) {
+          if (publicSignIn) return true;
           email = String(email || "").trim().toLowerCase();
           return ALLOWED.indexOf(email) !== -1;
         }
@@ -225,6 +227,7 @@
             if (data.contact && data.contact.email) {
               setContact(data.contact.email);
             }
+            if (data.publicSignIn) publicSignIn = true;
             if (Array.isArray(data.allowedEmails) && data.allowedEmails.length) {
               ALLOWED = data.allowedEmails;
             }
