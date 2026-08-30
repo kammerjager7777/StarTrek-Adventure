@@ -189,6 +189,39 @@
           <button type="button" id="btn-history" class="lcars-btn secondary">
             Campaign
           </button>
+          <div class="account-menu" id="account-menu">
+            <button
+              type="button"
+              id="btn-account"
+              class="account-avatar-btn"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="account-popover"
+              title="Account"
+            >
+              <img
+                id="account-avatar-img"
+                class="account-avatar-img hidden"
+                alt=""
+                referrerpolicy="no-referrer"
+              />
+              <span id="account-avatar-initials" class="account-avatar-initials">?</span>
+            </button>
+            <div
+              id="account-popover"
+              class="account-popover hidden"
+              role="menu"
+              aria-label="Account"
+            >
+              <div class="account-popover-id">
+                <div id="account-popover-name" class="account-popover-name"></div>
+                <div id="account-popover-email" class="account-popover-email"></div>
+              </div>
+              <button type="button" id="btn-logout" class="lcars-btn secondary">
+                Log out
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 

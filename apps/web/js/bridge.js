@@ -124,6 +124,14 @@ const els = {
   btnRetryAi: document.getElementById("btn-retry-ai"),
   btnNew: document.getElementById("btn-new"),
   btnHistory: document.getElementById("btn-history"),
+  accountMenu: document.getElementById("account-menu"),
+  btnAccount: document.getElementById("btn-account"),
+  accountPopover: document.getElementById("account-popover"),
+  accountAvatarImg: document.getElementById("account-avatar-img"),
+  accountAvatarInitials: document.getElementById("account-avatar-initials"),
+  accountPopoverName: document.getElementById("account-popover-name"),
+  accountPopoverEmail: document.getElementById("account-popover-email"),
+  btnLogout: document.getElementById("btn-logout"),
   buildStamp: document.getElementById("build-stamp"),
   btnFeedback: document.getElementById("btn-feedback"),
   btnCloseFeedback: document.getElementById("btn-close-feedback"),
@@ -287,6 +295,30 @@ function loadSpeechPref() {
     /* ignore */
   }
   return true;
+}
+
+/** Honor the local Voice toggle; push it onto the run if the save is stale. */
+function syncVoicePreference(view) {
+  voice.enabled = loadSpeechPref();
+  const runId = view?.state?.runId;
+  const serverOn = view?.state?.settings?.speechOn;
+  if (runId && voice.enabled && serverOn === false && aiReady) {
+    api(`/games/${runId}/settings`, {
+      method: "PATCH",
+      body: JSON.stringify({ speechOn: true }),
+    })
+      .then((out) => {
+        if (out?.state?.settings && current?.state?.runId === runId) {
+          current = {
+            ...current,
+            state: { ...current.state, settings: out.state.settings },
+          };
+        }
+      })
+      .catch(() => {
+        /* non-fatal */
+      });
+  }
 }
 
 /** Grok TTS auto-play queue + transport (volume always full) */
@@ -779,6 +811,7 @@ function render(view, opts = {}) {
 
   // Keep the player's speech preference (default on). Older runs stored
   // speechOn:false and must not flip narration off on load.
+  syncVoicePreference(view);
   updateVoiceToggleUi();
 
   // Phase badge: during debrief show clear success / failure
@@ -1528,8 +1561,10 @@ async function toggleVoice() {
           narratorVoice: view.state.narratorVoice || current.state.narratorVoice,
         },
       };
-      if (typeof view.state.settings?.speechOn === "boolean") {
+      if (typeof view.state.settings?.speechOn === "boolean" && next === false) {
         voice.enabled = view.state.settings.speechOn;
+      } else {
+        voice.enabled = next;
       }
       updateVoiceToggleUi();
     } catch (err) {
@@ -1801,7 +1836,7 @@ const INCOMING_COMM_URL = "/assets/incoming-communication.png";
  * Mission start gate (after name + ship + accept brief):
  * 1) Expand viewscreen with Incoming Communication
  * 2) Generate crew profiles (images + voice locks)
- * 3) Collapse viewscreen
+ * 3) Keep the viewscreen open
  * 4) Then type/play the first gamemaster message
  */
 let missionBoot = {
@@ -2684,11 +2719,10 @@ function finishMissionBoot() {
     els.viewscreen.classList.remove("mission-boot-active");
   }
 
-  // Collapse viewscreen — then start the first gamemaster message
-  setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, false, {
-    persist: true,
+  // Leave the viewscreen open after Incoming Communication
+  setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, true, {
+    persist: false,
   });
-  playViewscreenSfx("close");
 
   if (els.form) els.form.classList.remove("is-waiting");
   if (els.options) {
@@ -3714,25 +3748,22 @@ function renderOptions(options) {
  * Mission log shell stays open so the current narration is always visible.
  * Viewscreen auto-expands while the Narrator is responding.
  */
-const PANEL_PREF_KEY = "sta-panel-expanded";
+const PANEL_PREF_KEY = "sta-panel-expanded-v2";
 
 function loadPanelExpandedPrefs() {
   try {
     const raw = localStorage.getItem(PANEL_PREF_KEY);
-    // Default: viewscreen collapsed until mission-start Incoming Communication
-    if (!raw) return { viewscreen: false, history: false, run: false, crew: true };
+    // Default: viewscreen open; History/Run collapsed; crew carousel on
+    if (!raw) return { viewscreen: true, history: false, run: false, crew: true };
     const parsed = JSON.parse(raw);
     return {
-      // Only open if the user explicitly expanded it
-      viewscreen: parsed.viewscreen === true,
-      // History is always collapsed unless the user explicitly expanded it
+      viewscreen: parsed.viewscreen !== false,
       history: parsed.history === true,
       run: parsed.run === true,
-      // Crew roster defaults to focused carousel unless the user stacked it
       crew: parsed.crew !== false,
     };
   } catch {
-    return { viewscreen: false, history: false, run: false, crew: true };
+    return { viewscreen: true, history: false, run: false, crew: true };
   }
 }
 
@@ -3781,7 +3812,6 @@ function togglePanel(panel, toggleBtn) {
 
 function initCollapsiblePanels() {
   const prefs = loadPanelExpandedPrefs();
-  // Defaults: viewscreen collapsed; History strip collapsed; mission log always open
   setPanelExpanded(
     els.viewscreenPanel,
     els.viewscreenToggle,
@@ -4534,9 +4564,8 @@ async function newGame() {
         await sleep(250);
         update({ key: "ready", label: "Bridge ready", pct: 100, done: true });
         render(view);
-        // New game: viewscreen starts collapsed until mission begin
-        setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, false, {
-          persist: true,
+        setPanelExpanded(els.viewscreenPanel, els.viewscreenToggle, true, {
+          persist: false,
         });
         els.input.focus();
       }
@@ -4564,6 +4593,56 @@ async function resume(runId) {
   render(view);
   closeHistory();
   return view;
+}
+
+function sortByUpdatedDesc(a, b) {
+  return String(b?.updatedAt || "").localeCompare(String(a?.updatedAt || ""));
+}
+
+/** Reload should return to the live mission/campaign, not start a new captain. */
+async function resumeBestAvailable() {
+  const existing = getActiveRun();
+  if (existing) {
+    try {
+      await resume(existing);
+      return true;
+    } catch (err) {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      console.warn(
+        "[bridge] stored run could not be resumed",
+        err?.message || err
+      );
+    }
+  }
+
+  try {
+    const pdata = await api("/profiles");
+    const profiles = (pdata.profiles || []).slice().sort(sortByUpdatedDesc);
+    if (profiles[0]?.id) {
+      if (await continueProfile(profiles[0].id)) return true;
+    }
+  } catch (err) {
+    console.warn("[bridge] profile continue failed", err?.message || err);
+  }
+
+  try {
+    const data = await api("/games");
+    const games = (data.games || [])
+      .filter((g) => g.status === "active" && g.runId)
+      .sort(sortByUpdatedDesc);
+    if (games[0]?.runId) {
+      await resume(games[0].runId);
+      return true;
+    }
+  } catch (err) {
+    console.warn("[bridge] games resume failed", err?.message || err);
+  }
+
+  return false;
 }
 
 async function deleteGame(runId) {
@@ -4595,6 +4674,97 @@ async function deleteGame(runId) {
 
 /** Current signed-in account (IAP email / local browser account) */
 let currentUser = null;
+const USER_PROFILE_KEY = "sta-user-profile";
+
+function readStoredUserProfile() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(USER_PROFILE_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      email: String(parsed.email || "").trim().toLowerCase(),
+      name: String(parsed.name || "").trim(),
+      picture: String(parsed.picture || "").trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredUserProfile(profile) {
+  try {
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* ignore */
+  }
+}
+
+function accountInitials(name, email) {
+  const fromName = String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+  if (fromName) return fromName;
+  const local = String(email || "").split("@")[0] || "?";
+  return local.slice(0, 2).toUpperCase();
+}
+
+function paintAccountMenu() {
+  const stored = readStoredUserProfile();
+  const email = currentUser?.email || stored?.email || getLocalUserEmail() || "";
+  const name = stored?.name || (email ? email.split("@")[0] : "Captain");
+  const picture = stored?.picture || "";
+  if (els.accountPopoverName) els.accountPopoverName.textContent = name || "Captain";
+  if (els.accountPopoverEmail) els.accountPopoverEmail.textContent = email || "Not signed in";
+  if (els.btnAccount) {
+    els.btnAccount.title = email ? `${name} (${email})` : "Account";
+  }
+  if (els.accountAvatarImg && els.accountAvatarInitials) {
+    if (picture) {
+      els.accountAvatarImg.onerror = () => {
+        els.accountAvatarImg.classList.add("hidden");
+        els.accountAvatarInitials.classList.remove("hidden");
+        els.accountAvatarInitials.textContent = accountInitials(name, email);
+      };
+      els.accountAvatarImg.src = picture;
+      els.accountAvatarImg.alt = name || email;
+      els.accountAvatarImg.classList.remove("hidden");
+      els.accountAvatarInitials.classList.add("hidden");
+    } else {
+      els.accountAvatarImg.removeAttribute("src");
+      els.accountAvatarImg.classList.add("hidden");
+      els.accountAvatarInitials.classList.remove("hidden");
+      els.accountAvatarInitials.textContent = accountInitials(name, email);
+    }
+  }
+}
+
+function setAccountMenuOpen(open) {
+  if (!els.accountPopover || !els.btnAccount) return;
+  els.accountPopover.classList.toggle("hidden", !open);
+  els.btnAccount.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function isAccountMenuOpen() {
+  return Boolean(els.accountPopover && !els.accountPopover.classList.contains("hidden"));
+}
+
+async function logOut() {
+  setAccountMenuOpen(false);
+  try {
+    localStorage.removeItem(USER_PROFILE_KEY);
+    localStorage.removeItem(LOCAL_USER_EMAIL_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  } catch {
+    /* still leave */
+  }
+  window.location.replace("/access.html");
+}
 
 async function refreshCurrentUser() {
   try {
@@ -4602,6 +4772,23 @@ async function refreshCurrentUser() {
   } catch {
     currentUser = null;
   }
+  if (currentUser?.email) {
+    const stored = readStoredUserProfile() || {};
+    if (stored.email && stored.email !== currentUser.email) {
+      writeStoredUserProfile({
+        email: currentUser.email,
+        name: currentUser.email.split("@")[0],
+        picture: "",
+      });
+    } else if (!stored.email) {
+      writeStoredUserProfile({
+        email: currentUser.email,
+        name: stored.name || currentUser.email.split("@")[0],
+        picture: stored.picture || "",
+      });
+    }
+  }
+  paintAccountMenu();
   return currentUser;
 }
 
@@ -4698,7 +4885,7 @@ async function openHistory(opts = {}) {
       const cont = document.createElement("button");
       cont.className = "lcars-btn secondary";
       cont.type = "button";
-      cont.textContent = "Continue your story";
+      cont.textContent = p.activeRunId ? "Resume mission" : "Continue your story";
       cont.addEventListener("click", () => {
         uiSound("ok");
         continueProfile(p.id);
@@ -4735,9 +4922,46 @@ async function openHistory(opts = {}) {
     els.historyList.appendChild(warn);
   }
   const profileIds = new Set(profiles.map((p) => p.id));
-  const legacyGames = (data.games || []).filter(
-    (g) => !g.profileId || !profileIds.has(g.profileId)
+  const liveGames = (data.games || []).filter(
+    (g) => g.status === "active" && g.phase && g.phase !== "ask_name" && g.phase !== "boot"
   );
+  const legacyGames = (data.games || []).filter(
+    (g) =>
+      (!g.profileId || !profileIds.has(g.profileId)) &&
+      !liveGames.some((live) => live.runId === g.runId)
+  );
+  if (liveGames.length) {
+    const head = document.createElement("div");
+    head.className = "history-section-label";
+    head.textContent = "In progress";
+    els.historyList.appendChild(head);
+    for (const g of liveGames.sort(sortByUpdatedDesc)) {
+      const row = document.createElement("div");
+      row.className = "history-item";
+      row.innerHTML = `<div class="history-info">
+        <strong>${escapeHtml(g.playerName || "Captain")}</strong><br>
+        <span class="muted">${escapeHtml(g.shipName || "No ship")} — ${escapeHtml(
+        g.missionTitle || g.phase
+      )}</span><br>
+        <span class="muted">${new Date(g.updatedAt).toLocaleString()} · ${escapeHtml(
+        g.status
+      )}</span>
+      </div>`;
+      const actions = document.createElement("div");
+      actions.className = "history-actions";
+      const resumeBtn = document.createElement("button");
+      resumeBtn.className = "lcars-btn secondary";
+      resumeBtn.type = "button";
+      resumeBtn.textContent = "Resume";
+      resumeBtn.addEventListener("click", () => {
+        uiSound("ok");
+        resume(g.runId);
+      });
+      actions.appendChild(resumeBtn);
+      row.appendChild(actions);
+      els.historyList.appendChild(row);
+    }
+  }
   if (legacyGames.length) {
     const head = document.createElement("div");
     head.className = "history-section-label";
@@ -4784,7 +5008,7 @@ async function openHistory(opts = {}) {
     }
   }
 
-  if (!profiles.length && !legacyGames.length) {
+  if (!profiles.length && !liveGames.length && !legacyGames.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
     empty.textContent =
@@ -4803,8 +5027,10 @@ async function continueProfile(profileId) {
     });
     closeHistory();
     render(view, { forceTypewriter: true });
+    return true;
   } catch (err) {
     showSoftError(err?.message || "Failed to continue campaign");
+    return false;
   } finally {
     setActionBusy(false);
   }
@@ -5018,6 +5244,26 @@ els.btnNew.addEventListener("click", () => {
 els.btnHistory.addEventListener("click", () => {
   uiSound("secondary");
   openHistory();
+});
+els.btnAccount?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const next = !isAccountMenuOpen();
+  setAccountMenuOpen(next);
+  if (next) uiSound("open");
+});
+els.btnLogout?.addEventListener("click", () => {
+  uiSound("close");
+  logOut();
+});
+document.addEventListener("click", (e) => {
+  if (!isAccountMenuOpen()) return;
+  if (els.accountMenu && els.accountMenu.contains(e.target)) return;
+  setAccountMenuOpen(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && isAccountMenuOpen()) {
+    setAccountMenuOpen(false);
+  }
 });
 els.btnCloseHistory.addEventListener("click", () => {
   uiSound("close");
@@ -5251,24 +5497,7 @@ async function enforceAccessGate() {
     const ready = await checkAiLink(true);
     if (!ready) return;
 
-    const existing = getActiveRun();
-    if (existing) {
-      try {
-        await resume(existing);
-        return;
-      } catch (err) {
-        // Stale runId or different account — clear so refresh does not loop
-        try {
-          localStorage.removeItem(STORAGE_KEY);
-        } catch {
-          /* ignore */
-        }
-        console.warn(
-          "[bridge] resume failed after refresh; starting fresh",
-          err?.message || err
-        );
-      }
-    }
+    if (await resumeBestAvailable()) return;
     await newGame();
   } catch (err) {
     showAiError(

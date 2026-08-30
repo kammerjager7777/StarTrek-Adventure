@@ -37,6 +37,9 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Mission board: type → difficulty (Expanded = Hardcore), hover details, briefing TTS  
 - [x] In-app Feedback button (header) → Google Sheet + Drive screenshots  
 - [x] Header / sign-in “Updated” stamp from the last deploy  
+- [x] Viewscreen open by default  
+- [x] Auto-resume last mission / campaign on reload  
+- [x] Header account avatar with name, email, and log out  
 
 ### Narrator & media
 

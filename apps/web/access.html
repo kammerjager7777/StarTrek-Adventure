@@ -146,9 +146,33 @@
           return ALLOWED.indexOf(email) !== -1;
         }
 
+        function decodeIdToken(token) {
+          try {
+            var payload = token.split(".")[1];
+            var json = JSON.parse(
+              atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
+            );
+            return {
+              email: String(json.email || "").trim().toLowerCase(),
+              name: String(json.name || json.given_name || "").trim(),
+              picture: String(json.picture || "").trim(),
+            };
+          } catch (err) {
+            return null;
+          }
+        }
+
+        function storeUserProfile(profile) {
+          try {
+            localStorage.setItem("sta-user-profile", JSON.stringify(profile));
+          } catch (err) {}
+        }
+
         function onGoogleCredential(resp) {
           var token = resp && resp.credential;
           if (!token) return;
+          var profile = decodeIdToken(token);
+          if (profile && profile.email) storeUserProfile(profile);
           fetch("/api/auth/google", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -274,6 +298,14 @@
           if (!email || email.indexOf("@") < 0) return;
           try {
             localStorage.setItem("sta-user-email", email);
+            localStorage.setItem(
+              "sta-user-profile",
+              JSON.stringify({
+                email: email,
+                name: email.split("@")[0],
+                picture: "",
+              })
+            );
           } catch (err) {}
           if (isAllowed(email)) {
             window.location.href = "/";

@@ -122,6 +122,75 @@ body.init-active .shell {
   letter-spacing: 0.06em;
 }
 
+.account-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.account-avatar-btn {
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 2px solid var(--lcars-peach, #ffcc99);
+  border-radius: 50%;
+  background: #1e293b;
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.account-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.account-avatar-img.hidden,
+.account-avatar-initials.hidden {
+  display: none;
+}
+
+.account-avatar-initials {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.account-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 220px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-popover.hidden {
+  display: none;
+}
+
+.account-popover-name {
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.account-popover-email {
+  font-size: 0.75rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
 /* Classic / LCARS theme segmented control (behavior wired in bridge.js) */
 .theme-toggle {
   display: flex;

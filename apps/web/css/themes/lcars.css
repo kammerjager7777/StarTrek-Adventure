@@ -385,6 +385,26 @@ html[data-ui-theme="lcars"] .feedback-btn {
   border-radius: 0 14px 0 0;
 }
 
+html[data-ui-theme="lcars"] .account-avatar-btn {
+  border: 2px solid var(--lcars-bar);
+  border-radius: 50%;
+  background: #111;
+  color: var(--lcars-peach);
+}
+
+html[data-ui-theme="lcars"] .account-popover {
+  background: #000;
+  border: 3px solid var(--lcars-bar-2);
+  border-radius: 0 18px 0 0;
+  box-shadow: none;
+}
+
+html[data-ui-theme="lcars"] .account-popover-name {
+  color: var(--lcars-peach);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 html[data-ui-theme="lcars"] .lcars-btn.danger {
   background: var(--lcars-pink);
   color: #000;
