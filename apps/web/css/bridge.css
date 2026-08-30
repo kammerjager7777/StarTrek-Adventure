@@ -85,6 +85,22 @@ body.init-active .shell {
   text-transform: uppercase;
 }
 
+.build-stamp {
+  flex: 0 1 auto;
+  margin: 0;
+  padding: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11rem;
+  line-height: 1.2;
+}
+
 .brand-mark {
   flex: 0 0 auto;
   width: auto;

@@ -316,6 +316,11 @@ html[data-ui-theme="lcars"] .brand-mark {
   height: 40px;
 }
 
+html[data-ui-theme="lcars"] .build-stamp {
+  color: var(--lcars-blue);
+  letter-spacing: 0.1em;
+}
+
 html[data-ui-theme="lcars"] .top-actions {
   padding: 0 0 10px;
   gap: 6px;

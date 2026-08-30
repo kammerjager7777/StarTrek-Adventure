@@ -251,6 +251,11 @@ body.access-body {
   color: #997766;
 }
 
+.access-build {
+  margin-top: 0.35rem;
+  color: #9999ff;
+}
+
 .access-preview {
   margin-top: 1.4rem;
   padding-top: 0.8rem;

@@ -36,6 +36,7 @@ import {
   requireAllowedUser,
 } from "../auth/access.js";
 import { googleClientId, verifyGoogleIdToken } from "../auth/google.js";
+import { buildPayload } from "../buildInfo.js";
 import { clearSessionCookie, setSessionCookie } from "../auth/session.js";
 import {
   clampFeedbackMessage,
@@ -56,6 +57,7 @@ apiRouter.get("/health", async (_req, res) => {
     ok: probe.ok,
     name: "Star Trek Adventure",
     phase: 1,
+    build: buildPayload(),
     xai: probe.configured,
     narrator: probe.ok ? "llm" : "unavailable",
     model: probe.model,
@@ -84,6 +86,7 @@ apiRouter.get("/access", (req, res) => {
     process.env.NODE_ENV !== "production" && !process.env.K_SERVICE;
   res.json({
     ...payload,
+    build: buildPayload(),
     googleClientId: googleClientId() || null,
     allowedEmails:
       local && !payload.publicSignIn ? parseAllowedEmails() : undefined,

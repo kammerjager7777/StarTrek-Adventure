@@ -36,6 +36,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Full-width LCARS starbase hub + decorative rails  
 - [x] Mission board: type → difficulty (Expanded = Hardcore), hover details, briefing TTS  
 - [x] In-app Feedback button (header) → Google Sheet + Drive screenshots  
+- [x] Header / sign-in “Updated” stamp from the last deploy  
 
 ### Narrator & media
 

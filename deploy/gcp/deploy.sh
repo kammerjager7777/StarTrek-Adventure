@@ -30,6 +30,24 @@ gcloud artifacts repositories describe "$REPO" --location="$REGION" >/dev/null 2
 echo "==> Configure Docker auth"
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
+echo "==> Build stamp"
+node --input-type=module -e '
+import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+let git = "";
+try {
+  git = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+} catch { /* ignore */ }
+writeFileSync(
+  "server/src/build-stamp.json",
+  JSON.stringify({ builtAt: new Date().toISOString(), git }) + "\n"
+);
+console.log("  builtAt", new Date().toISOString(), git);
+'
+
 echo "==> Build image (Cloud Build)"
 gcloud builds submit --tag "$IMAGE" .
 

@@ -51,6 +51,7 @@
               <button type="submit" class="access-btn lilac">Continue</button>
             </form>
             <p class="access-note">Session monitored · Saves are per account</p>
+            <p id="access-build" class="access-note access-build" hidden></p>
           </div>
 
           <div id="state-denied" class="access-state hidden">
@@ -232,6 +233,17 @@
               ALLOWED = data.allowedEmails;
             }
             if (data.googleClientId) clientId = data.googleClientId;
+            if (data.build && data.build.label) {
+              var buildEl = document.getElementById("access-build");
+              if (buildEl) {
+                buildEl.hidden = false;
+                buildEl.textContent = "Updated " + data.build.label;
+                var bits = [];
+                if (data.build.builtAt) bits.push(data.build.builtAt);
+                if (data.build.git) bits.push(data.build.git);
+                if (bits.length) buildEl.title = bits.join(" · ");
+              }
+            }
             if (
               (data.source === "google" || data.source === "iap") &&
               data.authenticated &&

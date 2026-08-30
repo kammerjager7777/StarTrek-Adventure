@@ -124,6 +124,7 @@ const els = {
   btnRetryAi: document.getElementById("btn-retry-ai"),
   btnNew: document.getElementById("btn-new"),
   btnHistory: document.getElementById("btn-history"),
+  buildStamp: document.getElementById("build-stamp"),
   btnFeedback: document.getElementById("btn-feedback"),
   btnCloseFeedback: document.getElementById("btn-close-feedback"),
   feedbackModal: document.getElementById("feedback-modal"),
@@ -5187,11 +5188,24 @@ if (els.btnRetryAi) {
   });
 }
 
+function paintBuildStamp(build) {
+  const el = els.buildStamp;
+  if (!el || !build) return;
+  const label = String(build.label || "").trim();
+  if (!label) return;
+  const git = String(build.git || "").trim();
+  const when = String(build.builtAt || "").trim();
+  el.hidden = false;
+  el.textContent = `Updated ${label}`;
+  el.title = [when, git].filter(Boolean).join(" · ") || "Build stamp";
+}
+
 async function enforceAccessGate() {
   try {
     const access = await fetch("/api/access").then((r) =>
       r.ok ? r.json() : null
     );
+    if (access?.build) paintBuildStamp(access.build);
     if (!access?.gateEnabled) return true;
     if (!access.authenticated) {
       window.location.replace("/access.html");
