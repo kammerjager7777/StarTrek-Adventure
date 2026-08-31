@@ -40,6 +40,7 @@ Status reflects the **current codebase** (playable bridge + LLM referee/narrator
 - [x] Viewscreen open by default  
 - [x] Auto-resume last mission / campaign on reload  
 - [x] Header account avatar with name, email, and log out  
+- [x] Retry empty narrator scenes; debrief beat before starbase; no first-dock transfers  
 
 ### Narrator & media
 

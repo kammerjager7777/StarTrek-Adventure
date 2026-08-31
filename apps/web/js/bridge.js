@@ -3086,12 +3086,18 @@ function renderStarbaseScreen(state) {
   }
 }
 
+function objectiveTitle(o) {
+  const t = String(o?.title || o?.description || o?.text || "").trim();
+  if (t) return t;
+  return o?.kind === "main" ? "Primary objective" : "Secondary objective";
+}
+
 function renderObjectiveList(objectives) {
   return objectives
     .map(
       (o) => `<div class="obj-item">
         <span class="obj-status ${statusClass(o.status)}">[${escapeHtml(o.status)}]</span>
-        <span class="obj-title">${escapeHtml(o.title)}</span>
+        <span class="obj-title">${escapeHtml(objectiveTitle(o))}</span>
       </div>`
     )
     .join("");

@@ -65,12 +65,24 @@ function fromGit(): BuildInfo | null {
   }
 }
 
+function isLocalDev(): boolean {
+  return process.env.NODE_ENV !== "production" && !process.env.K_SERVICE;
+}
+
 export function getBuildInfo(): BuildInfo {
   if (cached) return cached;
-  cached =
-    readStampFile() ||
-    fromEnv() ||
-    fromGit() || { builtAt: null, git: "", source: "dev" };
+  // Local npm run dev: prefer git so a leftover deploy stamp does not stick.
+  if (isLocalDev()) {
+    cached =
+      fromGit() ||
+      fromEnv() ||
+      readStampFile() || { builtAt: null, git: "", source: "dev" };
+  } else {
+    cached =
+      readStampFile() ||
+      fromEnv() ||
+      fromGit() || { builtAt: null, git: "", source: "dev" };
+  }
   return cached;
 }
 

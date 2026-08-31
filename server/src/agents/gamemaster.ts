@@ -462,7 +462,19 @@ async function handleStarbase(
   input: string,
   prev: GameState
 ): Promise<GameState> {
+  const fromDebrief = state.phase === "debrief" || prev.phase === "debrief";
   let next = await attachCampaignLog(await ensureStarbaseSession(state));
+  if (fromDebrief) {
+    const ok = next.mission?.status === "success";
+    return paintStarbase(
+      next,
+      ok
+        ? "Mission complete. Starbase facilities are standing by for refit and recruitment."
+        : "Mission ended. The yard can still patch your hull and fill empty billets.",
+      prev,
+      input
+    );
+  }
   const choice = parseChoice(input, next.pendingChoices);
   const text = input.trim().toLowerCase();
   const session = next.starbase!;
@@ -1147,6 +1159,37 @@ async function requireScene(
   return scene;
 }
 
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function requireSceneWithRetry(
+  factory: () => Promise<LlmScene | null>,
+  purpose: string,
+  attempts = 3
+): Promise<LlmScene> {
+  let last: LlmScene | null = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      last = await factory();
+      if (last?.usedLlm && last.narration?.trim()) return last;
+    } catch (err) {
+      if (
+        err instanceof LlmNarratorError &&
+        /not configured/i.test(err.reason)
+      ) {
+        throw err;
+      }
+      console.warn(
+        `[gm] ${purpose} attempt ${i + 1}/${attempts} failed:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+    if (i < attempts - 1) await sleepMs(400 * (i + 1));
+  }
+  return requireScene(last, purpose);
+}
+
 async function startPlaying(state: GameState): Promise<GameState> {
   requireLlm();
   let next: GameState = {
@@ -1173,8 +1216,8 @@ async function startPlaying(state: GameState): Promise<GameState> {
     };
   }
 
-  const scene = await requireScene(
-    await generateOpeningScene(next),
+  const scene = await requireSceneWithRetry(
+    () => generateOpeningScene(next),
     "mission opening"
   );
   next = applySceneSideEffects(next, scene);
@@ -1314,8 +1357,8 @@ export async function resolvePlayTurn(
     return await finishMission(next, false, mechanical.results);
   }
 
-  const scene = await requireScene(
-    await generatePlayScene(next, mechanical.results),
+  const scene = await requireSceneWithRetry(
+    () => generatePlayScene(next, mechanical.results),
     "play turn"
   );
 
@@ -1367,8 +1410,8 @@ async function resolveFreeformTurn(
     };
   }
 
-  let scene = await requireScene(
-    await generateFreeformScene(next, input, mechanical?.results ?? null),
+  let scene = await requireSceneWithRetry(
+    () => generateFreeformScene(next, input, mechanical?.results ?? null),
     "freeform reply"
   );
 
@@ -1981,7 +2024,7 @@ async function finishMission(
   mechanical?: MechanicalResults
 ): Promise<GameState> {
   requireLlm();
-  let next: GameState = { ...state, phase: "debrief", status: "completed" };
+  let next: GameState = { ...state, phase: "debrief", status: "active" };
   if (next.mission) {
     // Finalize objectives so the bridge never shows [active] after the mission ends
     const objectives = next.mission.objectives.map((o) => {
@@ -2006,8 +2049,19 @@ async function finishMission(
     };
   }
 
-  const llmDebrief = await generateDebriefNarration(next, success);
-  if (!llmDebrief?.trim()) {
+  let llmDebrief = "";
+  for (let i = 0; i < 3 && !llmDebrief; i++) {
+    try {
+      llmDebrief = String((await generateDebriefNarration(next, success)) || "").trim();
+    } catch (err) {
+      console.warn(
+        `[gm] debrief attempt ${i + 1}/3 failed:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+    if (!llmDebrief && i < 2) await sleepMs(400 * (i + 1));
+  }
+  if (!llmDebrief) {
     throw new LlmNarratorError(
       "Narrator failed to generate mission debrief.",
       "The LLM returned no debrief text."
@@ -2017,7 +2071,7 @@ async function finishMission(
   const debrief = [
     success ? "=== Mission Successful ===" : "=== Mission Failed ===",
     "",
-    llmDebrief.trim(),
+    llmDebrief,
     "",
     buildDebriefStats(next),
     "",
@@ -2025,9 +2079,12 @@ async function finishMission(
   ].join("\n");
 
   next.debrief = debrief;
-  next.phase = "starbase";
+  next.phase = "debrief";
   next.status = "active";
-  next.starbase = null; // force fresh visit session on first hub paint
+  next.starbase = null;
+  next.pendingQuestion = debrief;
+  next.pendingChoices = numbered(["Proceed to starbase"]);
+  next.log = pushLog(next, "debrief", debrief).log;
 
   // Persist campaign profile (skills, crew, universe, log)
   try {
@@ -2049,21 +2106,6 @@ async function finishMission(
     console.warn("[campaign] profile update failed:", err);
   }
 
-  next = await paintStarbase(
-    next,
-    success
-      ? "Mission complete. Starbase facilities are standing by for refit and recruitment."
-      : "Mission failed — but the yard can still patch your hull and fill empty billets.",
-    next,
-    "debrief"
-  );
-  // Keep debrief text at top of the hub message
-  next = {
-    ...next,
-    debrief,
-    pendingQuestion: `${debrief}\n\n${next.pendingQuestion}`,
-    log: pushLog(next, "debrief", debrief).log,
-  };
   return next;
 }
 

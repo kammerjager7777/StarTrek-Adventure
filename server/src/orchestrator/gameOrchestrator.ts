@@ -247,11 +247,7 @@ export async function startNewGame(
 export { AiUnavailableError, LlmNarratorError };
 
 function isStarbaseResume(state: GameState): boolean {
-  return (
-    state.phase === "starbase" ||
-    state.phase === "debrief" ||
-    state.phase === "post_mission"
-  );
+  return state.phase === "starbase" || state.phase === "post_mission";
 }
 
 export async function getGame(

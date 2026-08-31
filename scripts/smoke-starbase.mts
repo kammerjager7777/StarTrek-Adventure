@@ -88,12 +88,16 @@ const sess = initStarbaseSession(ship, { universe });
 assert(sess.stationClass === "fleet_yards", "session uses fleet yards");
 assert(sess.recruitOffers.length >= 2, "slate has recruits");
 
-const labels = starbaseHubChoices({ ship, starbase: sess });
+const labels = starbaseHubChoices({ ship, starbase: sess, campaignLog: [] });
 assert(labels.some((l) => /view campaign log/i.test(l)), "hub offers campaign log");
 assert(labels.some((l) => /choose next mission/i.test(l)), "hub offers next mission");
 assert(labels.some((l) => /save and stand down/i.test(l)), "hub offers stand down");
 assert(labels.some((l) => /refit hull/i.test(l)), "hub offers hull refit");
 assert(labels.some((l) => /^hire:/i.test(l)), "hub offers hire");
+assert(
+  !labels.some((l) => /^transfer:/i.test(l)),
+  "first dock does not offer transfers"
+);
 
 const emptyLog = formatCampaignLog([]);
 assert(/no prior missions/i.test(emptyLog), "empty log message");
@@ -111,6 +115,15 @@ const entries: CampaignLogEntry[] = [
   },
 ];
 assert(formatCampaignLog(entries).includes("Skirmish"), "log includes title");
+const laterLabels = starbaseHubChoices({
+  ship,
+  starbase: sess,
+  campaignLog: entries,
+});
+assert(
+  laterLabels.some((l) => /^transfer:/i.test(l)),
+  "after a mission, hub may offer transfers"
+);
 
 const deep = deepStructuralRefit(ship, sess);
 assert(deep.ok, "deep structural refit allowed on heavy damage");

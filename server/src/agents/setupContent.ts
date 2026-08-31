@@ -705,17 +705,27 @@ Honor current faction standing and galactic flags in locations and antagonists.`
   const offers: SetupMissionOffer[] = raw.slice(0, 3).map((m, i) => {
     const mi = m as Record<string, unknown>;
     const secondaries = Array.isArray(mi.secondaries)
-      ? mi.secondaries.map((s) => String(s)).slice(0, 3)
-      : ["Complete secondary Starfleet objectives"];
+      ? mi.secondaries
+          .map((s) => String(s || "").trim())
+          .filter(Boolean)
+          .slice(0, 3)
+      : [];
     return {
       id: randomUUID(),
-      title: String(mi.title || `Mission ${i + 1}`),
-      summary: String(mi.summary || mi.background || "A Starfleet assignment."),
+      title: String(mi.title || `Mission ${i + 1}`).trim() || `Mission ${i + 1}`,
+      summary:
+        String(mi.summary || mi.background || "").trim() ||
+        "A Starfleet assignment.",
       type,
-      location: String(mi.location || "Uncharted space"),
-      background: String(mi.background || mi.summary || "Starfleet has issued orders."),
-      main: String(mi.main || "Complete the primary objective"),
-      secondaries: secondaries.length ? secondaries : ["Support allied vessels"],
+      location: String(mi.location || "").trim() || "Uncharted space",
+      background:
+        String(mi.background || mi.summary || "").trim() ||
+        "Starfleet has issued orders.",
+      main:
+        String(mi.main || "").trim() || "Complete the primary Starfleet objective",
+      secondaries: secondaries.length
+        ? secondaries
+        : ["Support allied vessels and uphold Federation principles"],
     };
   });
   if (offers.length < 3) throw new Error("Need 3 missions");
@@ -895,18 +905,25 @@ export function missionFromOffer(
     objectives: [
       {
         id: "main",
-        title: offer.main,
-        description: offer.main,
+        title:
+          String(offer.main || "").trim() ||
+          "Complete the primary Starfleet objective",
+        description:
+          String(offer.main || "").trim() ||
+          "Complete the primary Starfleet objective",
         kind: "main",
         status: "active",
       },
-      ...offer.secondaries.map((s, i) => ({
-        id: `sec-${i + 1}`,
-        title: s,
-        description: s,
-        kind: "secondary" as const,
-        status: "active" as const,
-      })),
+      ...offer.secondaries
+        .map((s) => String(s || "").trim())
+        .filter(Boolean)
+        .map((s, i) => ({
+          id: `sec-${i + 1}`,
+          title: s,
+          description: s,
+          kind: "secondary" as const,
+          status: "active" as const,
+        })),
     ],
   };
 }

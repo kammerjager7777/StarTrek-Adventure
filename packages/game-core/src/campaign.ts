@@ -869,6 +869,7 @@ export function formatCampaignLog(
 export function starbaseHubChoices(state: {
   ship?: Ship | null;
   starbase?: StarbaseSession | null;
+  campaignLog?: { length: number } | null;
 }): string[] {
   const session = state.starbase;
   const ship = state.ship;
@@ -925,7 +926,9 @@ export function starbaseHubChoices(state: {
         }
       }
     }
-    if (session.transfersUsed < session.transferBudget) {
+    // Do not offer transfers on a first commissioning visit (easy to gut a healthy roster).
+    const flown = (state.campaignLog?.length || 0) > 0;
+    if (flown && session.transfersUsed < session.transferBudget) {
       const living = (ship.crew || []).filter(
         (c) =>
           (c.status || "active") === "active" || c.status === "injured"
